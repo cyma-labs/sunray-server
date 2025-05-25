@@ -1,5 +1,7 @@
 # Muppy Sunray — Journal de développement
 
+> 📝 Note : Le projet Muppy Sunray repose sur un principe de souveraineté technologique. Le développement initial sera hébergé sur GitLab, avec une éventuelle migration vers GitHub prévue à des fins de diffusion open source plus large.
+
 ## Prochaines étapes
 
 - [x] 🎯 **Définir le format final du fichier YAML**

@@ -2,6 +2,8 @@ parts/
 py3x/
 *.pyc
 
+bin/sunray-srvr
+
 # ikb
 .ikb/buildit.json
 .ikb/buildit.jsonc

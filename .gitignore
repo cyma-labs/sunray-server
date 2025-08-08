@@ -1,1 +1,43 @@
+parts/
 py3x/
+*.pyc
+
+# ikb
+.ikb/buildit.json
+.ikb/buildit.jsonc
+.ikb/buildit.yml
+.ikb/buildit.yaml
+.ikb/final.buildit.json
+.ikb/plugins
+.ikb/buildit-requirements.pip
+
+pip_src/
+
+# customer addons
+customer_addons/
+
+.vscode/
+
+etc/
+
+# Traefik
+#acme.json
+#traefik/
+
+# Docker
+
+# DevContainers
+tmp/
+
+
+# Helm
+debug.yml
+.cache
+.config/helm
+
+#k8s
+.kube/
+
+# ikb
+.python-version
+bin/start_odoo

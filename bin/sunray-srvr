@@ -1,0 +1,283 @@
+#!/opt/muppy/appserver-sunray18/py3x/bin/python
+import sys
+import configparser
+
+import os 
+os.environ['TZ'] = 'UTC'  # set server timezone in UTC before time module imported
+if '/opt/muppy/appserver-toctoc17c/py3x/bin' not in os.environ['PATH']:
+    os.environ['PATH'] = '%s:%s' % ('/opt/muppy/appserver-toctoc17c/py3x/bin', os.environ['PATH'],)
+
+IKB_DEBUG = os.environ.get('IKB_DEBUG', None)
+
+import logging
+_logger = logging.getLogger('ikb-odoo-launcher')
+
+# Configuration du logger
+_logger.setLevel(logging.INFO)  # Niveau de log
+
+# Création d'un handler pour écrire les logs sur la sortie standard
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+
+# Format du log
+formatter = logging.Formatter('%(asctime)s %(process)d %(levelname)s %(name)s %(message)s')
+handler.setFormatter(formatter)
+
+# Ajout du handler au logger
+_logger.addHandler(handler)
+
+IKB_ENVFILE = os.environ.get('IKB_ENVFILE', '/etc/muppy.env')
+MUPPY_ENV = {}
+if IKB_ENVFILE:
+    try:
+        with open(IKB_ENVFILE) as f:
+            _logger.info("Loading EnvFile: %s " % IKB_ENVFILE)
+            for _env_line in f.read().splitlines():
+                try:
+                    _var, _value = _env_line.split('=')
+                    MUPPY_ENV[_var] = _value
+                    if _var.startswith('INOUK_SESSION_'):
+                        os.environ[_var] = _value
+                except:
+                    continue
+    except:
+        _logger.error("Failed to read EnvFile: %s " % IKB_ENVFILE)
+
+BUILDIT_ROOT_DIRECTORY = "/opt/muppy/appserver-sunray18"
+RUNNING_ENV_ROOT_DIR = "/opt/muppy/appserver-sunray18"
+ODOO_BUILDIT_CONFIG_FILE = "odoo.buildit.cfg"
+
+def update_odoo_config_with_PG_env_vars(odoo_config_file_path:str=None):
+    """ Reserved for future use. For nom we inject PG env vars into sys.argv as odoo command line parameters.
+    Update odoo.cfg with PG env vars.
+    This is used to set database connection parameters from environment variables.
+    :param c: context
+    :param part: part name
+    :param odoo_config_file_path: Path to the Odoo config file to update.
+
+    :returns: nothing, update odoo config file on disk.
+    """
+
+    print("Updating Odoo config with PG env vars.")
+
+    ENV_VARS_2_CONFIG_OPTIONS_DICT = {
+        "PGDATABASE": "db_name",
+        "PGUSER": "db_user",
+        "PGPASSWORD": "db_password",
+        "PGHOST": "db_host",
+        "PGPORT": "db_port",
+        "PGSSLMODE": "db_sslmode",
+        "PGFILTER": "dbfilter" ,
+    }
+    odoo_parsed_config = configparser.ConfigParser(interpolation=None)
+    odoo_parsed_config.read(odoo_config_file_path)
+    # Update options with PG env vars
+    section = 'options'
+    for env_var in ['PGDATABASE', 'PGUSER', 'PGPASSWORD', 'PGHOST', 'PGPORT', 'PGSSLMODE', 'PGFILTER']:
+        env_value = os.environ.get(env_var, None)
+        if env_value:
+            if section not in odoo_parsed_config:
+                odoo_parsed_config[section] = {}
+            config_opt_name = ENV_VARS_2_CONFIG_OPTIONS_DICT.get(env_var, None)
+            if config_opt_name:
+                odoo_parsed_config[section][config_opt_name] = env_value
+    # Write updated config back to file
+    with open(odoo_config_file_path, 'w') as configfile:
+        odoo_parsed_config.write(configfile)
+    return    
+
+# For each defined ikb env var, add corresponding command line parameter to sys.argv 
+#if it is not already explicitly passed.
+# :returns: nothing, update sys.argv
+
+def is_cl_param_passed(cl_params:list):
+    """ 
+    Check whether a param is passed in long or abrev form (defined par cl_params) in sys.argv
+
+    if passed parameter contains '=', it is split in two before comparison
+
+    :param cl_params: list of command line parameters to look for eg. ['--save','-s']
+    :returns: True if one of the params in cl_params is in sys.argv, False otherwise
+    """
+    for param in cl_params:
+        for arg in sys.argv:    
+            if param==arg or param==arg.split('=')[0]:
+                return True
+    return False
+
+def adjust_params_from_env_vars():
+    """ 
+    Scan ENV vars and map each IKB_ env var to corresponding odoo command line parameter
+    """
+
+    # Look for a param starting with --ikb-environ-prefix
+    env_params = list(filter(lambda p: p.lower().startswith('--ikb-environ-prefix'),sys.argv))
+    if env_params:
+        for _param in env_params: 
+            sys.argv.remove(_param)
+        IKB_ENVIRON_PREFIX = env_params[0].split('=')[1]
+    else:
+        IKB_ENVIRON_PREFIX = None
+
+    ENV_VARS_LIST = {
+        #"ODOO_RC": { 'cl_opts': ['--config','-c'], 'unary': False }, is process appart below
+        "IKB_SAVE": { 'cl_opts': ['--save','-s'], 'unary': True },
+        "IKB_WITHOUT_DEMO": { 'cl_opts': ['--without-demo'], 'unary': False },
+        "IKB_IMPORT_PARTIAL": { 'cl_opts': ['--import-partial','-P'], 'unary': False },
+        "IKB_PIDFILE": { 'cl_opts': ['--pidfile'], 'unary': False },
+        "IKB_ADDONS_PATH": { 'cl_opts': ['--addons-path'], 'unary': False },
+        "IKB_UPGRADE_PATH": { 'cl_opts': ['--upgrade-path'], 'unary': False },
+        "IKB_LOAD": { 'cl_opts': ['--load'], 'unary': False },
+        "IKB_DATA_DIR": { 'cl_opts': ['--data-dir','-D'], 'unary': False },
+        "IKB_HTTP_INTERFACE": { 'cl_opts': ['--http-interface'], 'unary': False },
+        "IKB_HTTP_PORT": { 'cl_opts': ['--http-port','-p'], 'unary': False },
+        "IKB_LONGPOLLING_PORT": { 'cl_opts': ['--longpolling-port'], 'unary': False },
+        "IKB_NO_HTTP": { 'cl_opts': ['--no-http'], 'unary': True },
+        "IKB_PROXY_MODE": { 'cl_opts': ['--proxy-mode'], 'unary': True },
+        "IKB_HTTP_INTERFACE": { 'cl_opts': ['--http-interface'], 'unary': False },
+        "IKB_HTTP_PORT": { 'cl_opts': ['--http-port'], 'unary': False },
+        "IKB_NO_XMLRPC": { 'cl_opts': ['--no-xmlrpc'], 'unary': True },
+        "IKB_DB_FILTER": { 'cl_opts': ['--db-filter'], 'unary': False },
+        "IKB_TEST_FILE": { 'cl_opts': ['--test-file'], 'unary': False },
+        "IKB_TEST_ENABLE": { 'cl_opts': ['--test-enable'], 'unary': False },
+        "IKB_TEST_TAGS": { 'cl_opts': ['--test-tags'], 'unary': False },
+        "IKB_SCREENCASTS": { 'cl_opts': ['--screencasts'], 'unary': False },
+        "IKB_SCREENSHOTS": { 'cl_opts': ['--screenshots'], 'unary': False },
+        "IKB_LOGFILE": { 'cl_opts': ['--logfile'], 'unary': False },
+        "IKB_SYSLOG": { 'cl_opts': ['--syslog'], 'unary': True },
+        "IKB_LOG_HANDLER": { 'cl_opts': ['--log-handler'], 'unary': False },
+        "IKB_LOG_REQUEST": { 'cl_opts': ['--log-request'], 'unary': True },
+        "IKB_LOG_RESPONSE": { 'cl_opts': ['--log-response'], 'unary': True },
+        "IKB_LOG_WEB": { 'cl_opts': ['--log-web'], 'unary': True },
+        "IKB_LOG_SQL": { 'cl_opts': ['--log-sql'], 'unary': True },
+        "IKB_LOG_DB": { 'cl_opts': ['--log-db'], 'unary': True },
+        "IKB_LOG_DB_LEVEL": { 'cl_opts': ['--log-db-level'], 'unary': False },
+        "IKB_LOG_LEVEL": { 'cl_opts': ['--log-level'], 'unary': False },
+        "IKB_EMAIL_FROM": { 'cl_opts': ['--email-from'], 'unary': False },
+        "IKB_SMTP": { 'cl_opts': ['--smtp'], 'unary': False },
+        "IKB_SMTP_PORT": { 'cl_opts': ['--smtp-port'], 'unary': False },
+        "IKB_SMTP_SSL": { 'cl_opts': ['--smtp-ssl'], 'unary': True },
+        "IKB_SMTP_USER": { 'cl_opts': ['--smtp-user'], 'unary': False },
+        "IKB_SMTP_PASSWORD": { 'cl_opts': ['--smtp-password'], 'unary': False },
+        "IKB_DATABASE": { 'cl_opts': ['--database','-d'], 'unary': False },
+        "IKB_DB_USER": { 'cl_opts': ['--db_user','-r'], 'unary': False },
+        "IKB_DB_PASSWORD": { 'cl_opts': ['--db_password','-w'], 'unary': False },
+        "IKB_PG_PATH": { 'cl_opts': ['--pg_path'], 'unary': False },
+        "IKB_DB_HOST": { 'cl_opts': ['--db_host'], 'unary': False },
+        "IKB_DB_PORT": { 'cl_opts': ['--db_port'], 'unary': False },
+        "IKB_DB_SSLMODE": { 'cl_opts': ['--db_sslmode'], 'unary': False },
+        "IKB_DB_MAXCONN": { 'cl_opts': ['--db_maxconn'], 'unary': False },
+        "IKB_DB_TEMPLATE": { 'cl_opts': ['--db-template'], 'unary': False },
+        "IKB_LOAD_LANGUAGE": { 'cl_opts': ['--load-language'], 'unary': False },
+        "IKB_MODULES": { 'cl_opts': ['--modules'], 'unary': False },
+        "IKB_NO_DATABASE_LIST": { 'cl_opts': ['--no-database-list'], 'unary': False },
+        "IKB_DEV": { 'cl_opts': ['--dev'], 'unary': False },
+        "IKB_SHELL_INTERFACE": { 'cl_opts': ['--shell-interface'], 'unary': False },
+        "IKB_STOP_AFTER_INIT": { 'cl_opts': ['--stop-after-init'], 'unary': True },
+        "IKB_OSV_MEMORY_COUNT_LIMIT": { 'cl_opts': ['--osv-memory-count-limit'], 'unary': False },
+        "IKB_OSV_MEMORY_AGE_LIMIT": { 'cl_opts': ['--osv-memory-age-limit'], 'unary': False },
+        "IKB_MAX_CRON_THREADS": { 'cl_opts': ['--max-cron-threads'], 'unary': False },
+        "IKB_UNACCENT": { 'cl_opts': ['--unaccent'], 'unary': True },
+        "IKB_GEOIP_DB": { 'cl_opts': ['--geoip-db'], 'unary': False },
+        "IKB_WORKERS": { 'cl_opts': ['--workers'], 'unary': False },
+        "IKB_LIMIT_MEMORY_SOFT": { 'cl_opts': ['--limit-memory-soft'], 'unary': False },
+        "IKB_LIMIT_MEMORY_HARD": { 'cl_opts': ['--limit-memory-hard'], 'unary': False },
+        "IKB_LIMIT_TIME_CPU": { 'cl_opts': ['--limit-time-cpu'], 'unary': False },
+        "IKB_LIMIT_TIME_REAL": { 'cl_opts': ['--limit-time-real'], 'unary': False },
+        "IKB_LIMIT_TIME_REAL_CRON": { 'cl_opts': ['--limit-time-real-cron'], 'unary': False },
+        "IKB_LIMIT_REQUEST": { 'cl_opts': ['--limit-request'], 'unary': False },
+
+        "PGDATABASE": { 'cl_opts': ['--database','-d'], 'unary': False },
+        "PGUSER": { 'cl_opts': ['--db_user','-r'], 'unary': False },
+        "PGPASSWORD": { 'cl_opts': ['--db_password','-w'], 'unary': False },
+        "PGHOST": { 'cl_opts': ['--db_host'], 'unary': False },
+        "PGPORT": { 'cl_opts': ['--db_port'], 'unary': False },
+        "PGSSLMODE": { 'cl_opts': ['--db_sslmode'], 'unary': False },
+        "PGFILTER": { 'cl_opts': ['--db-filter'], 'unary': False },
+    }
+
+    # Force configuration file if not already set via ODOO_RC 
+    # ENV var and not passed as command line param
+    if not os.environ.get('ODOO_RC') and not is_cl_param_passed(['--config', '-c']):
+        odoo_config_file_opt = "--config=%s/etc/%s" % (
+            RUNNING_ENV_ROOT_DIR,
+            ODOO_BUILDIT_CONFIG_FILE,
+        )
+        sys.argv.append(odoo_config_file_opt)
+
+    for env_var_name in ENV_VARS_LIST:
+
+        env_var_value = None
+        if IKB_ENVIRON_PREFIX:
+            env_var_name_prefixed = "%s_%s" % (IKB_ENVIRON_PREFIX, env_var_name,)
+        else:
+            env_var_name_prefixed = env_var_name
+
+        env_var_value = os.environ.get(
+            env_var_name_prefixed,
+            MUPPY_ENV.get(env_var_name_prefixed, None)
+        )
+        
+        if env_var_value:
+            cl_param_dict = ENV_VARS_LIST[env_var_name]
+            passed = is_cl_param_passed(cl_param_dict['cl_opts'])
+
+            # TODO: eval env var to True or False and inject the param or not
+            if cl_param_dict['unary']:  # some params don't expect values
+                arg_str = "%s" % (cl_param_dict['cl_opts'][0],)
+            else:
+                arg_str = "%s=%s" % (cl_param_dict['cl_opts'][0], env_var_value,)
+
+            if not passed:
+                sys.argv.append(arg_str)
+                _logger.info(
+                    "'%s' command line parameter added from environment variable '%s'.",  
+                    arg_str, env_var_name_prefixed
+                )
+            else:
+                _logger.info(
+                    "'%s' environment variable value '%s' ignored since '%s' is present in "
+                    "command line.",
+                    env_var_name_prefixed, env_var_value, cl_param_dict['cl_opts'][0],
+                )
+    return
+
+def extract_addons_path( cfg_file_path=None ):
+    """ Extract addons path from the supplied Odoo configuration file.
+    :returns: addons paths as csv string
+    """
+    if not cfg_file_path:
+        cfg_file_path = '%s/etc/%s' % (RUNNING_ENV_ROOT_DIR, ODOO_BUILDIT_CONFIG_FILE)
+
+    addons_path = None
+    if os.path.exists(cfg_file_path):
+        with open(cfg_file_path) as f:
+            for line in f.read().splitlines():
+                if line.startswith('addons_path'):
+                    addons_path = line.split('=')[1].strip()
+                    break
+    return addons_path
+
+if __name__ == "__main__":
+    args = sys.argv
+    if len(args) >= 2 and not args[1].startswith("-"):  # command
+        command = args[1]
+        if command in ('shell', 'gevent', 'server',):
+            # 'shell' and some muppy cli expects same parameters as odoo server
+            adjust_params_from_env_vars()
+
+        else:
+            # For others commands, we align with the Odoo CLI conventions
+            # Each command defines its own set of parameters.
+            args[1:1] = ['--addons-path=%s' % extract_addons_path()] 
+
+    else:
+        adjust_params_from_env_vars()
+
+    # Reset logging state so that it will be reconfigured based on parameters
+    # now they are available
+    rootlogger = logging.getLogger()
+    for h in rootlogger.handlers: 
+        rootlogger.removeHandler(h)    
+    import odoo
+    odoo.cli.main()  # main() uses sys.exit so we don't need to return anything 

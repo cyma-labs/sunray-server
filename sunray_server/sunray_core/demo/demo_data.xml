@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Demo Host -->
+        <record id="demo_host_main" model="sunray.host">
+            <field name="domain">demo.example.com</field>
+            <field name="backend_url">http://localhost:8080</field>
+            <field name="is_active">True</field>
+            <field name="allowed_cidrs">10.0.0.0/8
+192.168.0.0/16</field>
+            <field name="public_url_patterns">^/api/webhook
+^/health$
+^/favicon.ico$</field>
+            <field name="allowed_ips">127.0.0.1
+::1</field>
+        </record>
+        
+        <!-- Demo API Key -->
+        <record id="demo_api_key" model="sunray.api.key">
+            <field name="name">Demo Worker API Key</field>
+            <field name="key">demo_sk_test_4242424242424242424242424242424242424242</field>
+            <field name="is_active">True</field>
+        </record>
+        
+        <!-- Demo User -->
+        <record id="demo_user_alice" model="sunray.user">
+            <field name="username">alice</field>
+            <field name="email">alice@example.com</field>
+            <field name="display_name">Alice Demo</field>
+            <field name="is_active">True</field>
+            <field name="host_ids" eval="[(4, ref('demo_host_main'))]"/>
+        </record>
+        
+        <record id="demo_user_bob" model="sunray.user">
+            <field name="username">bob</field>
+            <field name="email">bob@example.com</field>
+            <field name="display_name">Bob Demo</field>
+            <field name="is_active">True</field>
+            <field name="host_ids" eval="[(4, ref('demo_host_main'))]"/>
+        </record>
+        
+        <!-- Demo Webhook Token -->
+        <record id="demo_webhook_token" model="sunray.webhook.token">
+            <field name="name">Demo Webhook</field>
+            <field name="host_id" ref="demo_host_main"/>
+            <field name="token">whk_test_abcdef123456</field>
+            <field name="is_active">True</field>
+            <field name="allowed_paths">["/api/webhook", "/api/events"]</field>
+        </record>
+        
+        <!-- Demo Audit Log Entries -->
+        <record id="demo_audit_log_1" model="sunray.audit.log">
+            <field name="event_type">auth_success</field>
+            <field name="user_id" ref="demo_user_alice"/>
+            <field name="username">alice</field>
+            <field name="ip_address">192.168.1.100</field>
+            <field name="user_agent">Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)</field>
+            <field name="severity">info</field>
+            <field name="details">Successful authentication via passkey</field>
+        </record>
+        
+        <record id="demo_audit_log_2" model="sunray.audit.log">
+            <field name="event_type">session_created</field>
+            <field name="user_id" ref="demo_user_alice"/>
+            <field name="username">alice</field>
+            <field name="ip_address">192.168.1.100</field>
+            <field name="severity">info</field>
+            <field name="details">New session created after successful authentication</field>
+        </record>
+    </data>
+</odoo>

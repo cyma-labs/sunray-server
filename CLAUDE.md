@@ -53,9 +53,24 @@ npm --version   # 10.8.2
 # Install Cloudflare Wrangler globally
 npm install -g wrangler
 
-# Initialize Odoo build environment (if needed)
-/usr/local/python/current/bin/ikb init      # Initialize build environment
-/usr/local/python/current/bin/ikb install   # Install Python dependencies
+# ikb (inouk buildit) - One-command builder tool for Odoo
+# Inspired by buildout but relies on pip
+# Builds complete running Odoo environment
+# Note: ikb location varies by environment, find it with: which ikb
+ikb install   # Processes buildit.json[c] and requirements.txt
+
+# Python dependencies for Sunray modules
+# Requirements are automatically processed by ikb from sunray_server/requirements.txt
+# The path is configured in .ikb/buildit.jsonc at odoo.requirements.requirements_file
+cd sunray_server/
+cat > requirements.txt << EOF
+pyotp>=2.8.0
+qrcode[pil]>=7.4.0
+python-jose[cryptography]>=3.3.0
+EOF
+
+# After creating/updating requirements.txt, run:
+ikb install   # This will process both Odoo and project requirements
 ```
 
 ### Sunray Server (Odoo 18) Development
@@ -187,6 +202,21 @@ sunray_core/
       return user_obj or False
   ```
 
+- **Audit Fields**: Never create `created_by`, `created_date`, `modified_by`, or `modified_date` fields
+  ```python
+  # DON'T DO THIS - Odoo provides these automatically:
+  # created_by = fields.Many2one('res.users')  # Use create_uid instead
+  # created_date = fields.Datetime()           # Use create_date instead
+  # modified_by = fields.Many2one('res.users') # Use write_uid instead  
+  # modified_date = fields.Datetime()          # Use write_date instead
+  
+  # These fields are automatically available on all models:
+  # - create_uid: User who created the record
+  # - create_date: When the record was created
+  # - write_uid: User who last modified the record
+  # - write_date: When the record was last modified
+  ```
+
 ### Testing Best Practices
 
 ```python
@@ -241,14 +271,46 @@ def test_webhook(self, mock_post):
 ## Configuration Management
 
 ### Build Configuration
-- `buildit.json`: Odoo build configuration (if using ikb)
+- `.ikb/buildit.jsonc`: ikb configuration file
+  - `odoo.addons.project_addons`: Points to `./sunray_server` for addon discovery
+  - `odoo.requirements.requirements_file`: Points to `sunray_server/requirements.txt` for Python dependencies
+- `sunray_server/requirements.txt`: Python dependencies automatically processed by ikb install
 - `wrangler.toml`: Cloudflare Worker configuration
-- `etc/odoo.buildit.cfg`: Generated Odoo configuration
+- `etc/odoo.buildit.cfg`: Generated Odoo configuration by ikb
 
 ### Environment Variables
-- PostgreSQL: `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGHOST`, `PGPORT`
-- Worker: `ADMIN_API_ENDPOINT`, `ADMIN_API_KEY`, `WORKER_ID`
-- Development: Set in `.env` file (not committed)
+
+#### PostgreSQL
+- Connection via standard PG environment variables (pre-configured)
+- `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGHOST`, `PGPORT`
+- Direct `psql` access works without additional configuration
+
+#### Odoo Server  
+- `APP_PRIMARY_URL`: HTTPS URL for the Odoo server (provided by environment)
+- Default admin credentials: `admin/admin` (development)
+- User management via `inouk_odoo_cli` addon
+
+#### Cloudflare Worker
+- `ADMIN_API_ENDPOINT`: Set to `$APP_PRIMARY_URL`
+- `ADMIN_API_KEY`: Generated after sunray_core installation
+- `SESSION_SECRET`: Generate with `openssl rand -base64 32`
+- `WORKER_ID`: Unique identifier for worker instance
+- `WORKER_URL`: https://wrkr-sunray18-main-dev-cmorisse.msa2.lair.ovh
+
+## Backup Strategy
+
+### Development Environment
+- Database will be regenerated as needed during development
+- Keep SQL dumps of key test scenarios:
+  ```bash
+  pg_dump $PGDATABASE > backups/sunray_$(date +%Y%m%d_%H%M%S).sql
+  ```
+
+### Production Recommendations
+1. **Before Major Updates**: Full database backup
+2. **Daily Incremental**: Backup audit logs and session data
+3. **Weekly Full**: Complete database dump
+4. **Configuration Backup**: Version control for `buildit.json[c]` and module code
 
 ## Important Notes
 

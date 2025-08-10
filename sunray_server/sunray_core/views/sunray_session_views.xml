@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_sunray_session_tree" model="ir.ui.view">
+        <field name="name">sunray.session.list</field>
+        <field name="model">sunray.session</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="session_id"/>
+                <field name="user_id"/>
+                <field name="host_id"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="created_at"/>
+                <field name="last_activity"/>
+                <field name="expires_at"/>
+                <field name="created_ip"/>
+            </list>
+        </field>
+    </record>
+    
+    <!-- Search View -->
+    <record id="view_sunray_session_search" model="ir.ui.view">
+        <field name="name">sunray.session.search</field>
+        <field name="model">sunray.session</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="session_id"/>
+                <field name="user_id"/>
+                <field name="host_id"/>
+                <field name="created_ip"/>
+                <separator/>
+                <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
+                <filter name="expired" string="Expired" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="today" string="Created Today" domain="[('created_at', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="User" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Host" name="group_by_host" context="{'group_by': 'host_id'}"/>
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    
+    <!-- Form View -->
+    <record id="view_sunray_session_form" model="ir.ui.view">
+        <field name="name">sunray.session.form</field>
+        <field name="model">sunray.session</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="session_id" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="host_id" readonly="1"/>
+                            <field name="is_active" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="created_at" readonly="1"/>
+                            <field name="last_activity" readonly="1"/>
+                            <field name="expires_at" readonly="1"/>
+                            <field name="revoked_at" readonly="1" invisible="not revoked_at"/>
+                        </group>
+                    </group>
+                    
+                    <group string="Security Information">
+                        <field name="created_ip" readonly="1"/>
+                        <field name="last_ip" readonly="1"/>
+                        <field name="user_agent" readonly="1"/>
+                        <field name="device_fingerprint" readonly="1"/>
+                    </group>
+                    
+                    <group string="Security Information" colspan="2">
+                        <field name="csrf_token" readonly="1"/>
+                        <field name="credential_id" readonly="1"/>
+                        <field name="risk_score" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Action -->
+    <record id="action_sunray_sessions" model="ir.actions.act_window">
+        <field name="name">Active Sessions</field>
+        <field name="res_model">sunray.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_sunray_session_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p>
+                Monitor active user sessions across all protected hosts.
+                Sessions can be revoked individually or in bulk.
+            </p>
+        </field>
+    </record>
+</odoo>

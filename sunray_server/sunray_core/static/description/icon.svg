@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="70" height="70" viewBox="0 0 70 70" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="70" height="70" rx="8" fill="#FF6B35"/>
+    
+    <!-- Sun rays -->
+    <g transform="translate(35, 35)">
+        <!-- Top ray -->
+        <rect x="-2" y="-30" width="4" height="8" fill="white" rx="2"/>
+        <!-- Top-right ray -->
+        <rect x="15" y="-25" width="4" height="8" fill="white" rx="2" transform="rotate(45)"/>
+        <!-- Right ray -->
+        <rect x="22" y="-2" width="8" height="4" fill="white" rx="2"/>
+        <!-- Bottom-right ray -->
+        <rect x="15" y="17" width="4" height="8" fill="white" rx="2" transform="rotate(45)"/>
+        <!-- Bottom ray -->
+        <rect x="-2" y="22" width="4" height="8" fill="white" rx="2"/>
+        <!-- Bottom-left ray -->
+        <rect x="-25" y="17" width="4" height="8" fill="white" rx="2" transform="rotate(-45)"/>
+        <!-- Left ray -->
+        <rect x="-30" y="-2" width="8" height="4" fill="white" rx="2"/>
+        <!-- Top-left ray -->
+        <rect x="-25" y="-25" width="4" height="8" fill="white" rx="2" transform="rotate(-45)"/>
+        
+        <!-- Center circle (sun) -->
+        <circle cx="0" cy="0" r="12" fill="white"/>
+        
+        <!-- Lock icon in center -->
+        <g transform="scale(0.8)">
+            <rect x="-6" y="-2" width="12" height="9" rx="2" fill="#FF6B35"/>
+            <path d="M -4 -2 L -4 -5 A 4 4 0 0 1 4 -5 L 4 -2" stroke="#FF6B35" stroke-width="2" fill="none"/>
+            <circle cx="0" cy="2" r="1.5" fill="white"/>
+        </g>
+    </g>
+</svg>

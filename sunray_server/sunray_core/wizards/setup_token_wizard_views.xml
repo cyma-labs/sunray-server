@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Wizard Form View -->
+    <record id="view_sunray_setup_token_wizard_form" model="ir.ui.view">
+        <field name="name">sunray.setup.token.wizard.form</field>
+        <field name="model">sunray.setup.token.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="user_id" options="{'no_create': True}"/>
+                    <field name="device_name" placeholder="e.g., John's Laptop, iPhone 15"/>
+                    <field name="validity_hours"/>
+                    <field name="allowed_ips" widget="text" placeholder="Optional: One IP or CIDR range per line&#10;Example:&#10;192.168.1.0/24&#10;10.0.0.1"/>
+                </group>
+                <footer>
+                    <button name="generate_token" string="Generate Token" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Wizard Action -->
+    <record id="action_sunray_setup_token_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Setup Token</field>
+        <field name="res_model">sunray.setup.token.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Cron job: Cleanup expired setup tokens -->
+        <record id="ir_cron_cleanup_expired_tokens" model="ir.cron">
+            <field name="name">Sunray: Cleanup Expired Tokens</field>
+            <field name="model_id" ref="model_sunray_setup_token"/>
+            <field name="state">code</field>
+            <field name="code">model.cleanup_expired()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+        
+        <!-- Cron job: Cleanup old audit logs -->
+        <record id="ir_cron_cleanup_old_logs" model="ir.cron">
+            <field name="name">Sunray: Cleanup Old Audit Logs</field>
+            <field name="model_id" ref="model_sunray_audit_log"/>
+            <field name="state">code</field>
+            <field name="code">model.cleanup_old_logs()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+        
+        <!-- Cron job: Cleanup expired sessions -->
+        <record id="ir_cron_cleanup_expired_sessions" model="ir.cron">
+            <field name="name">Sunray: Cleanup Expired Sessions</field>
+            <field name="model_id" ref="model_sunray_session"/>
+            <field name="state">code</field>
+            <field name="code">model.cleanup_expired()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

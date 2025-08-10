@@ -157,8 +157,7 @@ class SunraySetupToken(models.Model):
     max_uses = fields.Integer(default=1)
     current_uses = fields.Integer(default=0)
     
-    # Generation info
-    generated_by = fields.Many2one('res.users')
+    # Note: Odoo's create_uid automatically tracks who generated the token
     
     @api.model
     def cleanup_expired(self):
@@ -268,6 +267,81 @@ class SunrayHost(models.Model):
         return 'passkey'
 ```
 
+### sunray.session
+
+```python
+class SunraySession(models.Model):
+    _name = 'sunray.session'
+    _description = 'Active Session'
+    _order = 'created_at desc'
+    
+    session_id = fields.Char(string='Session ID', required=True, index=True)
+    user_id = fields.Many2one('sunray.user', required=True, ondelete='cascade')
+    host_id = fields.Many2one('sunray.host', required=True)
+    
+    # Session metadata
+    created_at = fields.Datetime(default=fields.Datetime.now, required=True)
+    last_activity = fields.Datetime(default=fields.Datetime.now)
+    expires_at = fields.Datetime(required=True)
+    
+    # Security tracking
+    created_ip = fields.Char(string='Created IP')
+    last_ip = fields.Char(string='Last IP')
+    device_fingerprint = fields.Char(string='Device Fingerprint')
+    user_agent = fields.Text(string='User Agent')
+    
+    # Credential used
+    passkey_id = fields.Many2one('sunray.passkey')
+    credential_id = fields.Char(string='Credential ID')
+    
+    # Session state
+    is_active = fields.Boolean(string='Active', default=True)
+    revoked = fields.Boolean(string='Revoked', default=False)
+    revoked_at = fields.Datetime()
+    revoked_reason = fields.Text()
+    
+    # CSRF token (for additional validation)
+    csrf_token = fields.Char(string='CSRF Token')
+    
+    # Advanced features (if enabled)
+    totp_verified = fields.Boolean(default=False)
+    totp_verified_at = fields.Datetime()
+    risk_score = fields.Float()
+    
+    _sql_constraints = [
+        ('session_unique', 'UNIQUE(session_id)', 'Session ID must be unique!')
+    ]
+    
+    @api.model
+    def cleanup_expired(self):
+        """Cron job to clean expired sessions"""
+        expired_objs = self.search([
+            ('expires_at', '<', fields.Datetime.now()),
+            ('is_active', '=', True)
+        ])
+        expired_objs.write({'is_active': False})
+    
+    def revoke(self, reason='Manual revocation'):
+        """Revoke this session"""
+        self.write({
+            'is_active': False,
+            'revoked': True,
+            'revoked_at': fields.Datetime.now(),
+            'revoked_reason': reason
+        })
+        
+        # Log revocation
+        self.env['sunray.audit.log'].create({
+            'event_type': 'session.revoked',
+            'user_id': self.user_id.id,
+            'username': self.user_id.username,
+            'details': json.dumps({
+                'session_id': self.session_id,
+                'reason': reason
+            })
+        })
+```
+
 ### sunray.webhook.token
 
 ```python
@@ -314,6 +388,40 @@ class SunrayWebhookToken(models.Model):
         return True
 ```
 
+### sunray.api.key
+
+```python
+class SunrayApiKey(models.Model):
+    _name = 'sunray.api.key'
+    _description = 'API Key for Worker Authentication'
+    _rec_name = 'name'
+    
+    name = fields.Char(string='Name', required=True)
+    key = fields.Char(string='API Key', required=True, index=True)
+    is_active = fields.Boolean(string='Active', default=True)
+    
+    # Usage tracking
+    last_used = fields.Datetime(string='Last Used')
+    usage_count = fields.Integer(string='Usage Count', default=0)
+    
+    _sql_constraints = [
+        ('key_unique', 'UNIQUE(key)', 'API key must be unique!')
+    ]
+    
+    @api.model
+    def generate_key(self):
+        """Generate a secure API key"""
+        import secrets
+        return secrets.token_urlsafe(32)
+    
+    def track_usage(self):
+        """Update usage statistics"""
+        self.write({
+            'last_used': fields.Datetime.now(),
+            'usage_count': self.usage_count + 1
+        })
+```
+
 ### sunray.audit.log
 
 ```python
@@ -332,6 +440,15 @@ class SunrayAuditLog(models.Model):
         ('passkey.registered', 'Passkey Registered'),
         ('passkey.revoked', 'Passkey Revoked'),
         ('config.fetched', 'Config Fetched'),
+        ('session.created', 'Session Created'),
+        ('session.revoked', 'Session Revoked'),
+        ('session.expired', 'Session Expired'),
+        ('webhook.used', 'Webhook Token Used'),
+        ('security.alert', 'Security Alert'),
+        ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
+        ('SESSION_IP_CHANGED', 'Session IP Changed'),
+        ('SESSION_COUNTRY_CHANGED', 'Session Country Changed'),
+        ('SESSION_VALIDATION_FAILED', 'Session Validation Failed'),
     ], required=True)
     
     user_id = fields.Many2one('sunray.user')
@@ -362,12 +479,21 @@ def _authenticate_api(self, request):
         return False
     
     token = auth_header[7:]
-    # Validate against api.keys model
-    api_key = request.env['api.key'].sudo().search([
+    # Validate against sunray.api.key model
+    api_key_obj = request.env['sunray.api.key'].sudo().search([
         ('key', '=', token),
-        ('active', '=', True)
+        ('is_active', '=', True)
     ])
-    return bool(api_key)
+    return bool(api_key_obj)
+
+def _add_cors_headers(self, response):
+    """Add CORS headers for Worker requests"""
+    # Allow the configured Worker URL
+    response.headers['Access-Control-Allow-Origin'] = 'https://wrkr-sunray18-main-dev-cmorisse.msa2.lair.ovh'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type, X-Worker-ID'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
 ```
 
 ### Configuration Endpoint
@@ -501,6 +627,130 @@ def validate_token(self, username, token_hash, client_ip, **kwargs):
         'email': user_obj.email,
         'display_name': user_obj.display_name
     }}
+```
+
+### User Existence Check
+
+```python
+@http.route('/sunray-srvr/v1/users/check', type='json', auth='none', methods=['POST'])
+def check_user_exists(self, username, **kwargs):
+    if not self._authenticate_api(request):
+        return {'error': 'Unauthorized'}, 401
+    
+    user_obj = request.env['sunray.user'].sudo().search([
+        ('username', '=', username),
+        ('is_active', '=', True)
+    ], limit=1)
+    
+    return {'exists': bool(user_obj)}
+```
+
+### Session Management
+
+```python
+@http.route('/sunray-srvr/v1/sessions', type='json', auth='none', methods=['POST'])
+def create_session(self, session_id, username, credential_id, **kwargs):
+    """Create new session record"""
+    if not self._authenticate_api(request):
+        return {'error': 'Unauthorized'}, 401
+    
+    user_obj = request.env['sunray.user'].sudo().search([
+        ('username', '=', username)
+    ])
+    
+    if not user_obj:
+        return {'error': 'User not found'}, 404
+    
+    # Get host from request
+    host_domain = kwargs.get('host_domain')
+    host_obj = request.env['sunray.host'].sudo().search([
+        ('domain', '=', host_domain)
+    ])
+    
+    # Create session
+    session_obj = request.env['sunray.session'].sudo().create({
+        'session_id': session_id,
+        'user_id': user_obj.id,
+        'host_id': host_obj.id if host_obj else False,
+        'credential_id': credential_id,
+        'created_ip': kwargs.get('created_ip'),
+        'device_fingerprint': kwargs.get('device_fingerprint'),
+        'user_agent': kwargs.get('user_agent'),
+        'csrf_token': kwargs.get('csrf_token'),
+        'expires_at': kwargs.get('expires_at')
+    })
+    
+    return {'success': True, 'session_id': session_obj.session_id}
+
+@http.route('/sunray-srvr/v1/sessions/<string:session_id>/revoke', type='json', auth='none', methods=['POST'])
+def revoke_session(self, session_id, reason='API revocation', **kwargs):
+    """Revoke a session"""
+    if not self._authenticate_api(request):
+        return {'error': 'Unauthorized'}, 401
+    
+    session_obj = request.env['sunray.session'].sudo().search([
+        ('session_id', '=', session_id)
+    ])
+    
+    if not session_obj:
+        return {'error': 'Session not found'}, 404
+    
+    session_obj.revoke(reason)
+    return {'success': True}
+```
+
+### Security Events
+
+```python
+@http.route('/sunray-srvr/v1/security-events', type='json', auth='none', methods=['POST'])
+def log_security_event(self, type, details, **kwargs):
+    """Log security event from Worker"""
+    if not self._authenticate_api(request):
+        return {'error': 'Unauthorized'}, 401
+    
+    # Create audit log entry
+    request.env['sunray.audit.log'].sudo().create({
+        'event_type': type,
+        'timestamp': fields.Datetime.now(),
+        'details': json.dumps(details),
+        'ip_address': details.get('ip'),
+        'user_agent': details.get('user_agent')
+    })
+    
+    return {'success': True}
+```
+
+### Webhook Usage Tracking
+
+```python
+@http.route('/sunray-srvr/v1/webhooks/track-usage', type='json', auth='none', methods=['POST'])
+def track_webhook_usage(self, token, client_ip, **kwargs):
+    """Track webhook token usage"""
+    if not self._authenticate_api(request):
+        return {'error': 'Unauthorized'}, 401
+    
+    token_obj = request.env['sunray.webhook.token'].sudo().search([
+        ('token', '=', token)
+    ])
+    
+    if token_obj:
+        token_obj.write({
+            'last_used': fields.Datetime.now(),
+            'usage_count': token_obj.usage_count + 1
+        })
+        
+        # Log usage
+        request.env['sunray.audit.log'].sudo().create({
+            'event_type': 'webhook.used',
+            'timestamp': fields.Datetime.now(),
+            'ip_address': client_ip,
+            'details': json.dumps({
+                'token_name': token_obj.name,
+                'host': token_obj.host_id.domain
+            })
+        })
+    
+    return {'success': True}
 ```
 
 ### Passkey Registration
@@ -661,7 +911,7 @@ def register_passkey(self, username, credential_id, public_key, name, client_ip,
                                 <field name="device_name"/>
                                 <field name="expires_at"/>
                                 <field name="consumed"/>
-                                <field name="generated_by"/>
+                                <field name="create_uid" string="Generated By"/>
                             </tree>
                         </field>
                     </page>
@@ -704,8 +954,7 @@ class SetupTokenWizard(models.TransientModel):
             'token_hash': f'sha512:{token_hash}',
             'device_name': self.device_name,
             'expires_at': fields.Datetime.now() + timedelta(hours=self.validity_hours),
-            'allowed_ips': json.dumps(ip_list),
-            'generated_by': self.env.user.id
+            'allowed_ips': json.dumps(ip_list)
         })
         
         # Log event
@@ -838,6 +1087,15 @@ admin = env['res.users'].create({
     <field name="code">model.cleanup_old_logs()</field>
     <field name="interval_number">1</field>
     <field name="interval_type">days</field>
+</record>
+
+<record id="ir_cron_cleanup_expired_sessions" model="ir.cron">
+    <field name="name">Sunray: Cleanup Expired Sessions</field>
+    <field name="model_id" ref="model_sunray_session"/>
+    <field name="state">code</field>
+    <field name="code">model.cleanup_expired()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">hours</field>
 </record>
 ```
 

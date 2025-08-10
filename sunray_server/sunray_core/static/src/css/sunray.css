@@ -1,0 +1,61 @@
+/* Sunray Core CSS */
+
+.o_sunray_passkey_badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.o_sunray_passkey_badge.backup-eligible {
+    background-color: #28a745;
+    color: white;
+}
+
+.o_sunray_passkey_badge.backup-ineligible {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.o_sunray_session_active {
+    color: #28a745;
+}
+
+.o_sunray_session_expired {
+    color: #dc3545;
+}
+
+.o_sunray_audit_success {
+    color: #28a745;
+}
+
+.o_sunray_audit_failure {
+    color: #dc3545;
+}
+
+.o_sunray_setup_token {
+    font-family: monospace;
+    font-size: 14px;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+.o_sunray_qr_code {
+    text-align: center;
+    padding: 20px;
+}
+
+.o_sunray_api_key {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.o_sunray_ip_list {
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.6;
+}

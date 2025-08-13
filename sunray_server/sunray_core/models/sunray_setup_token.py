@@ -41,9 +41,9 @@ class SunraySetupToken(models.Model):
     )
     
     # Constraints
-    allowed_ips = fields.Text(
-        string='Allowed IPs', 
-        help='IP addresses allowed to use this token (one per line, # for comments)'
+    allowed_cidrs = fields.Text(
+        string='Allowed CIDRs', 
+        help='IP addresses or CIDR blocks allowed to use this token (one per line, # for comments)\nExamples: 192.168.1.100 or 192.168.1.100/32 or 192.168.1.0/24'
     )
     max_uses = fields.Integer(
         default=1,
@@ -108,8 +108,8 @@ class SunraySetupToken(models.Model):
                 result.append(line)
         return result
     
-    def get_allowed_ips(self, format='json'):
-        """Parse allowed IP addresses from line-separated format
+    def get_allowed_cidrs(self, format='json'):
+        """Parse allowed CIDRs from line-separated format
         
         Args:
             format: Output format ('json' returns list, future: 'txt', 'yaml')
@@ -118,7 +118,7 @@ class SunraySetupToken(models.Model):
             Parsed data in requested format
         """
         if format == 'json':
-            return self._parse_line_separated_field(self.allowed_ips)
+            return self._parse_line_separated_field(self.allowed_cidrs)
         elif format == 'txt':
             # Future: return clean text without comments
             raise NotImplementedError(f"Format '{format}' not yet implemented")

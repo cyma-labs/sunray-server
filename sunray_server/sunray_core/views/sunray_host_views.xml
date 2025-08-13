@@ -52,8 +52,7 @@
                     <notebook>
                         <page string="Access Control">
                             <group>
-                                <field name="allowed_ips" widget="text" placeholder="One IP or CIDR range per line&#10;Example:&#10;192.168.1.0/24&#10;10.0.0.1"/>
-                                <field name="allowed_cidrs" widget="text" placeholder="CIDR ranges for bypass&#10;Example:&#10;10.0.0.0/8&#10;192.168.0.0/16"/>
+                                <field name="allowed_cidrs" widget="text" placeholder="IP addresses or CIDR ranges for bypass&#10;Examples:&#10;192.168.1.100&#10;192.168.1.100/32&#10;10.0.0.0/8&#10;192.168.0.0/16"/>
                                 <field name="public_url_patterns" widget="text" placeholder="Regex patterns for public URLs&#10;Example:&#10;^/api/webhook&#10;^/public/.*&#10;^/health$"/>
                                 <field name="token_url_patterns" widget="text" placeholder="Regex patterns for token auth URLs&#10;Example:&#10;^/api/.*&#10;^/webhook/.*"/>
                             </group>

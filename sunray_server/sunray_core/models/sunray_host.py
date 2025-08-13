@@ -34,7 +34,7 @@ class SunrayHost(models.Model):
     # CIDR-based exceptions (bypass all authentication)
     allowed_cidrs = fields.Text(
         string='Allowed CIDR Blocks', 
-        help='CIDR blocks that bypass all authentication (one per line, # for comments)'
+        help='IP addresses or CIDR blocks that bypass all authentication (one per line, # for comments)\nExamples: 192.168.1.100 or 192.168.1.100/32 or 192.168.1.0/24'
     )
     
     # URL-based public exceptions  
@@ -73,10 +73,6 @@ class SunrayHost(models.Model):
         'host_id',
         'user_id',
         string='Authorized Users'
-    )
-    allowed_ips = fields.Text(
-        string='Allowed IP Addresses', 
-        help='Additional IP restrictions for this host (one per line, # for comments)'
     )
     
     # Session overrides
@@ -173,26 +169,6 @@ class SunrayHost(models.Model):
         """
         if format == 'json':
             return self._parse_line_separated_field(self.token_url_patterns)
-        elif format == 'txt':
-            # Future: return clean text without comments
-            raise NotImplementedError(f"Format '{format}' not yet implemented")
-        elif format == 'yaml':
-            # Future: return YAML formatted data
-            raise NotImplementedError(f"Format '{format}' not yet implemented")
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-    
-    def get_allowed_ips(self, format='json'):
-        """Parse allowed IP addresses from line-separated format
-        
-        Args:
-            format: Output format ('json' returns list, future: 'txt', 'yaml')
-            
-        Returns:
-            Parsed data in requested format
-        """
-        if format == 'json':
-            return self._parse_line_separated_field(self.allowed_ips)
         elif format == 'txt':
             # Future: return clean text without comments
             raise NotImplementedError(f"Format '{format}' not yet implemented")

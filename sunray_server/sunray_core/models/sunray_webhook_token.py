@@ -44,9 +44,9 @@ class SunrayWebhookToken(models.Model):
     )
     
     # Optional restrictions
-    allowed_ips = fields.Text(
-        string='Allowed IPs', 
-        help='IP addresses allowed to use this token (one per line, # for comments)'
+    allowed_cidrs = fields.Text(
+        string='Allowed CIDRs', 
+        help='IP addresses or CIDR blocks allowed to use this token (one per line, # for comments)\nExamples: 192.168.1.100 or 192.168.1.100/32 or 192.168.1.0/24'
     )
     expires_at = fields.Datetime(
         string='Expiration Date',
@@ -95,10 +95,11 @@ class SunrayWebhookToken(models.Model):
         if self.expires_at and self.expires_at < fields.Datetime.now():
             return False
         
-        # Check IP restrictions
-        if client_ip and self.allowed_ips:
-            allowed_ips = self.get_allowed_ips()
-            if allowed_ips and client_ip not in allowed_ips:
+        # Check IP restrictions using CIDR
+        if client_ip and self.allowed_cidrs:
+            from odoo.addons.sunray_core.utils.cidr import check_cidr_match
+            allowed_cidrs = self.get_allowed_cidrs()
+            if allowed_cidrs and not any(check_cidr_match(client_ip, cidr) for cidr in allowed_cidrs):
                 return False
         
         return True
@@ -132,8 +133,8 @@ class SunrayWebhookToken(models.Model):
                 result.append(line)
         return result
     
-    def get_allowed_ips(self, format='json'):
-        """Parse allowed IP addresses from line-separated format
+    def get_allowed_cidrs(self, format='json'):
+        """Parse allowed CIDRs from line-separated format
         
         Args:
             format: Output format ('json' returns list, future: 'txt', 'yaml')
@@ -142,7 +143,7 @@ class SunrayWebhookToken(models.Model):
             Parsed data in requested format
         """
         if format == 'json':
-            return self._parse_line_separated_field(self.allowed_ips)
+            return self._parse_line_separated_field(self.allowed_cidrs)
         elif format == 'txt':
             # Future: return clean text without comments
             raise NotImplementedError(f"Format '{format}' not yet implemented")

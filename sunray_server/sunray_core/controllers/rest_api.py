@@ -165,7 +165,6 @@ class SunrayRESTController(http.Controller):
                 'domain': host_obj.domain,
                 'backend': host_obj.backend_url,
                 'authorized_users': host_obj.user_ids.mapped('username'),
-                'allowed_ips': host_obj.get_allowed_ips(),
                 'session_duration_override': host_obj.session_duration_s,
                 
                 # Security exceptions
@@ -185,7 +184,7 @@ class SunrayRESTController(http.Controller):
                     host_config['webhook_tokens'].append({
                         'token': token_obj.token,
                         'name': token_obj.name,
-                        'allowed_ips': token_obj.get_allowed_ips(),
+                        'allowed_cidrs': token_obj.get_allowed_cidrs(),
                         'expires_at': token_obj.expires_at.isoformat() if token_obj.expires_at else None
                     })
             
@@ -255,9 +254,10 @@ class SunrayRESTController(http.Controller):
         if not token_obj:
             return self._json_response({'valid': False, 'error': 'Invalid or expired token'})
         
-        # Check constraints
-        allowed_ips = token_obj.get_allowed_ips()
-        if allowed_ips and client_ip not in allowed_ips:
+        # Check constraints using CIDR
+        from odoo.addons.sunray_core.utils.cidr import check_cidr_match
+        allowed_cidrs = token_obj.get_allowed_cidrs()
+        if allowed_cidrs and not any(check_cidr_match(client_ip, cidr) for cidr in allowed_cidrs):
             return self._json_response({'valid': False, 'error': 'IP not allowed'})
         
         # Check usage limit
@@ -337,6 +337,7 @@ class SunrayRESTController(http.Controller):
         username = data.get('username')
         credential = data.get('credential')
         challenge = data.get('challenge')
+        host_domain = data.get('host_domain')  # Domain requesting authentication
         
         if not all([username, credential, challenge]):
             return self._error_response('Missing required fields', 400)
@@ -349,6 +350,16 @@ class SunrayRESTController(http.Controller):
         
         if not user_obj:
             return self._error_response('User not found', 404)
+        
+        # Check if user is authorized for this specific host
+        if host_domain:
+            host_obj = request.env['sunray.host'].sudo().search([
+                ('domain', '=', host_domain),
+                ('is_active', '=', True)
+            ])
+            
+            if host_obj and user_obj not in host_obj.user_ids:
+                return self._error_response('User not authorized for this host', 403)
         
         # For MVP, we'll do basic verification
         # In production, this should verify the signature using the public key

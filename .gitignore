@@ -4,6 +4,7 @@ py3x/
 *.pyc
 
 bin/sunray-srvr
+sunray-srvr-debug.log
 
 # ikb
 .ikb/buildit.json

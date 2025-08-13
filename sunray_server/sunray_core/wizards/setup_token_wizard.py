@@ -26,9 +26,9 @@ class SetupTokenWizard(models.TransientModel):
         default=24,
         help='How long the token remains valid'
     )
-    allowed_ips = fields.Text(
-        string='Allowed IPs (one per line)',
-        help='Optional: Restrict token to specific IP addresses'
+    allowed_cidrs = fields.Text(
+        string='Allowed CIDRs (one per line)',
+        help='Optional: Restrict token to specific IP addresses or CIDR ranges'
     )
     max_uses = fields.Integer(
         string='Maximum Uses',
@@ -54,10 +54,10 @@ class SetupTokenWizard(models.TransientModel):
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha512(token.encode()).hexdigest()
         
-        # Parse allowed IPs
-        ip_list = []
-        if self.allowed_ips:
-            ip_list = [ip.strip() for ip in self.allowed_ips.splitlines() if ip.strip()]
+        # Parse allowed CIDRs
+        cidr_list = []
+        if self.allowed_cidrs:
+            cidr_list = [cidr.strip() for cidr in self.allowed_cidrs.splitlines() if cidr.strip()]
         
         # Create token record
         setup_token_obj = self.env['sunray.setup.token'].create({
@@ -65,7 +65,7 @@ class SetupTokenWizard(models.TransientModel):
             'token_hash': f'sha512:{token_hash}',
             'device_name': self.device_name,
             'expires_at': fields.Datetime.now() + timedelta(hours=self.validity_hours),
-            'allowed_ips': self.allowed_ips,  # Store as text, not JSON
+            'allowed_cidrs': self.allowed_cidrs,  # Store as text, not JSON
             'max_uses': self.max_uses
         })
         
@@ -103,8 +103,8 @@ Security Notes:
 - It can be used {self.max_uses} time(s)
 """
         
-        if ip_list:
-            instructions += f"- Restricted to IPs: {', '.join(ip_list)}\n"
+        if cidr_list:
+            instructions += f"- Restricted to IPs/CIDRs: {', '.join(cidr_list)}\n"
         
         # Update wizard for display
         self.generated_token = token

@@ -12,6 +12,8 @@ export async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const clientIP = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
   
+  console.log(`[Request] ${request.method} ${url.pathname} from IP: ${clientIP}`);
+  
   // Get configuration (with caching)
   const config = await getConfig(env);
   if (!config) {
@@ -29,7 +31,7 @@ export async function handleRequest(request, env, ctx) {
   
   // Check bypass conditions in order
   
-  // 1. Check CIDR bypass (office networks, etc.)
+  // 1. Check CIDR bypass (office networks, single IPs with /32, etc.)
   if (hostConfig.allowed_cidrs && hostConfig.allowed_cidrs.length > 0) {
     for (const cidr of hostConfig.allowed_cidrs) {
       if (checkCIDRBypass(clientIP, cidr)) {

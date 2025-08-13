@@ -12,7 +12,7 @@
                     <field name="device_name" placeholder="e.g., John's Laptop, iPhone 15"/>
                     <field name="validity_hours"/>
                     <field name="max_uses"/>
-                    <field name="allowed_ips" widget="text" placeholder="Optional: One IP or CIDR range per line&#10;Example:&#10;192.168.1.0/24&#10;10.0.0.1"/>
+                    <field name="allowed_cidrs" widget="text" placeholder="Optional: IP addresses or CIDR ranges per line&#10;Examples:&#10;192.168.1.100&#10;192.168.1.100/32&#10;10.0.0.0/8"/>
                 </group>
                 
                 <!-- Show instructions when token is generated -->

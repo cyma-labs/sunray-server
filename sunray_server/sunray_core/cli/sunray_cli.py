@@ -141,7 +141,7 @@ class SunrayCommand(Command):
         setuptoken_create.add_argument('--sr-device', required=True, help='Device name')
         setuptoken_create.add_argument('--sr-hours', type=int, default=24,
                                       help='Validity in hours (default: 24)')
-        setuptoken_create.add_argument('--sr-ips', help='Allowed IPs (comma-separated)')
+        setuptoken_create.add_argument('--sr-cidrs', help='Allowed CIDRs/IPs (comma-separated)')
         setuptoken_create.add_argument('--sr-uses', type=int, default=1,
                                       help='Maximum uses (default: 1)')
         
@@ -653,12 +653,12 @@ class SunrayCommand(Command):
             if token.consumed_date:
                 print(f"Consumed:     {token.consumed_date}")
             
-            if token.allowed_ips:
-                ips = token.get_allowed_ips()
-                if ips:
-                    print(f"Allowed IPs:")
-                    for ip in ips:
-                        print(f"  - {ip}")
+            if token.allowed_cidrs:
+                cidrs = token.get_allowed_cidrs()
+                if cidrs:
+                    print(f"Allowed CIDRs:")
+                    for cidr in cidrs:
+                        print(f"  - {cidr}")
         
         elif args.action == 'create':
             # Find user
@@ -675,10 +675,10 @@ class SunrayCommand(Command):
             token_value = token_urlsafe(32)
             token_hash = f"sha512:{hashlib.sha512(token_value.encode()).hexdigest()}"
             
-            # Prepare allowed IPs (convert comma-separated to line-separated)
-            allowed_ips = ''
-            if args.sr_ips:
-                allowed_ips = '\n'.join([ip.strip() for ip in args.sr_ips.split(',') if ip.strip()])
+            # Prepare allowed CIDRs (convert comma-separated to line-separated)
+            allowed_cidrs = ''
+            if args.sr_cidrs:
+                allowed_cidrs = '\n'.join([cidr.strip() for cidr in args.sr_cidrs.split(',') if cidr.strip()])
             
             # Create token
             token = SetupToken.create([{
@@ -686,7 +686,7 @@ class SunrayCommand(Command):
                 'token_hash': token_hash,
                 'device_name': args.sr_device,
                 'expires_at': datetime.now() + timedelta(hours=args.sr_hours),
-                'allowed_ips': allowed_ips,
+                'allowed_cidrs': allowed_cidrs,
                 'max_uses': args.sr_uses,
                 'current_uses': 0
             }])
@@ -699,11 +699,11 @@ class SunrayCommand(Command):
             print(f"Expires:  {token.expires_at}")
             print(f"Max Uses: {args.sr_uses}")
             
-            if allowed_ips:
-                print(f"Allowed IPs:")
-                for ip in allowed_ips.split('\n'):
-                    if ip.strip():
-                        print(f"  - {ip.strip()}")
+            if allowed_cidrs:
+                print(f"Allowed CIDRs:")
+                for cidr in allowed_cidrs.split('\n'):
+                    if cidr.strip():
+                        print(f"  - {cidr.strip()}")
             
             print(f"\nInstructions:")
             print(f"1. Share this token securely with the user")

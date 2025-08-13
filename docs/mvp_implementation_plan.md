@@ -215,7 +215,7 @@ npm install -g wrangler
 ### **Project Structure**
 ```
 sunray/
-├── worker/                 # Cloudflare Worker
+├── sunray_worker/          # Cloudflare Worker
 │   ├── src/
 │   │   ├── index.js       # Main handler
 │   │   ├── auth.js        # Authentication logic  

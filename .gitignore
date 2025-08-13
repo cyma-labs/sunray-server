@@ -1,3 +1,4 @@
+.DS_Store
 parts/
 py3x/
 *.pyc
@@ -43,3 +44,19 @@ debug.yml
 # ikb
 .python-version
 bin/start_odoo
+
+# Cloudflare Worker / Sunray Worker
+sunray_worker/node_modules/
+sunray_worker/.wrangler/
+sunray_worker/dist/
+sunray_worker/.dev.vars
+sunray_worker/.mf/
+sunray_worker/coverage/
+sunray_worker/*.bak
+sunray_worker/.env
+sunray_worker/.env.local
+sunray_worker/wrangler-*.log
+
+# Local environment configuration
+.claude.local.md
+*.local.md

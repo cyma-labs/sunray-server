@@ -12,11 +12,28 @@ Muppy Sunray is a lightweight, secure, self-hosted solution for authorizing HTTP
 2. **Sunray Server (Odoo 18 Addon)**: Admin interface and configuration management
 3. **Demo Application**: Protected web application for testing
 
+## Environment Configuration
+
+**Note**: Sensitive environment-specific information (URLs, API keys, credentials) should be stored in `.claude.local.md` which is not committed to the repository. Create this file locally with your specific environment details.
+
+### URL Structure
+- **Sunray Server (Admin)**: The Odoo 18 server with sunray_core addon
+  - Provides admin UI and API endpoints at `/sunray-srvr/v1/*`
+  - Environment variable: `APP_PRIMARY_URL`
+
+- **Sunray Worker**: Cloudflare Worker handling authentication
+  - Provides auth endpoints at `/sunray-wrkr/v1/*`
+  - Environment variable: `WORKER_URL`
+
+- **Protected Hosts**: Applications protected by Sunray
+  - Configured as hosts in Sunray Server
+  - Users must authenticate via Worker to access
+
 ## Project Structure
 
 ```
 /opt/muppy/appserver-sunray18/
-├── worker/                    # Cloudflare Worker (to be created)
+├── sunray_worker/             # Cloudflare Worker
 │   ├── src/                   # Worker source code
 │   ├── wrangler.toml          # Cloudflare configuration
 │   └── package.json           # Node dependencies
@@ -80,6 +97,9 @@ ikb install   # This will process both Odoo and project requirements
 bin/sunray-srvr                              # Normal startup
 bin/sunray-srvr --dev=all                    # Development mode with auto-reload
 
+# Start server with logging and monitor output
+cd /opt/muppy/appserver-sunray18 && bin/sunray-srvr --workers=4 --logfile=./sunray-srvr-debug.log & tail -f /opt/muppy/appserver-sunray18/sunray-srvr-debug.log
+
 # Module Management
 bin/sunray-srvr -u sunray_core               # Update sunray_core module
 bin/sunray-srvr -u all --stop-after-init     # Update all modules and exit
@@ -105,8 +125,8 @@ bin/sunray-srvr --database=${TESTDB} -i sunray_core
 ### Worker Development
 
 ```bash
-# Navigate to worker directory (once created)
-cd worker/
+# Navigate to worker directory
+cd sunray_worker/
 
 # Install dependencies
 npm install
@@ -119,6 +139,17 @@ wrangler deploy
 
 # Run tests
 npm test
+```
+
+### Sunray CLI (srctl)
+
+A CLI exists to manage Sunray objects. It provides `create`, `get`, `list`, and `delete` operations for: `apikey`, `user`, `session`, `host`, and `setuptoken`.
+
+```bash
+# Usage: bin/sunray-srvr srctl <object> <action> [options]
+bin/sunray-srvr srctl apikey list
+bin/sunray-srvr srctl user create "username" --sr-email "user@example.com"
+bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hours 24
 ```
 
 ## Architecture Details
@@ -217,6 +248,46 @@ sunray_core/
   # - write_date: When the record was last modified
   ```
 
+### Field Format Pattern
+
+For multi-value configuration fields (IPs, CIDRs, URL patterns, etc.):
+
+- **Storage Format**: One value per line in Text fields
+- **Comment Support**: Lines starting with `#` are ignored
+- **Inline Comments**: Use `#` after value for inline comments
+- **Accessor Methods**: Each field has an accessor method with format parameter
+  ```python
+  # Field definition
+  allowed_cidrs = fields.Text(
+      string='Allowed CIDR Blocks',
+      help='CIDR blocks that bypass authentication (one per line, # for comments)'
+  )
+  
+  # Accessor method with format parameter (default 'json')
+  def get_allowed_cidrs(self, format='json'):
+      """Parse field from line-separated format
+      
+      Args:
+          format: Output format ('json' returns list, future: 'txt', 'yaml')
+      """
+      if format == 'json':
+          return self._parse_line_separated_field(self.allowed_cidrs)
+      # Future formats: 'txt', 'yaml', etc.
+  ```
+
+- **Example Input**:
+  ```
+  10.0.0.0/8          # Private network
+  192.168.0.0/16      # Local network
+  # This line is ignored
+  172.16.0.0/12
+  ```
+
+- **Example Output** (JSON format):
+  ```python
+  ['10.0.0.0/8', '192.168.0.0/16', '172.16.0.0/12']
+  ```
+
 ### Testing Best Practices
 
 ```python
@@ -287,15 +358,15 @@ def test_webhook(self, mock_post):
 
 #### Odoo Server  
 - `APP_PRIMARY_URL`: HTTPS URL for the Odoo server (provided by environment)
-- Default admin credentials: `admin/admin` (development)
+- Default admin credentials: See `.claude.local.md` for development credentials
 - User management via `inouk_odoo_cli` addon
 
 #### Cloudflare Worker
 - `ADMIN_API_ENDPOINT`: Set to `$APP_PRIMARY_URL`
-- `ADMIN_API_KEY`: Generated after sunray_core installation
+- `ADMIN_API_KEY`: Generated after sunray_core installation (store in `.claude.local.md`)
 - `SESSION_SECRET`: Generate with `openssl rand -base64 32`
 - `WORKER_ID`: Unique identifier for worker instance
-- `WORKER_URL`: https://wrkr-sunray18-main-dev-cmorisse.msa2.lair.ovh
+- `WORKER_URL`: The Worker's public URL (store in `.claude.local.md`)
 
 ## Backup Strategy
 

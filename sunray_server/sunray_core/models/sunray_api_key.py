@@ -25,6 +25,15 @@ class SunrayApiKey(models.Model):
         default=True,
         help='Deactivate to disable this API key'
     )
+    description = fields.Text(
+        string='Description',
+        help='Purpose and usage of this API key'
+    )
+    scopes = fields.Text(
+        string='Scopes',
+        help='Permission scopes (e.g., config:read,user:write,session:all)',
+        default='all'
+    )
     
     # Usage tracking
     last_used = fields.Datetime(
@@ -74,3 +83,26 @@ class SunrayApiKey(models.Model):
             'usage_count': self.usage_count + 1
         })
         return True
+    
+    def has_scope(self, required_scope):
+        """Check if this API key has the required scope"""
+        self.ensure_one()
+        
+        # 'all' scope grants everything
+        if self.scopes == 'all':
+            return True
+        
+        # Check if the required scope is in the key's scopes
+        key_scopes = set(s.strip() for s in (self.scopes or '').split(','))
+        
+        # Check exact match
+        if required_scope in key_scopes:
+            return True
+        
+        # Check wildcard match (e.g., 'user:*' matches 'user:read')
+        resource, action = required_scope.split(':', 1) if ':' in required_scope else (required_scope, '')
+        for scope in key_scopes:
+            if scope == f"{resource}:all" or scope == f"{resource}:*":
+                return True
+        
+        return False

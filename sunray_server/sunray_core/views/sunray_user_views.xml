@@ -44,6 +44,9 @@
         <field name="model">sunray.user</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="generate_setup_token" string="Generate Setup Token" type="object" class="btn-warning"/>
+                </header>
                 <sheet>
                     <group>
                         <group>

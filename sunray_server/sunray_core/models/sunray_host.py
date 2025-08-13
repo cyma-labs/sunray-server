@@ -33,23 +33,20 @@ class SunrayHost(models.Model):
     
     # CIDR-based exceptions (bypass all authentication)
     allowed_cidrs = fields.Text(
-        string='Allowed CIDR Blocks (JSON)', 
-        default='[]',
-        help='CIDR blocks that bypass all authentication (e.g., office networks)'
+        string='Allowed CIDR Blocks', 
+        help='CIDR blocks that bypass all authentication (one per line, # for comments)'
     )
     
     # URL-based public exceptions  
     public_url_patterns = fields.Text(
-        string='Public URL Patterns (JSON)', 
-        default='[]',
-        help='URL regex patterns that allow unrestricted public access'
+        string='Public URL Patterns', 
+        help='URL patterns that allow unrestricted public access (one per line, # for comments)'
     )
     
     # URL-based token exceptions
     token_url_patterns = fields.Text(
-        string='Token-Protected URL Patterns (JSON)', 
-        default='[]',
-        help='URL regex patterns that accept token authentication instead of passkeys'
+        string='Token-Protected URL Patterns', 
+        help='URL patterns that accept token authentication (one per line, # for comments)'
     )
     
     # Webhook Authentication
@@ -78,9 +75,8 @@ class SunrayHost(models.Model):
         string='Authorized Users'
     )
     allowed_ips = fields.Text(
-        string='Allowed IPs (JSON)', 
-        default='[]',
-        help='Additional IP restrictions for this host'
+        string='Allowed IP Addresses', 
+        help='Additional IP restrictions for this host (one per line, # for comments)'
     )
     
     # Session overrides
@@ -97,26 +93,114 @@ class SunrayHost(models.Model):
         ('domain_unique', 'UNIQUE(domain)', 'Domain must be unique!')
     ]
     
-    def _get_allowed_cidrs(self):
-        """Parse allowed CIDR blocks from JSON"""
-        try:
-            return json.loads(self.allowed_cidrs or '[]')
-        except (json.JSONDecodeError, TypeError):
+    def _parse_line_separated_field(self, field_value):
+        """Parse line-separated field with comment support
+        
+        Format:
+        - One value per line
+        - Lines starting with # are ignored (comments)
+        - # can be used for inline comments
+        
+        Args:
+            field_value: The raw field value to parse
+            
+        Returns:
+            list: Array of parsed values
+        """
+        if not field_value:
             return []
+        
+        result = []
+        for line in field_value.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # Remove inline comments
+            if '#' in line:
+                line = line.split('#')[0].strip()
+            if line:
+                result.append(line)
+        return result
     
-    def _get_public_url_patterns(self):
-        """Parse public URL patterns from JSON"""  
-        try:
-            return json.loads(self.public_url_patterns or '[]')
-        except (json.JSONDecodeError, TypeError):
-            return []
+    def get_allowed_cidrs(self, format='json'):
+        """Parse allowed CIDR blocks from line-separated format
+        
+        Args:
+            format: Output format ('json' returns list, future: 'txt', 'yaml')
+            
+        Returns:
+            Parsed data in requested format
+        """
+        if format == 'json':
+            return self._parse_line_separated_field(self.allowed_cidrs)
+        elif format == 'txt':
+            # Future: return clean text without comments
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        elif format == 'yaml':
+            # Future: return YAML formatted data
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
     
-    def _get_token_url_patterns(self):
-        """Parse token URL patterns from JSON"""
-        try:
-            return json.loads(self.token_url_patterns or '[]')
-        except (json.JSONDecodeError, TypeError):
-            return []
+    def get_public_url_patterns(self, format='json'):
+        """Parse public URL patterns from line-separated format
+        
+        Args:
+            format: Output format ('json' returns list, future: 'txt', 'yaml')
+            
+        Returns:
+            Parsed data in requested format
+        """  
+        if format == 'json':
+            return self._parse_line_separated_field(self.public_url_patterns)
+        elif format == 'txt':
+            # Future: return clean text without comments
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        elif format == 'yaml':
+            # Future: return YAML formatted data
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+    
+    def get_token_url_patterns(self, format='json'):
+        """Parse token URL patterns from line-separated format
+        
+        Args:
+            format: Output format ('json' returns list, future: 'txt', 'yaml')
+            
+        Returns:
+            Parsed data in requested format
+        """
+        if format == 'json':
+            return self._parse_line_separated_field(self.token_url_patterns)
+        elif format == 'txt':
+            # Future: return clean text without comments
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        elif format == 'yaml':
+            # Future: return YAML formatted data
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+    
+    def get_allowed_ips(self, format='json'):
+        """Parse allowed IP addresses from line-separated format
+        
+        Args:
+            format: Output format ('json' returns list, future: 'txt', 'yaml')
+            
+        Returns:
+            Parsed data in requested format
+        """
+        if format == 'json':
+            return self._parse_line_separated_field(self.allowed_ips)
+        elif format == 'txt':
+            # Future: return clean text without comments
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        elif format == 'yaml':
+            # Future: return YAML formatted data
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
     
     def check_access_requirements(self, client_ip, url_path):
         """
@@ -133,7 +217,7 @@ class SunrayHost(models.Model):
         if client_ip:
             try:
                 client = ipaddress.ip_address(client_ip)
-                for cidr_str in self._get_allowed_cidrs():
+                for cidr_str in self.get_allowed_cidrs():
                     if client in ipaddress.ip_network(cidr_str, strict=False):
                         return 'cidr_allowed'
             except (ValueError, ipaddress.AddressValueError):
@@ -141,12 +225,12 @@ class SunrayHost(models.Model):
                 pass
         
         # 2. Check public URL exceptions
-        for pattern in self._get_public_url_patterns():
+        for pattern in self.get_public_url_patterns():
             if re.match(pattern, url_path):
                 return 'public'
         
         # 3. Check token URL exceptions  
-        for pattern in self._get_token_url_patterns():
+        for pattern in self.get_token_url_patterns():
             if re.match(pattern, url_path):
                 return 'token'
         

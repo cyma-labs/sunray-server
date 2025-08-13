@@ -45,9 +45,8 @@ class SunrayWebhookToken(models.Model):
     
     # Optional restrictions
     allowed_ips = fields.Text(
-        string='Allowed IPs (JSON)', 
-        default='[]',
-        help='List of IP addresses allowed to use this token'
+        string='Allowed IPs', 
+        help='IP addresses allowed to use this token (one per line, # for comments)'
     )
     expires_at = fields.Datetime(
         string='Expiration Date',
@@ -98,14 +97,60 @@ class SunrayWebhookToken(models.Model):
         
         # Check IP restrictions
         if client_ip and self.allowed_ips:
-            try:
-                allowed_ips = json.loads(self.allowed_ips or '[]')
-                if allowed_ips and client_ip not in allowed_ips:
-                    return False
-            except (json.JSONDecodeError, TypeError):
+            allowed_ips = self.get_allowed_ips()
+            if allowed_ips and client_ip not in allowed_ips:
                 return False
         
         return True
+    
+    def _parse_line_separated_field(self, field_value):
+        """Parse line-separated field with comment support
+        
+        Format:
+        - One value per line
+        - Lines starting with # are ignored (comments)
+        - # can be used for inline comments
+        
+        Args:
+            field_value: The raw field value to parse
+            
+        Returns:
+            list: Array of parsed values
+        """
+        if not field_value:
+            return []
+        
+        result = []
+        for line in field_value.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # Remove inline comments
+            if '#' in line:
+                line = line.split('#')[0].strip()
+            if line:
+                result.append(line)
+        return result
+    
+    def get_allowed_ips(self, format='json'):
+        """Parse allowed IP addresses from line-separated format
+        
+        Args:
+            format: Output format ('json' returns list, future: 'txt', 'yaml')
+            
+        Returns:
+            Parsed data in requested format
+        """
+        if format == 'json':
+            return self._parse_line_separated_field(self.allowed_ips)
+        elif format == 'txt':
+            # Future: return clean text without comments
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        elif format == 'yaml':
+            # Future: return YAML formatted data
+            raise NotImplementedError(f"Format '{format}' not yet implemented")
+        else:
+            raise ValueError(f"Unsupported format: {format}")
     
     def track_usage(self, client_ip=None):
         """Update usage statistics"""

@@ -20,10 +20,7 @@ class SunrayUser(models.Model):
         required=True,
         help='User email address for notifications'
     )
-    display_name = fields.Char(
-        string='Display Name',
-        help='Full name displayed in UI'
-    )
+
     is_active = fields.Boolean(
         string='Active', 
         default=True,

@@ -1,31 +1,47 @@
 name = "sunray-worker"
 main = "src/index.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-11-01"
+workers_dev = true
+account_id = "374806389059d0f432e88bae437bac53"  # oursbleu account - ONLY authorized account
 
-[env.development]
-vars = { ENVIRONMENT = "development" }
-
-[env.production]
-vars = { ENVIRONMENT = "production" }
-
-# KV Namespaces for storing session data
-[[kv_namespaces]]
-binding = "SESSIONS"
-id = "YOUR_KV_NAMESPACE_ID"
-preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID"
-
+# KV Namespaces for caching and session storage
 [[kv_namespaces]]
 binding = "CONFIG_CACHE"
-id = "YOUR_CONFIG_KV_NAMESPACE_ID"
-preview_id = "YOUR_CONFIG_PREVIEW_KV_NAMESPACE_ID"
+id = "9d13d31c0e734c969e1ab57b58fe644c"
+preview_id = "fb646bf577ba4cc2a2a829da6ac71360"
 
-# Durable Objects (if needed for WebAuthn state)
-# [[durable_objects.bindings]]
-# name = "WEBAUTHN_STATE"
-# class_name = "WebAuthnState"
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "72d472d5b72e405b81f15f823fe0c651"
+preview_id = "de7d498963df4647aa6fef97197cd4a8"
 
-# Environment variables (set these in Cloudflare dashboard)
-# [vars]
-# ADMIN_API_ENDPOINT = "https://your-odoo-server.com"
-# ADMIN_API_KEY = "your-api-key"
-# WORKER_ID = "worker-1"
+[[kv_namespaces]]
+binding = "CHALLENGES"
+id = "952656e635fb49ee8bb01add3602e5ed"
+preview_id = "85570b37da5d4e63a99ec07f2d173f7a"
+
+# Environment variables (will be set via wrangler secret)
+[vars]
+ADMIN_API_ENDPOINT = "https://sunray-server-dev-cyril.pack8s.com"
+RP_ID = "odoo18-cfed-test-g.pack8s.com"  # The domain being protected
+RP_NAME = "Sunray Authentication"
+CACHE_TTL = "300"
+SESSION_TTL = "86400"
+CHALLENGE_TTL = "300"
+WORKER_ID = "sunray-worker-001"
+
+# Routes - Worker intercepts ALL requests to protected domain
+# Pattern with leading asterisk (*) will also protect subdomain variations (e.g., admin-odoo18-cfed-test-g.pack8s.com)
+# Without asterisk, only the exact domain is protected
+routes = [
+  { pattern = "*odoo18-cfed-test-g.pack8s.com/*", zone_name = "pack8s.com" }
+]
+
+# Secrets (set via wrangler secret put)
+# ADMIN_API_KEY - API key for admin server
+# SESSION_SECRET - Secret for signing session cookies
+
+[observability]
+enabled = true
+# optional. default = 1.
+head_sampling_rate = 1 

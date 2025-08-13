@@ -6,15 +6,27 @@
         <field name="model">sunray.setup.token.wizard</field>
         <field name="arch" type="xml">
             <form>
-                <group>
+                <!-- Show input fields when no token is generated yet -->
+                <group invisible="generated_token">
                     <field name="user_id" options="{'no_create': True}"/>
                     <field name="device_name" placeholder="e.g., John's Laptop, iPhone 15"/>
                     <field name="validity_hours"/>
+                    <field name="max_uses"/>
                     <field name="allowed_ips" widget="text" placeholder="Optional: One IP or CIDR range per line&#10;Example:&#10;192.168.1.0/24&#10;10.0.0.1"/>
                 </group>
+                
+                <!-- Show instructions when token is generated -->
+                <div invisible="not generated_token" class="alert alert-success">
+                    <field name="token_display" readonly="1" widget="text" nolabel="1"/>
+                </div>
+                
+                <!-- Hidden field to track state -->
+                <field name="generated_token" invisible="1"/>
+                
                 <footer>
-                    <button name="generate_token" string="Generate Token" type="object" class="btn-primary"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    <button name="generate_token" string="Generate Token" type="object" class="btn-primary" invisible="generated_token"/>
+                    <button string="Close" class="btn-primary" special="cancel" invisible="not generated_token"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" invisible="generated_token"/>
                 </footer>
             </form>
         </field>

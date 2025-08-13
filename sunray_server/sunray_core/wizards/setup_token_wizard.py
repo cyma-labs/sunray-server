@@ -65,7 +65,7 @@ class SetupTokenWizard(models.TransientModel):
             'token_hash': f'sha512:{token_hash}',
             'device_name': self.device_name,
             'expires_at': fields.Datetime.now() + timedelta(hours=self.validity_hours),
-            'allowed_ips': json.dumps(ip_list),
+            'allowed_ips': self.allowed_ips,  # Store as text, not JSON
             'max_uses': self.max_uses
         })
         

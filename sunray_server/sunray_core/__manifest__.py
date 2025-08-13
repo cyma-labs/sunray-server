@@ -67,4 +67,7 @@ Technical Components:
             'sunray_core/static/src/js/sunray.js',
         ],
     },
+    'cli': {
+        'sunray_core.cli.sunray_cli': ['sunray'],
+    },
 }

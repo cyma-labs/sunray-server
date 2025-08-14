@@ -16,6 +16,13 @@ class SunraySetupToken(models.Model):
         ondelete='cascade',
         string='User'
     )
+    host_id = fields.Many2one(
+        'sunray.host',
+        required=True,
+        ondelete='cascade',
+        string='Host',
+        help='The host this token is valid for'
+    )
     token_hash = fields.Char(
         string='Token Hash (SHA-512)', 
         required=True,
@@ -127,3 +134,65 @@ class SunraySetupToken(models.Model):
             raise NotImplementedError(f"Format '{format}' not yet implemented")
         else:
             raise ValueError(f"Unsupported format: {format}")
+    
+    @api.model
+    def create_setup_token(self, user_id, host_id, device_name, validity_hours=24, max_uses=1, allowed_cidrs=''):
+        """
+        Create a setup token and auto-authorize user for the host if needed.
+        This is the single source of truth for token creation logic.
+        
+        Args:
+            user_id: ID of the user
+            host_id: ID of the host
+            device_name: Name of the device this token is for
+            validity_hours: How long the token is valid (default: 24)
+            max_uses: Maximum number of uses (default: 1)
+            allowed_cidrs: Text field with allowed CIDRs (one per line)
+            
+        Returns:
+            tuple: (token_obj, plain_token_value)
+        """
+        import secrets
+        import hashlib
+        import json
+        from datetime import timedelta
+        
+        # Auto-authorize user for the host if not already
+        host_obj = self.env['sunray.host'].browse(host_id)
+        user_obj = self.env['sunray.user'].browse(user_id)
+        
+        if user_obj not in host_obj.user_ids:
+            host_obj.write({
+                'user_ids': [(4, user_id)]  # Add user to host's authorized users
+            })
+        
+        # Generate secure token
+        token_value = secrets.token_urlsafe(32)
+        token_hash = f"sha512:{hashlib.sha512(token_value.encode()).hexdigest()}"
+        
+        # Create token record
+        token_obj = self.create({
+            'user_id': user_id,
+            'host_id': host_id,
+            'token_hash': token_hash,
+            'device_name': device_name,
+            'expires_at': fields.Datetime.now() + timedelta(hours=validity_hours),
+            'allowed_cidrs': allowed_cidrs,
+            'max_uses': max_uses,
+            'current_uses': 0
+        })
+        
+        # Log event
+        self.env['sunray.audit.log'].create({
+            'event_type': 'token.generated',
+            'user_id': user_id,
+            'username': user_obj.username,
+            'details': json.dumps({
+                'device_name': device_name,
+                'host': host_obj.domain,
+                'validity_hours': validity_hours,
+                'max_uses': max_uses
+            })
+        })
+        
+        return token_obj, token_value

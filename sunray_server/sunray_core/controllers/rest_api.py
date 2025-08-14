@@ -230,6 +230,7 @@ class SunrayRESTController(http.Controller):
         username = data.get('username')
         token_hash = data.get('token_hash')
         client_ip = data.get('client_ip')
+        host_domain = data.get('host_domain')  # Domain where token is being used
         
         if not all([username, token_hash, client_ip]):
             return self._error_response('Missing required fields', 400)
@@ -253,6 +254,19 @@ class SunrayRESTController(http.Controller):
         
         if not token_obj:
             return self._json_response({'valid': False, 'error': 'Invalid or expired token'})
+        
+        # Check if token is for the correct host
+        if host_domain:
+            host_obj = request.env['sunray.host'].sudo().search([
+                ('domain', '=', host_domain),
+                ('is_active', '=', True)
+            ])
+            
+            if not host_obj:
+                return self._json_response({'valid': False, 'error': 'Unknown host'})
+            
+            if token_obj.host_id.id != host_obj.id:
+                return self._json_response({'valid': False, 'error': 'Token not valid for this host'})
         
         # Check constraints using CIDR
         from odoo.addons.sunray_core.utils.cidr import check_cidr_match

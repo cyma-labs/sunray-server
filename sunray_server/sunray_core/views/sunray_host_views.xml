@@ -67,7 +67,7 @@
                         </page>
                         
                         <page string="Authorized Users">
-                            <field name="user_ids" widget="many2many_tags"/>
+                            <field name="user_ids" />
                         </page>
                         
                         <page string="Webhook Tokens">

@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 from odoo.exceptions import UserError
-import secrets
-import hashlib
-import json
-from datetime import timedelta
 
 
 class SetupTokenWizard(models.TransientModel):
@@ -15,6 +11,12 @@ class SetupTokenWizard(models.TransientModel):
         'sunray.user', 
         required=True,
         string='User'
+    )
+    host_id = fields.Many2one(
+        'sunray.host',
+        required=True,
+        string='Host',
+        help='The host this token will grant access to'
     )
     device_name = fields.Char(
         string='Device Name', 
@@ -50,50 +52,30 @@ class SetupTokenWizard(models.TransientModel):
         """Generate and display setup token"""
         self.ensure_one()
         
-        # Generate secure token
-        token = secrets.token_urlsafe(32)
-        token_hash = hashlib.sha512(token.encode()).hexdigest()
-        
-        # Parse allowed CIDRs
-        cidr_list = []
-        if self.allowed_cidrs:
-            cidr_list = [cidr.strip() for cidr in self.allowed_cidrs.splitlines() if cidr.strip()]
-        
-        # Create token record
-        setup_token_obj = self.env['sunray.setup.token'].create({
-            'user_id': self.user_id.id,
-            'token_hash': f'sha512:{token_hash}',
-            'device_name': self.device_name,
-            'expires_at': fields.Datetime.now() + timedelta(hours=self.validity_hours),
-            'allowed_cidrs': self.allowed_cidrs,  # Store as text, not JSON
-            'max_uses': self.max_uses
-        })
-        
-        # Log event
-        self.env['sunray.audit.log'].create({
-            'event_type': 'token.generated',
-            'user_id': self.user_id.id,
-            'username': self.user_id.username,
-            'details': json.dumps({
-                'device_name': self.device_name,
-                'validity_hours': self.validity_hours,
-                'max_uses': self.max_uses
-            })
-        })
+        # Use centralized token creation method
+        token_obj, token_value = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_id.id,
+            host_id=self.host_id.id,
+            device_name=self.device_name,
+            validity_hours=self.validity_hours,
+            max_uses=self.max_uses,
+            allowed_cidrs=self.allowed_cidrs or ''
+        )
         
         # Prepare display instructions
         instructions = f"""
 Setup Token Generated Successfully!
 
-Token: {token}
+Token: {token_value}
 Username: {self.user_id.username}
+Host: {self.host_id.domain}
 Device: {self.device_name}
-Expires: {setup_token_obj.expires_at}
+Expires: {token_obj.expires_at}
 Max Uses: {self.max_uses}
 
 Instructions:
 1. Save this token securely - it will only be shown once
-2. Visit your protected domain
+2. Visit {self.host_id.domain}
 3. You'll be redirected to the setup page
 4. Enter this token along with your username
 5. Follow the passkey registration process
@@ -101,13 +83,16 @@ Instructions:
 Security Notes:
 - This token expires in {self.validity_hours} hours
 - It can be used {self.max_uses} time(s)
+- This token is only valid for {self.host_id.domain}
 """
         
-        if cidr_list:
-            instructions += f"- Restricted to IPs/CIDRs: {', '.join(cidr_list)}\n"
+        if self.allowed_cidrs:
+            cidr_list = [cidr.strip() for cidr in self.allowed_cidrs.splitlines() if cidr.strip()]
+            if cidr_list:
+                instructions += f"- Restricted to IPs/CIDRs: {', '.join(cidr_list)}\n"
         
         # Update wizard for display
-        self.generated_token = token
+        self.generated_token = token_value
         self.token_display = instructions
         
         # Return wizard action to show the token

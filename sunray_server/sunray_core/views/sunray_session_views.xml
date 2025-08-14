@@ -32,7 +32,7 @@
                 <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
                 <filter name="expired" string="Expired" domain="[('is_active', '=', False)]"/>
                 <separator/>
-                <filter name="today" string="Created Today" domain="[('created_at', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                <filter name="today" string="Created Today" domain="[('created_at', '>=', (context_today()).strftime('%Y-%m-%d'))]" />
                 <group expand="0" string="Group By">
                     <filter string="User" name="group_by_user" context="{'group_by': 'user_id'}"/>
                     <filter string="Host" name="group_by_host" context="{'group_by': 'host_id'}"/>

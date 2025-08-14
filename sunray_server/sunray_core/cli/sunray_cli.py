@@ -138,6 +138,7 @@ class SunrayCommand(Command):
         # setuptoken create
         setuptoken_create = setuptoken_sub.add_parser('create', help='Create setup token')
         setuptoken_create.add_argument('username', help='Username')
+        setuptoken_create.add_argument('--sr-host', required=True, help='Host domain for this token')
         setuptoken_create.add_argument('--sr-device', required=True, help='Device name')
         setuptoken_create.add_argument('--sr-hours', type=int, default=24,
                                       help='Validity in hours (default: 24)')
@@ -667,36 +668,36 @@ class SunrayCommand(Command):
                 print(f"User '{args.username}' not found")
                 return
             
-            # Generate token
-            from secrets import token_urlsafe
-            import hashlib
-            from datetime import datetime, timedelta
-            
-            token_value = token_urlsafe(32)
-            token_hash = f"sha512:{hashlib.sha512(token_value.encode()).hexdigest()}"
+            # Find host
+            Host = env['sunray.host']
+            host = Host.search([('domain', '=', args.sr_host)], limit=1)
+            if not host:
+                print(f"Error: Host '{args.sr_host}' not found")
+                return
             
             # Prepare allowed CIDRs (convert comma-separated to line-separated)
             allowed_cidrs = ''
             if args.sr_cidrs:
                 allowed_cidrs = '\n'.join([cidr.strip() for cidr in args.sr_cidrs.split(',') if cidr.strip()])
             
-            # Create token
-            token = SetupToken.create([{
-                'user_id': user.id,
-                'token_hash': token_hash,
-                'device_name': args.sr_device,
-                'expires_at': datetime.now() + timedelta(hours=args.sr_hours),
-                'allowed_cidrs': allowed_cidrs,
-                'max_uses': args.sr_uses,
-                'current_uses': 0
-            }])
+            # Use centralized token creation method
+            SetupToken = env['sunray.setup.token']
+            token_obj, token_value = SetupToken.create_setup_token(
+                user_id=user.id,
+                host_id=host.id,
+                device_name=args.sr_device,
+                validity_hours=args.sr_hours,
+                max_uses=args.sr_uses,
+                allowed_cidrs=allowed_cidrs
+            )
             
             print(f"Setup token created successfully!")
-            print(f"ID:       {token.id}")
+            print(f"ID:       {token_obj.id}")
             print(f"User:     {user.username}")
+            print(f"Host:     {host.domain}")
             print(f"Device:   {args.sr_device}")
             print(f"Token:    {token_value}")
-            print(f"Expires:  {token.expires_at}")
+            print(f"Expires:  {token_obj.expires_at}")
             print(f"Max Uses: {args.sr_uses}")
             
             if allowed_cidrs:

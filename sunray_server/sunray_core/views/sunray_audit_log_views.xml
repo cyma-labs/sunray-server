@@ -29,8 +29,8 @@
                 <filter name="error" string="Error" domain="[('severity', '=', 'error')]"/>
                 <filter name="warning" string="Warning" domain="[('severity', '=', 'warning')]"/>
                 <separator/>
-                <filter name="today" string="Today" domain="[('timestamp', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
-                <filter name="last_week" string="Last 7 Days" domain="[('timestamp', '>=', (datetime.datetime.now() - datetime.timedelta(days=7)))]"/>
+                <filter name="today" string="Today" domain="[('timestamp', '>=', (context_today()).strftime('%Y-%m-%d'))]"/>
+                <filter name="last_week" string="Last 7 Days" domain="[('timestamp', '>=', (context_today() + relativedelta(days=-7)).strftime('%Y-%m-%d'))]"/>
                 <separator/>
                 <filter name="auth_events" string="Authentication" domain="[('event_type', 'in', ['auth_challenge', 'auth_success', 'auth_failure'])]"/>
                 <filter name="session_events" string="Sessions" domain="[('event_type', 'in', ['session_created', 'session_revoked', 'session_expired'])]"/>

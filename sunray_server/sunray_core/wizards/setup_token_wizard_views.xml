@@ -9,6 +9,7 @@
                 <!-- Show input fields when no token is generated yet -->
                 <group invisible="generated_token">
                     <field name="user_id" options="{'no_create': True}"/>
+                    <field name="host_id" options="{'no_create': True}"/>
                     <field name="device_name" placeholder="e.g., John's Laptop, iPhone 15"/>
                     <field name="validity_hours"/>
                     <field name="max_uses"/>

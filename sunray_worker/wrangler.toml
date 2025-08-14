@@ -29,6 +29,7 @@ CACHE_TTL = "300"
 SESSION_TTL = "86400"
 CHALLENGE_TTL = "300"
 WORKER_ID = "sunray-worker-001"
+LOG_LEVEL = "error"  # Options: debug, info, warn, error, none
 
 # Routes - Worker intercepts ALL requests to protected domain
 # Pattern with leading asterisk (*) will also protect subdomain variations (e.g., admin-odoo18-cfed-test-g.pack8s.com)

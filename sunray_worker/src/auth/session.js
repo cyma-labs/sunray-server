@@ -3,17 +3,19 @@
  */
 
 import { SignJWT, jwtVerify } from 'jose';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * Create a new session
  */
 export async function createSession(user, hostId, env) {
+  const logger = createLogger(env);
   const sessionId = crypto.randomUUID();
   const now = Date.now();
   const ttl = parseInt(env.SESSION_TTL || '86400') * 1000; // Convert to ms
   const expiresAt = now + ttl;
   
-  console.log(`[createSession] Creating session for user ${user.username} on host ${hostId}`);
+  logger.info(`[createSession] Creating session for user ${user.username} on host ${hostId}`);
   
   const sessionData = {
     session_id: sessionId,
@@ -25,11 +27,11 @@ export async function createSession(user, hostId, env) {
     is_active: true
   };
   
-  console.log(`[createSession] Session data:`, JSON.stringify(sessionData));
+  logger.debug(`[createSession] Session data:`, JSON.stringify(sessionData));
   
   // Store in KV
   const sessionKey = `session:${sessionId}`;
-  console.log(`[createSession] Storing in KV with key: ${sessionKey}`);
+  logger.debug(`[createSession] Storing in KV with key: ${sessionKey}`);
   
   await env.SESSIONS.put(
     sessionKey,
@@ -37,7 +39,7 @@ export async function createSession(user, hostId, env) {
     { expirationTtl: parseInt(env.SESSION_TTL || '86400') }
   );
   
-  console.log(`[createSession] Session stored successfully`);
+  logger.debug(`[createSession] Session stored successfully`);
   
   // Create JWT for cookie
   const secret = new TextEncoder().encode(env.SESSION_SECRET || 'default-secret-change-me');

@@ -7,8 +7,11 @@
         <field name="arch" type="xml">
             <list>
                 <field name="domain"/>
-                <field name="backend_url"/>
+                <field name="worker_url" optional="show"/>
+                <field name="backend_url" optional="show"/>
                 <field name="is_active" widget="boolean_toggle"/>
+                <field name="create_date" optional="show"/>
+                <field name="config_version" optional="show"/>
             </list>
         </field>
     </record>
@@ -37,15 +40,21 @@
         <field name="model">sunray.host</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="force_cache_refresh" string="Force Cache Refresh" icon="fa-refresh" type="object" class="btn-warning"
+                            confirm="This will immediately invalidate cached configuration for this host. Continue?"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
                             <field name="domain"/>
-                            <field name="backend_url"/>
+                            <field name="worker_url" widget="url"/>
+                            <field name="backend_url" widget="url"/>
                         </group>
                         <group>
                             <field name="is_active" widget="boolean_toggle"/>
                             <field name="create_date" readonly="1"/>
+                            <field name="config_version" readonly="1"/>
                         </group>
                     </group>
                     

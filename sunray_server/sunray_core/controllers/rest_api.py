@@ -129,16 +129,23 @@ class SunrayRESTController(http.Controller):
         if not self._authenticate_api(request):
             return self._error_response('Unauthorized', 401)
         
-        # Build configuration
+        # Build configuration with version tracking
         config = {
             'version': 3,
             'generated_at': fields.Datetime.now().isoformat(),
+            'config_version': fields.Datetime.now().isoformat(),  # Global config version
+            'host_versions': {},  # Per-host versions
+            'user_versions': {},  # Recently modified user versions
             'users': {},
             'hosts': []
         }
         
-        # Add users
+        # Add users and track recently modified versions
         user_objs = request.env['sunray.user'].sudo().search([('is_active', '=', True)])
+        
+        # Include users modified in the last 5 minutes
+        five_minutes_ago = fields.Datetime.now() - timedelta(minutes=5)
+        
         for user_obj in user_objs:
             config['users'][user_obj.username] = {
                 'email': user_obj.email,
@@ -146,6 +153,10 @@ class SunrayRESTController(http.Controller):
                 'created_at': user_obj.create_date.isoformat(),
                 'passkeys': []
             }
+            
+            # Track version for recently modified users
+            if user_obj.config_version and user_obj.config_version > five_minutes_ago:
+                config['user_versions'][user_obj.username] = user_obj.config_version.isoformat()
             
             # Add passkeys
             for passkey in user_obj.passkey_ids:
@@ -158,11 +169,16 @@ class SunrayRESTController(http.Controller):
                     'backup_state': passkey.backup_state
                 })
         
-        # Add hosts
+        # Add hosts with version tracking
         host_objs = request.env['sunray.host'].sudo().search([('is_active', '=', True)])
         for host_obj in host_objs:
+            # Track host version
+            if host_obj.config_version:
+                config['host_versions'][host_obj.domain] = host_obj.config_version.isoformat()
+            
             host_config = {
                 'domain': host_obj.domain,
+                'worker_url': host_obj.worker_url,
                 'backend': host_obj.backend_url,
                 'authorized_users': host_obj.user_ids.mapped('username'),
                 'session_duration_override': host_obj.session_duration_s,

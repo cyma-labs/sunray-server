@@ -112,6 +112,7 @@ class SunrayCommand(Command):
         host_create = host_sub.add_parser('create', help='Create host')
         host_create.add_argument('domain', help='Domain')
         host_create.add_argument('--sr-backend', help='Backend URL', default='')
+        host_create.add_argument('--sr-worker-url', help='Cloudflare Worker URL', required=True)
         host_create.add_argument('--sr-cidr', help='CIDR whitelist (comma-separated)')
         host_create.add_argument('--sr-public', help='Public URL patterns (comma-separated)')
         
@@ -150,6 +151,28 @@ class SunrayCommand(Command):
         setuptoken_delete = setuptoken_sub.add_parser('delete', help='Delete setup token')
         setuptoken_delete.add_argument('token_id', help='Setup token ID')
         
+        # Cache commands
+        cache = subparsers.add_parser('cache', help='Manage worker cache')
+        cache_sub = cache.add_subparsers(dest='action', help='Action')
+        
+        # cache status
+        cache_status = cache_sub.add_parser('status', help='Get cache status from worker')
+        
+        # cache invalidate
+        cache_invalidate = cache_sub.add_parser('invalidate', help='Trigger cache invalidation')
+        cache_invalidate.add_argument('--sr-scope', required=True,
+                                     choices=['global', 'user', 'host', 'config'],
+                                     help='Invalidation scope')
+        cache_invalidate.add_argument('--sr-target', help='Target for user/host scope')
+        cache_invalidate.add_argument('--sr-reason', help='Reason for invalidation')
+        
+        # cache clear
+        cache_clear = cache_sub.add_parser('clear', help='Clear cache directly')
+        cache_clear.add_argument('--sr-scope', required=True,
+                               choices=['all', 'config', 'sessions'],
+                               help='Cache scope to clear')
+        cache_clear.add_argument('--sr-target', help='Target for sessions scope')
+        
         # Parse arguments
         parsed_args = parser.parse_args(args)
         
@@ -183,6 +206,8 @@ class SunrayCommand(Command):
                     self._handle_host(env, parsed_args)
                 elif parsed_args.resource == 'setuptoken':
                     self._handle_setuptoken(env, parsed_args)
+                elif parsed_args.resource == 'cache':
+                    self._handle_cache(env, parsed_args)
                 
                 # Commit changes for write operations
                 if parsed_args.action in ['create', 'delete', 'revoke', 'create-token']:
@@ -477,14 +502,15 @@ class SunrayCommand(Command):
                 print("No hosts found")
                 return
             
-            print(f"{'DOMAIN':<30} {'ACTIVE':<8} {'CIDR':<10} {'PUBLIC':<10} {'USERS'}")
-            print("-" * 80)
+            print(f"{'DOMAIN':<25} {'WORKER URL':<35} {'ACTIVE':<8} {'CIDR':<10} {'PUBLIC':<10} {'USERS'}")
+            print("-" * 110)
             for host in hosts:
                 active = '✓' if host.is_active else '✗'
+                worker_url = host.worker_url[:32] + '...' if len(host.worker_url) > 35 else host.worker_url
                 cidr_count = len(host.allowed_cidrs.split('\n')) if host.allowed_cidrs else 0
                 public_count = len(host.public_url_patterns.split('\n')) if host.public_url_patterns else 0
                 user_count = len(host.user_ids)
-                print(f"{host.domain:<30} {active:<8} {cidr_count:<10} {public_count:<10} {user_count}")
+                print(f"{host.domain:<25} {worker_url:<35} {active:<8} {cidr_count:<10} {public_count:<10} {user_count}")
         
         elif args.action == 'get':
             # Search by domain
@@ -495,6 +521,7 @@ class SunrayCommand(Command):
                 return
             
             print(f"Domain:      {host.domain}")
+            print(f"Worker URL:  {host.worker_url}")
             print(f"Backend URL: {host.backend_url or 'Not configured'}")
             print(f"Active:      {'Yes' if host.is_active else 'No'}")
             print(f"Users:       {len(host.user_ids)}")
@@ -519,6 +546,7 @@ class SunrayCommand(Command):
             data = {
                 'domain': args.domain,
                 'backend_url': args.sr_backend or '',
+                'worker_url': args.sr_worker_url,
                 'is_active': True
             }
             
@@ -737,6 +765,141 @@ class SunrayCommand(Command):
             print(f"  ID: {token_id}")
             print(f"  User: {user}")
             print(f"  Device: {device}")
+    
+    def _handle_cache(self, env, args):
+        """Handle cache operations"""
+        
+        if args.action == 'status':
+            # For status, we need to determine which worker to query
+            if args.sr_scope == 'host' and args.sr_target:
+                # Get specific host's worker
+                Host = env['sunray.host']
+                host = Host.search([('domain', '=', args.sr_target)], limit=1)
+                if not host:
+                    print(f"Error: Host '{args.sr_target}' not found")
+                    return
+                worker_urls = [host.worker_url]
+            else:
+                # Get all unique worker URLs
+                Host = env['sunray.host']
+                hosts = Host.search([('is_active', '=', True)])
+                worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
+                
+                if not worker_urls:
+                    print("Error: No active hosts with worker URLs found")
+                    return
+            
+            # Query each worker
+            for worker_url in worker_urls:
+                print(f"\n=== Worker: {worker_url} ===")
+                self._query_worker_status(env, worker_url)
+                
+        elif args.action == 'invalidate':
+            # Use model method for invalidation
+            self._handle_cache_invalidate(env, args)
+            
+        elif args.action == 'clear':
+            print("Clear cache not implemented - use invalidate instead")
+    
+    def _query_worker_status(self, env, worker_url):
+        """Query a single worker's cache status"""
+        import requests
+        
+        # Get API key
+        api_key_obj = env['sunray.api.key'].sudo().search([
+            ('is_active', '=', True)
+        ], limit=1)
+        
+        if not api_key_obj:
+            print("Error: No active API key found")
+            return
+        
+        headers = {
+            'Authorization': f'Bearer {api_key_obj.key}',
+            'Content-Type': 'application/json'
+        }
+        
+        url = f"{worker_url}/sunray-wrkr/v1/cache"
+        try:
+            response = requests.get(url, headers=headers, timeout=5)
+            response.raise_for_status()
+            status = response.json()
+            
+            print("Cache Status:")
+            print(f"  Worker ID: {status.get('worker_id', 'N/A')}")
+            print(f"  Timestamp: {status.get('timestamp', 'N/A')}")
+            
+            if 'caches' in status:
+                caches = status['caches']
+                if 'config' in caches:
+                    config = caches['config']
+                    print("\nConfiguration Cache:")
+                    print(f"  Exists: {config.get('exists', False)}")
+                    if config.get('exists'):
+                        print(f"  Age: {config.get('age_seconds', 0)} seconds")
+                        print(f"  TTL: {config.get('ttl_seconds', 0)} seconds")
+                        print(f"  Last Version Check: {config.get('last_version_check', 'N/A')}")
+            
+            if 'invalidation_tracker' in status:
+                tracker = status['invalidation_tracker']
+                print("\nInvalidation Tracker:")
+                print(f"  Processed Count: {tracker.get('processed_count', 0)}")
+                print(f"  Last Invalidation: {tracker.get('last_invalidation', 'Never')}")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting cache status: {e}")
+    
+    def _handle_cache_invalidate(self, env, args):
+        """Handle cache invalidation using model methods"""
+        if args.sr_scope == 'host':
+            # Invalidate specific host cache
+            if not args.sr_target:
+                print("Error: --sr-target required for host scope")
+                return
+                
+            Host = env['sunray.host']
+            host = Host.search([('domain', '=', args.sr_target)], limit=1)
+            if not host:
+                print(f"Error: Host '{args.sr_target}' not found")
+                return
+            
+            try:
+                result = host._call_worker_cache_invalidate(
+                    scope=args.sr_scope,
+                    target=args.sr_target,
+                    reason=args.sr_reason or f'CLI invalidation by {env.user.name}'
+                )
+                print(f"✓ Cache invalidation triggered for host {args.sr_target}")
+                print(f"  Message: {result.get('message', 'Success')}")
+            except Exception as e:
+                print(f"✗ Cache invalidation failed: {e}")
+        
+        else:
+            # For global/user scope, invalidate across all workers
+            Host = env['sunray.host']
+            hosts = Host.search([('is_active', '=', True)])
+            worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
+            
+            if not worker_urls:
+                print("Error: No active hosts with worker URLs found")
+                return
+            
+            success_count = 0
+            for worker_url in worker_urls:
+                # Pick any host with this worker_url to call the method
+                host = hosts.filtered(lambda h: h.worker_url == worker_url)[0]
+                try:
+                    result = host._call_worker_cache_invalidate(
+                        scope=args.sr_scope,
+                        target=args.sr_target,
+                        reason=args.sr_reason or f'CLI invalidation by {env.user.name}'
+                    )
+                    print(f"✓ Cache invalidation triggered on {worker_url}")
+                    success_count += 1
+                except Exception as e:
+                    print(f"✗ Failed to invalidate cache on {worker_url}: {e}")
+            
+            print(f"\nInvalidated cache on {success_count}/{len(worker_urls)} workers")
 
 
 # Register the command

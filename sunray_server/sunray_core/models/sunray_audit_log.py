@@ -32,6 +32,7 @@ class SunrayAuditLog(models.Model):
         ('webhook.used', 'Webhook Token Used'),
         ('webhook.regenerated', 'Webhook Token Regenerated'),
         ('api_key.regenerated', 'API Key Regenerated'),
+        ('cache_invalidation', 'Cache Invalidation'),
         ('security.alert', 'Security Alert'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
         ('SESSION_IP_CHANGED', 'Session IP Changed'),
@@ -40,7 +41,7 @@ class SunrayAuditLog(models.Model):
     ], required=True, string='Event Type')
     
     user_id = fields.Many2one(
-        'sunray.user',
+        'res.users',
         string='User'
     )
     username = fields.Char(

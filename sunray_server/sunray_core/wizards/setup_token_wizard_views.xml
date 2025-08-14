@@ -17,7 +17,7 @@
                 </group>
                 
                 <!-- Show instructions when token is generated -->
-                <div invisible="not generated_token" class="alert alert-success">
+                <div invisible="not generated_token" class="alert alert-success" role="alert">
                     <field name="token_display" readonly="1" widget="text" nolabel="1"/>
                 </div>
                 

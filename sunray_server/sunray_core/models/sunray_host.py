@@ -33,9 +33,9 @@ class SunrayHost(models.Model):
         help='Cloudflare Worker URL protecting this domain (e.g., https://sunray-worker.example.workers.dev)'
     )
     is_active = fields.Boolean(
-        string='Active', 
+        string='Is Sunray Active?', 
         default=True,
-        help='Deactivate to temporarily disable host protection'
+        help='When disabled, host becomes publicly accessible through Worker route (no authentication required)'
     )
     
     # Security Exceptions (whitelist approach)

@@ -224,21 +224,16 @@ class SunrayRESTController(http.Controller):
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_minutes': host_obj.waf_bypass_revalidation_minutes or 15,
                 
-                # Token authentication
+                # Token authentication (deprecated - kept for backward compatibility)
                 'webhook_header_name': host_obj.webhook_header_name,
                 'webhook_param_name': host_obj.webhook_param_name,
                 'webhook_tokens': []
             }
             
-            # Add active webhook tokens
+            # Add active webhook tokens with per-token extraction config
             for token_obj in host_obj.webhook_token_ids.filtered('is_active'):
                 if token_obj.is_valid():
-                    host_config['webhook_tokens'].append({
-                        'token': token_obj.token,
-                        'name': token_obj.name,
-                        'allowed_cidrs': token_obj.get_allowed_cidrs(),
-                        'expires_at': token_obj.expires_at.isoformat() if token_obj.expires_at else None
-                    })
+                    host_config['webhook_tokens'].append(token_obj.get_extraction_config())
             
             config['hosts'].append(host_config)
         

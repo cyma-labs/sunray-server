@@ -18,15 +18,16 @@ class TestCacheInvalidation(TransactionCase):
         self.ApiKey = self.env['sunray.api.key']
         
         # Create test API key
-        self.api_key = self.ApiKey.create({
+        self.api_key = self.ApiKey.create([{
             'name': 'test_worker_key',
             'is_active': True,
             'scopes': 'config:read'
-        })
+        }])
         
         # Create test host
         self.host = self.Host.create({
             'domain': 'test.example.com',
+            'worker_url': 'https://test-worker.example.com',
             'backend_url': 'http://backend.example.com',
             'is_active': True
         })
@@ -77,8 +78,8 @@ class TestCacheInvalidation(TransactionCase):
     def test_config_endpoint_includes_versions(self):
         """Test that /config endpoint includes version information"""
         # Create API controller
-        from odoo.addons.sunray_core.controllers.rest_api import SunrayAPIController
-        controller = SunrayAPIController()
+        from odoo.addons.sunray_core.controllers.rest_api import SunrayRESTController
+        controller = SunrayRESTController()
         
         # Mock request
         with patch('odoo.http.request') as mock_request:
@@ -189,7 +190,7 @@ class TestCacheInvalidation(TransactionCase):
         # Check audit log was created
         audit_log = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'cache_invalidation'),
-            ('user_id', '=', self.user.id)
+            ('sunray_user_id', '=', self.user.id)
         ], limit=1)
         self.assertTrue(audit_log)
     
@@ -214,8 +215,9 @@ class TestCacheInvalidation(TransactionCase):
     @patch('requests.post')
     def test_force_cache_refresh_no_api_key(self, mock_post):
         """Test force_cache_refresh when no API key exists"""
-        # Delete API key
-        self.api_key.unlink()
+        # Delete ALL active API keys to ensure the test condition
+        all_api_keys = self.env['sunray.api.key'].sudo().search([('is_active', '=', True)])
+        all_api_keys.unlink()
         
         # Set worker URL
         self.env['ir.config_parameter'].sudo().set_param(
@@ -234,11 +236,13 @@ class TestCacheInvalidation(TransactionCase):
         # Create additional hosts
         host2 = self.Host.create({
             'domain': 'test2.example.com',
+            'worker_url': 'https://test-worker.example.com',
             'backend_url': 'http://backend2.example.com'
         })
         
         host3 = self.Host.create({
             'domain': 'test3.example.com',
+            'worker_url': 'https://test-worker.example.com',
             'backend_url': 'http://backend3.example.com'
         })
         
@@ -304,6 +308,7 @@ class TestCacheInvalidation(TransactionCase):
         # Create additional hosts
         host2 = self.Host.create({
             'domain': 'test2.example.com',
+            'worker_url': 'https://test-worker.example.com',
             'backend_url': 'http://backend2.example.com'
         })
         
@@ -324,8 +329,8 @@ class TestCacheInvalidation(TransactionCase):
     
     def test_version_format_in_api_response(self):
         """Test that versions are properly formatted in API response"""
-        from odoo.addons.sunray_core.controllers.rest_api import SunrayAPIController
-        controller = SunrayAPIController()
+        from odoo.addons.sunray_core.controllers.rest_api import SunrayRESTController
+        controller = SunrayRESTController()
         
         with patch('odoo.http.request') as mock_request:
             mock_request.env = self.env

@@ -153,6 +153,39 @@ The Cloudflare Worker uses **Vitest** as its testing framework. Vitest is chosen
 - Compatible with Wrangler's testing utilities
 - Zero-config TypeScript support
 
+**Important Test File Requirements:**
+- Test files MUST be located in the `src/` directory (NOT in `test/` directory)
+- Test files MUST use `.test.js` extension (e.g., `src/example.test.js`)
+- Vitest uses glob pattern `**/*.{test,spec}.?(c|m)[jt]s?(x)` to find tests
+- Files in `test/` directory are NOT automatically discovered by Vitest
+
+**Correct test file locations:**
+```bash
+# ✅ CORRECT - These will be found and run
+src/cache.test.js
+src/invalidation-tracker.test.js  
+src/multi-provider-tokens.test.js
+
+# ❌ INCORRECT - These will NOT be found
+test/test-multi-provider.js
+test/webhook-tests.js
+```
+
+**Running tests:**
+```bash
+# Run all tests (finds *.test.js in src/)
+npm test
+
+# Run specific test file
+npm test src/multi-provider-tokens.test.js
+
+# Run tests with specific pattern
+npx vitest run src/cache.test.js
+
+# Watch mode for development
+npm run test:watch
+```
+
 Example test structure:
 ```javascript
 // src/example.test.js
@@ -164,6 +197,38 @@ describe('Worker Handler', () => {
     const request = new Request('https://example.com');
     const response = await handleRequest(request);
     expect(response.status).toBe(200);
+  });
+});
+```
+
+**Testing Worker Functions:**
+When testing worker functions that aren't exported from the main module, you can:
+1. Copy the function code into the test file (for unit testing)
+2. Move functions to separate modules and import them
+3. Use dynamic imports or require() if needed
+
+Example for testing internal functions:
+```javascript
+// src/token-validation.test.js
+import { describe, it, expect } from 'vitest';
+
+// Copy function from handler.js for testing
+function extractTokenByConfig(request, tokenConfig, url, logger) {
+  // ... function implementation
+}
+
+describe('Token Extraction', () => {
+  it('should extract Shopify token from header', () => {
+    const request = new Request('https://api.example.com', {
+      headers: { 'X-Shopify-Hmac-Sha256': 'test_token' }
+    });
+    const tokenConfig = {
+      name: 'Shopify',
+      header_name: 'X-Shopify-Hmac-Sha256',
+      token_source: 'header'
+    };
+    const result = extractTokenByConfig(request, tokenConfig, new URL(request.url), console);
+    expect(result).toBe('test_token');
   });
 });
 ```

@@ -18,12 +18,12 @@ Webhook tokens complement Sunray's WebAuthn/passkey authentication by providing 
 - **Flexible IP filtering**: Support for single IPs (`192.168.1.100`) or CIDR blocks (`192.168.1.0/24`)
 - **Comment support**: Inline documentation for IP restrictions
 
-### ð **Expiration Management**
+### ï¿½ **Expiration Management**
 - **Optional expiration dates**: Tokens can be time-limited or permanent
 - **Automatic validation**: Expired tokens are automatically rejected
 - **Grace period handling**: Clean expiration without breaking existing workflows
 
-### =Ê **Usage Tracking & Analytics**
+### =ï¿½ **Usage Tracking & Analytics**
 - **Usage counters**: Track how many times each token has been used
 - **Last used timestamps**: Monitor token activity patterns
 - **Active/inactive states**: Temporarily disable tokens without deletion
@@ -40,7 +40,7 @@ Webhook tokens complement Sunray's WebAuthn/passkey authentication by providing 
 - **Bearer tokens**: `Authorization: Bearer xxx`
 - **Flexible extraction**: Supports multiple token delivery methods
 
-### <× **Per-Host Configuration**
+### <ï¿½ **Per-Host Configuration**
 - **Host-specific tokens**: Each protected host can have its own set of tokens
 - **URL pattern matching**: Define which endpoints accept token authentication
 - **Custom header/parameter names**: Customize token extraction for each host
@@ -70,7 +70,7 @@ Webhook tokens complement Sunray's WebAuthn/passkey authentication by providing 
 ### Creating Webhook Tokens
 
 1. **Navigate to Host Configuration**:
-   - Go to Sunray ’ Hosts ’ Select your host
+   - Go to Sunray ï¿½ Hosts ï¿½ Select your host
    - Scroll to "Webhook Tokens" section
 
 2. **Add New Token**:
@@ -354,6 +354,114 @@ new_token_value = token.regenerate_token()
 # Check token validity
 is_valid = token.is_valid(client_ip='192.168.1.100')
 ```
+
+## Multi-Provider Webhook Support
+
+### Overview
+
+**NEW**: Sunray now supports multiple webhook providers on the same host with per-token authentication configuration. This eliminates the previous limitation where all tokens on a host had to use the same header or parameter name.
+
+### Real-World Multi-Provider Scenario
+
+```python
+# Example: E-commerce platform receiving webhooks from multiple providers
+host_config = {
+    'domain': 'api.shop.example.com',
+    'webhook_tokens': [
+        {
+            'name': 'Shopify Order Updates',
+            'token': 'shopify_webhook_secret_xyz',
+            'header_name': 'X-Shopify-Hmac-Sha256',
+            'token_source': 'header'
+        },
+        {
+            'name': 'Stripe Payment Events', 
+            'token': 'stripe_webhook_secret_abc',
+            'header_name': 'Stripe-Signature',
+            'token_source': 'header'
+        },
+        {
+            'name': 'Mirakl Marketplace API',
+            'token': 'mirakl_api_key_123',
+            'header_name': 'Authorization',
+            'token_source': 'header'
+        },
+        {
+            'name': 'Legacy Inventory System',
+            'token': 'legacy_api_token_456',
+            'param_name': 'api_key',
+            'token_source': 'param'
+        }
+    ]
+}
+```
+
+### Token Source Options
+
+- **`header`**: Extract token from specified HTTP header only
+- **`param`**: Extract token from specified URL parameter only  
+- **`both`**: Try header first, fall back to parameter if header not found
+
+### Configuration Examples
+
+#### Shopify Webhooks
+```
+Name: Shopify Order Webhook
+Header Name: X-Shopify-Hmac-Sha256
+Token Source: Header Only
+Token: [auto-generated secure token]
+```
+
+#### Stripe Webhooks
+```
+Name: Stripe Payment Webhook
+Header Name: Stripe-Signature
+Token Source: Header Only
+Token: [auto-generated secure token]
+```
+
+#### GitHub Webhooks
+```
+Name: GitHub Repository Webhook
+Header Name: X-Hub-Signature-256
+Token Source: Header Only
+Token: [auto-generated secure token]
+```
+
+#### Legacy API Integration
+```
+Name: Legacy System API
+Parameter Name: api_key
+Token Source: Parameter Only
+Token: [auto-generated secure token]
+```
+
+#### Flexible API (supports both)
+```
+Name: Flexible API Client
+Header Name: X-API-Key
+Parameter Name: key
+Token Source: Both (Header First)
+Token: [auto-generated secure token]
+```
+
+### Migration from Previous Version
+
+**Automatic Compatibility**: Existing deployments continue to work without changes. The host-level `webhook_header_name` and `webhook_param_name` fields are still supported for backward compatibility but are now marked as deprecated.
+
+**Recommended Upgrade Path**:
+1. Create new tokens with per-token configuration
+2. Update client systems to use provider-specific headers
+3. Test thoroughly in staging environment
+4. Remove old host-level configuration when ready
+
+### Benefits
+
+- **True Multi-Provider Support**: Host the same application behind Sunray and receive webhooks from Shopify, Stripe, GitHub, etc.
+- **Provider-Specific Security**: Each provider can use its own authentication method
+- **Simplified Configuration**: No more conflicts between different webhook formats
+- **Better Audit Trail**: Token usage logs show which provider authenticated
+- **Flexible Deployment**: Same configuration works for development, staging, and production
 
 ---
 

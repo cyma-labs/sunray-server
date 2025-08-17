@@ -57,9 +57,9 @@ export async function handleRequest(request, env, ctx) {
   if (hostConfig.token_url_patterns && hostConfig.token_url_patterns.length > 0) {
     for (const pattern of hostConfig.token_url_patterns) {
       if (checkTokenURL(url.pathname, pattern)) {
-        const token = extractToken(request, hostConfig);
-        if (token && validateWebhookToken(token, hostConfig.webhook_tokens)) {
-          logger.info(`Token auth granted for ${url.pathname}`);
+        const validatedToken = extractAndValidateTokens(request, hostConfig, logger);
+        if (validatedToken) {
+          logger.info(`Token auth granted for ${url.pathname} using token '${validatedToken.name}'`);
           return fetch(request);  // Pass through to origin
         }
       }
@@ -162,7 +162,111 @@ export async function handleRequest(request, env, ctx) {
 // Removed proxyRequest function - we now pass through directly to origin
 
 /**
- * Extract token from request (header or query param)
+ * Extract and validate tokens using per-token configuration
+ */
+function extractAndValidateTokens(request, hostConfig, logger) {
+  if (!hostConfig.webhook_tokens || hostConfig.webhook_tokens.length === 0) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+  
+  // Try each configured token
+  for (const tokenConfig of hostConfig.webhook_tokens) {
+    const extractedToken = extractTokenByConfig(request, tokenConfig, url, logger);
+    
+    if (extractedToken && isTokenValid(extractedToken, tokenConfig, logger)) {
+      logger.debug(`Token validation successful for '${tokenConfig.name}'`);
+      return tokenConfig;
+    }
+  }
+  
+  logger.debug('No valid tokens found');
+  return null;
+}
+
+/**
+ * Extract token based on individual token configuration
+ */
+function extractTokenByConfig(request, tokenConfig, url, logger) {
+  const { header_name, param_name, token_source } = tokenConfig;
+  
+  logger.debug(`Extracting token for '${tokenConfig.name}' with source '${token_source}'`);
+  
+  switch (token_source) {
+    case 'header':
+      if (header_name) {
+        const headerValue = request.headers.get(header_name);
+        if (headerValue) {
+          logger.debug(`Found token in header '${header_name}'`);
+          return headerValue;
+        }
+      }
+      break;
+      
+    case 'param':
+      if (param_name) {
+        const paramValue = url.searchParams.get(param_name);
+        if (paramValue) {
+          logger.debug(`Found token in parameter '${param_name}'`);
+          return paramValue;
+        }
+      }
+      break;
+      
+    case 'both':
+      // Try header first, then parameter
+      if (header_name) {
+        const headerValue = request.headers.get(header_name);
+        if (headerValue) {
+          logger.debug(`Found token in header '${header_name}' (both mode)`);
+          return headerValue;
+        }
+      }
+      if (param_name) {
+        const paramValue = url.searchParams.get(param_name);
+        if (paramValue) {
+          logger.debug(`Found token in parameter '${param_name}' (both mode)`);
+          return paramValue;
+        }
+      }
+      break;
+  }
+  
+  logger.debug(`No token found for '${tokenConfig.name}'`);
+  return null;
+}
+
+/**
+ * Validate if extracted token matches the configured token
+ */
+function isTokenValid(extractedToken, tokenConfig, logger) {
+  // Check if token matches
+  if (extractedToken !== tokenConfig.token) {
+    logger.debug(`Token mismatch for '${tokenConfig.name}'`);
+    return false;
+  }
+  
+  // Check if token is active
+  if (!tokenConfig.is_active) {
+    logger.debug(`Token '${tokenConfig.name}' is inactive`);
+    return false;
+  }
+  
+  // Check expiration
+  if (tokenConfig.expires_at) {
+    const expiresAt = new Date(tokenConfig.expires_at);
+    if (expiresAt < new Date()) {
+      logger.debug(`Token '${tokenConfig.name}' has expired`);
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Legacy: Extract token from request (kept for backward compatibility)
  */
 function extractToken(request, hostConfig) {
   // Check header first
@@ -188,7 +292,7 @@ function extractToken(request, hostConfig) {
 }
 
 /**
- * Validate webhook token
+ * Legacy: Validate webhook token (kept for backward compatibility)
  */
 function validateWebhookToken(token, validTokens) {
   if (!validTokens || validTokens.length === 0) return false;

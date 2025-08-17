@@ -77,9 +77,11 @@
                                 <field name="waf_bypass_revalidation_minutes" invisible="not bypass_waf_for_authenticated"/>
                             </group>
                             
-                            <group string="Webhook Settings">
-                                <field name="webhook_header_name"/>
-                                <field name="webhook_param_name"/>
+                            <group string="Webhook Settings (Deprecated)">
+                                <field name="webhook_header_name" 
+                                       help="Default header name - configure per-token instead"/>
+                                <field name="webhook_param_name" 
+                                       help="Default parameter name - configure per-token instead"/>
                             </group>
                         </page>
                         
@@ -91,11 +93,54 @@
                             <field name="webhook_token_ids">
                                 <list>
                                     <field name="name"/>
-                                    <field name="is_active"/>
-                                    <field name="expires_at"/>
-                                    <field name="last_used"/>
+                                    <field name="token_source"/>
+                                    <field name="header_name" optional="show"/>
+                                    <field name="param_name" optional="show"/>
+                                    <field name="is_active" widget="boolean_toggle"/>
+                                    <field name="expires_at" optional="show"/>
+                                    <field name="last_used" optional="show"/>
+                                    <field name="usage_count" optional="show"/>
                                 </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <group name="basic_info">
+                                                <field name="name"/>
+                                                <field name="token" password="True"/>
+                                                <field name="is_active"/>
+                                            </group>
+                                            <group name="extraction_config">
+                                                <field name="token_source"/>
+                                                <field name="header_name" 
+                                                       invisible="token_source == 'param'"
+                                                       required="token_source in ('header', 'both')"/>
+                                                <field name="param_name" 
+                                                       invisible="token_source == 'header'"
+                                                       required="token_source in ('param', 'both')"/>
+                                            </group>
+                                        </group>
+                                        
+                                        <group string="Access Restrictions">
+                                            <field name="allowed_cidrs" 
+                                                   placeholder="192.168.1.0/24&#10;10.0.0.0/8&#10;# Comments supported"/>
+                                            <field name="expires_at"/>
+                                        </group>
+                                        
+                                        <group string="Usage Statistics">
+                                            <field name="usage_count" readonly="1"/>
+                                            <field name="last_used" readonly="1"/>
+                                        </group>
+                                    </sheet>
+                                </form>
                             </field>
+                            
+                            <div class="mt16">
+                                <h3>Examples for Common Providers:</h3>
+                                <p><strong>Shopify:</strong> Header = X-Shopify-Hmac-Sha256, Source = Header Only</p>
+                                <p><strong>Stripe:</strong> Header = Stripe-Signature, Source = Header Only</p>
+                                <p><strong>GitHub:</strong> Header = X-Hub-Signature-256, Source = Header Only</p>
+                                <p><strong>Generic API:</strong> Parameter = api_key, Source = Parameter Only</p>
+                            </div>
                         </page>
                     </notebook>
                 </sheet>

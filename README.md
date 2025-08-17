@@ -198,17 +198,201 @@ bin/sunray-srvr shell
 
 ## 🧪 Testing
 
+Sunray includes comprehensive test suites for both server (Odoo) and worker (Cloudflare) components with dedicated test scripts for easy execution.
+
+### Prerequisites
+
+- **Database**: PostgreSQL with test database access
+- **Node.js**: Version 20.x for worker tests  
+- **Environment**: All required environment variables configured
+- **Dependencies**: `npm install` completed in `sunray_worker/`
+
+### Quick Start
+
 ```bash
-# Run Worker tests locally
-cd sunray_worker
-npm test
+# Run server tests (Odoo/Python)
+./test_server.sh
 
-# Test with local Odoo server
-bin/sunray-srvr --test-enable -u sunray_core
+# Run worker tests (Vitest/Node.js)
+./test_worker.sh
 
-# End-to-end testing
-npm run test:e2e
+# Run both with coverage
+./test_server.sh --coverage && ./test_worker.sh --coverage
 ```
+
+### Server Tests (Odoo)
+
+The `test_server.sh` script provides comprehensive testing for the Sunray Server (Odoo addon):
+
+#### Basic Usage
+```bash
+# Run sunray_core tests (default)
+./test_server.sh
+
+# Run with verbose debug output
+./test_server.sh --verbose
+
+# Run all module tests
+./test_server.sh --full
+
+# Generate coverage report  
+./test_server.sh --coverage
+```
+
+#### Advanced Options
+```bash
+# Clean database before testing
+./test_server.sh --clean
+
+# Run specific test class
+./test_server.sh --test TestCacheInvalidation
+
+# Run specific test method
+./test_server.sh --test TestWebhookToken --method test_token_creation
+
+# Stop on first failure
+./test_server.sh --stop-on-fail
+
+# List available tests
+./test_server.sh --list-tests
+```
+
+#### Test Categories
+- **Multi-provider webhook tokens**: Authentication for Shopify, Stripe, GitHub webhooks
+- **Cache invalidation**: Version tracking and worker synchronization
+- **User management**: WebAuthn passkey registration and validation
+- **Host configuration**: Protected resource management
+- **Audit logging**: Security event tracking and compliance
+
+### Worker Tests (Vitest)
+
+The `test_worker.sh` script provides testing for the Cloudflare Worker components:
+
+#### Basic Usage
+```bash
+# Run all tests once
+./test_worker.sh
+
+# Development watch mode (auto-rerun on changes)
+./test_worker.sh --watch
+
+# Generate coverage report
+./test_worker.sh --coverage
+
+# Run with visual UI
+./test_worker.sh --ui
+```
+
+#### Advanced Options
+```bash
+# Run specific test file
+./test_worker.sh cache.test.js
+
+# Verbose output with debug info
+./test_worker.sh --verbose
+
+# Stop on first failure
+./test_worker.sh --bail
+
+# Environment validation only
+./test_worker.sh --check-env
+
+# List available tests
+./test_worker.sh --list-tests
+```
+
+#### Test Categories
+- **Cache management**: Configuration caching and invalidation
+- **Token extraction**: Multi-provider webhook authentication
+- **Session handling**: WebAuthn session management
+- **Request routing**: Protected resource access control
+
+### Test Output and Logs
+
+Both scripts generate detailed logs and reports:
+
+```bash
+# Logs are saved to
+./test_logs/
+├── server_test_20250817_094512.log
+├── worker_test_20250817_094630.log
+└── ...
+
+# Coverage reports in  
+./coverage/
+├── server_coverage_20250817_094512.html
+├── worker_coverage_20250817_094630/
+└── ...
+```
+
+### Continuous Integration
+
+For CI/CD pipelines, use the scripts with appropriate flags:
+
+```yaml
+# GitHub Actions example
+- name: Test Server
+  run: ./test_server.sh --coverage --stop-on-fail
+
+- name: Test Worker  
+  run: ./test_worker.sh --coverage --bail
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+**Server Tests Failing**:
+```bash
+# Check database connection
+bin/sunray-srvr --help
+
+# Verify addon installation
+bin/sunray-srvr -i sunray_core --stop-after-init
+
+# Clean test with fresh database
+./test_server.sh --clean --verbose
+```
+
+**Worker Tests Failing**:
+```bash
+# Verify Node.js version
+node --version  # Should be 20.x
+
+# Check dependencies
+./test_worker.sh --check-env
+
+# Reinstall dependencies
+cd sunray_worker && rm -rf node_modules && npm install
+```
+
+**Database Constraint Errors**:
+These are often expected validation tests. Look for:
+- `ERREUR: la nouvelle ligne de la relation « sunray_webhook_token » viole la contrainte`
+- These prove our validation logic is working correctly
+
+### Performance Benchmarks
+
+Test execution times on typical development machine:
+- **Server tests**: ~10 seconds (32 tests)
+- **Worker tests**: ~2 seconds (15+ tests)  
+- **Coverage generation**: Additional ~5 seconds each
+
+### Test Development
+
+When adding new tests:
+
+**Server (Python/Odoo)**:
+- Place in `sunray_server/sunray_core/tests/`
+- Follow pattern: `test_feature_name.py`
+- Extend `TransactionCase` for database tests
+- Import in `tests/__init__.py`
+
+**Worker (JavaScript/Vitest)**:
+- Place in `sunray_worker/src/`
+- Follow pattern: `feature.test.js`
+- Use Vitest API: `describe()`, `test()`, `expect()`
+- Mock Cloudflare Worker APIs as needed
 
 ## 🛟 Support
 

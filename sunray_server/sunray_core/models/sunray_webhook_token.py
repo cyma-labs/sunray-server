@@ -53,8 +53,29 @@ class SunrayWebhookToken(models.Model):
         help='Token expiration date (empty = never expires)'
     )
     
+    # Token extraction configuration
+    header_name = fields.Char(
+        string='Header Name',
+        help='HTTP header name for this token (e.g., X-Shopify-Hmac-Sha256, Authorization)'
+    )
+    param_name = fields.Char(
+        string='Parameter Name',
+        help='URL parameter name for this token (e.g., api_key, token)'
+    )
+    token_source = fields.Selection([
+        ('header', 'HTTP Header Only'),
+        ('param', 'URL Parameter Only'),
+        ('both', 'Both (Header First)')
+    ], string='Token Source', default='header',
+       help='Where to extract the token from')
+    
     _sql_constraints = [
-        ('token_unique', 'UNIQUE(token)', 'Token must be unique!')
+        ('token_unique', 'UNIQUE(token)', 'Token must be unique!'),
+        ('source_config_check', 
+         "CHECK((token_source = 'header' AND header_name IS NOT NULL) OR "
+         "(token_source = 'param' AND param_name IS NOT NULL) OR "
+         "(token_source = 'both' AND (header_name IS NOT NULL OR param_name IS NOT NULL)))",
+         'Header name required for header source, parameter name required for param source!')
     ]
     
     def create(self, vals_list):
@@ -172,3 +193,16 @@ class SunrayWebhookToken(models.Model):
         )
         
         return True
+    
+    def get_extraction_config(self):
+        """Get token extraction configuration for worker"""
+        self.ensure_one()
+        return {
+            'token': self.token,
+            'name': self.name,
+            'header_name': self.header_name,
+            'param_name': self.param_name,
+            'token_source': self.token_source,
+            'allowed_cidrs': self.get_allowed_cidrs(),
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }

@@ -20,6 +20,7 @@ class TestVersionTracking(TransactionCase):
         # Create test host
         self.test_host = self.env['sunray.host'].create({
             'domain': 'test-version.example.com',
+            'worker_url': 'https://worker.test-version.example.com',
             'backend_url': 'http://backend.example.com',
             'is_active': True
         })
@@ -155,6 +156,7 @@ class TestVersionTracking(TransactionCase):
             'name': 'Test Webhook',
             'token': 'webhook-token-123',
             'host_id': self.test_host.id,
+            'header_name': 'X-Test-Token',  # Required for token_source='header' (default)
             'is_active': True
         }])
         

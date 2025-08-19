@@ -179,12 +179,6 @@
                                 <field name="waf_bypass_revalidation_minutes" invisible="not bypass_waf_for_authenticated"/>
                             </group>
                             
-                            <group string="Webhook Settings (Deprecated)">
-                                <field name="webhook_header_name" 
-                                       help="Default header name - configure per-token instead"/>
-                                <field name="webhook_param_name" 
-                                       help="Default parameter name - configure per-token instead"/>
-                            </group>
                         </page>
                         
                     </notebook>

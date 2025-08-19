@@ -213,29 +213,6 @@ function extractAndValidateTokensByConfig(request, tokenConfigs, logger) {
   return null;
 }
 
-/**
- * Legacy: Extract and validate tokens using per-token configuration
- */
-function extractAndValidateTokens(request, hostConfig, logger) {
-  if (!hostConfig.webhook_tokens || hostConfig.webhook_tokens.length === 0) {
-    return null;
-  }
-
-  const url = new URL(request.url);
-  
-  // Try each configured token
-  for (const tokenConfig of hostConfig.webhook_tokens) {
-    const extractedToken = extractTokenByConfig(request, tokenConfig, url, logger);
-    
-    if (extractedToken && isTokenValid(extractedToken, tokenConfig, logger)) {
-      logger.debug(`Token validation successful for '${tokenConfig.name}'`);
-      return tokenConfig;
-    }
-  }
-  
-  logger.debug('No valid tokens found');
-  return null;
-}
 
 /**
  * Extract token based on individual token configuration
@@ -317,53 +294,7 @@ function isTokenValid(extractedToken, tokenConfig, logger) {
   return true;
 }
 
-/**
- * Legacy: Extract token from request (kept for backward compatibility)
- */
-function extractToken(request, hostConfig) {
-  // Check header first
-  if (hostConfig.webhook_header_name) {
-    const headerToken = request.headers.get(hostConfig.webhook_header_name);
-    if (headerToken) return headerToken;
-  }
-  
-  // Check query parameter
-  if (hostConfig.webhook_param_name) {
-    const url = new URL(request.url);
-    const paramToken = url.searchParams.get(hostConfig.webhook_param_name);
-    if (paramToken) return paramToken;
-  }
-  
-  // Check Authorization header
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  
-  return null;
-}
 
-/**
- * Legacy: Validate webhook token (kept for backward compatibility)
- */
-function validateWebhookToken(token, validTokens) {
-  if (!validTokens || validTokens.length === 0) return false;
-  
-  for (const validToken of validTokens) {
-    if (validToken.token === token && validToken.is_active) {
-      // Check if token has expired
-      if (validToken.expires_at) {
-        const expiresAt = new Date(validToken.expires_at);
-        if (expiresAt < new Date()) {
-          continue;
-        }
-      }
-      return true;
-    }
-  }
-  
-  return false;
-}
 
 /**
  * Get cookie value

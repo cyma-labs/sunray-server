@@ -160,9 +160,8 @@ class TestVersionTracking(TransactionCase):
             'is_active': True
         }])
         
-        # Host version should be updated due to relation
-        # Note: This might need explicit handling in the model
-        self.test_host.write({'webhook_header_name': 'X-Custom-Token'})
+        # Host version should be updated
+        self.test_host.write({'bypass_waf_for_authenticated': True})
         
         updated_version = self.test_host.config_version
         self.assertGreater(updated_version, initial_version,

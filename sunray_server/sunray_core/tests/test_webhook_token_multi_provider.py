@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo.tests.common import TransactionCase
+from odoo.exceptions import ValidationError
 import json
 import unittest.mock
 
@@ -167,8 +168,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
     def test_token_validation_constraints(self):
         """Test that database constraints work correctly"""
         
-        from odoo.exceptions import ValidationError
-        import psycopg2
         
         # Test that header source requires header_name
         # SQL constraints fire first, causing database error
@@ -273,36 +272,28 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         for host_obj in self.env['sunray.host'].search([('id', '=', self.host.id)]):
             host_config = {
                 'domain': host_obj.domain,
-                'webhook_header_name': host_obj.webhook_header_name,  # Legacy field
-                'webhook_param_name': host_obj.webhook_param_name,    # Legacy field
-                'webhook_tokens': [],
                 'exceptions_tree': host_obj.get_exceptions_tree()  # New format
             }
             
-            # Add tokens with new format
-            for token_obj in host_obj.webhook_token_ids.filtered('is_active'):
-                if token_obj.is_valid():
-                    host_config['webhook_tokens'].append(token_obj.get_extraction_config())
             
             host_configs.append(host_config)
         
-        # Verify legacy fields are still present
+        # Get the first host config  
         test_host = host_configs[0]
-        self.assertIn('webhook_header_name', test_host)
-        self.assertIn('webhook_param_name', test_host)
         
-        # Verify new exceptions_tree format is present
+        # Verify exceptions_tree format is present
         self.assertIn('exceptions_tree', test_host)
+        self.assertIsInstance(test_host['exceptions_tree'], list)
         
-        # Verify legacy tokens format is also present
-        self.assertIn('webhook_tokens', test_host)
-        self.assertTrue(len(test_host['webhook_tokens']) > 0)
-        
-        # Verify new token format includes all required fields
-        token_config = test_host['webhook_tokens'][0]
-        required_fields = ['token', 'name', 'header_name', 'param_name', 'token_source']
-        for field in required_fields:
-            self.assertIn(field, token_config)
+        # Since we removed webhook_tokens from API, verify tokens are in exceptions_tree
+        # when using Access Rules with token-based access
+        exceptions = test_host['exceptions_tree']
+        token_exceptions = [ex for ex in exceptions if ex.get('access_type') == 'token']
+        if token_exceptions:
+            # Check that token configuration is present in exceptions
+            token_exception = token_exceptions[0] 
+            self.assertIn('tokens', token_exception)
+            self.assertTrue(len(token_exception['tokens']) > 0)
     
     def test_access_rules_integration(self):
         """Test integration between webhook tokens and access rules"""

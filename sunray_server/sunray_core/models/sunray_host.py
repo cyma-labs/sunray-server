@@ -52,16 +52,6 @@ class SunrayHost(models.Model):
         'host_id', 
         string='Webhook Tokens'
     )
-    webhook_header_name = fields.Char(
-        string='Webhook Header Name', 
-        default='X-Sunray-Webhook-Token',
-        help='HTTP header name for webhook token'
-    )
-    webhook_param_name = fields.Char(
-        string='Webhook URL Parameter', 
-        default='sunray_token',
-        help='URL parameter name for webhook token'
-    )
     
     # Access control  
     user_ids = fields.Many2many(

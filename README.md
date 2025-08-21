@@ -1,6 +1,10 @@
 # Sunray
 
-**Sunray** is a comprehensive Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all policies while lightweight edge workers enforce protection. This approach delivers passwordless authentication via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
+**Sunray** is a comprehensive Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. 
+
+Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all policies while lightweight edge workers enforce protection. 
+
+This approach delivers passwordless authentication via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
 
 ---
 

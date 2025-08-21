@@ -69,8 +69,10 @@ Sunray is organized as separate repositories following a server-centric architec
 │   └── mvp_implementation_plan.md
 ├── config/                    # Configuration examples
 ├── schema/                    # JSON Schema validation
-├── bin/                       # Executable scripts
-│   └── sunray-srvr           # Odoo launcher script
+├── bin/                       # Executable scripts (all project tools & utilities)
+│   ├── sunray-srvr           # Odoo launcher script
+│   ├── test_server.sh        # Internal Odoo test runner
+│   └── test_rest_api.sh      # External REST API tester
 └── etc/                       # Configuration files
     └── odoo.buildit.cfg       # Generated Odoo config
 ```
@@ -471,9 +473,13 @@ def test_webhook(self, mock_post):
 
 ### Test Launcher Scripts
 
-Two comprehensive test runners are available for both server and worker components:
+**Policy**: All tools, scripts and utilities that are part of the project must be stored in the `bin/` directory.
+
+Three comprehensive test runners are available for different testing scenarios:
 
 #### Server Tests (`bin/test_server.sh`)
+Internal unit/integration testing for Odoo modules and business logic.
+
 ```bash
 # Run all Sunray server tests
 bin/test_server.sh
@@ -489,6 +495,31 @@ bin/test_server.sh --list-tests
 
 # Run specific test method
 bin/test_server.sh --test TestAccessRules --method test_priority_ordering
+```
+
+#### REST API Tests (`bin/test_rest_api.sh`)
+External API testing that simulates Worker-Server communication.
+
+```bash
+# Run all REST API tests (requires API URL and key)
+export SUNRAY_API_URL="https://sunray.example.com"
+export SUNRAY_API_KEY="your-api-key-here"
+bin/test_rest_api.sh
+
+# Run specific endpoint test
+bin/test_rest_api.sh --url https://sunray.example.com --key YOUR_KEY --test config
+
+# Run only non-authenticated tests
+bin/test_rest_api.sh --url https://sunray.example.com --skip-auth
+
+# Verbose mode with custom username
+bin/test_rest_api.sh -v --username admin
+
+# Output results in JSON format
+bin/test_rest_api.sh --json
+
+# List all available tests
+bin/test_rest_api.sh --list-tests
 ```
 
 #### Worker Tests (`./test_worker.sh`)
@@ -513,8 +544,8 @@ bin/test_server.sh --test TestAccessRules --method test_priority_ordering
 ```
 
 #### Test Features
-- **Comprehensive Logging**: All test runs logged to `test_logs/` directory
-- **Coverage Reports**: HTML coverage reports in `coverage/` directory
+- **Comprehensive Logging**: All test runs logged to `test_logs_and_coverage/` directory
+- **Coverage Reports**: HTML coverage reports in `test_logs_and_coverage/` directory
 - **Colored Output**: Clear visual feedback on test results
 - **Parallel Execution**: Fast test runs with automatic parallelization
 - **Environment Validation**: Checks dependencies and configuration

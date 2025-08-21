@@ -2,23 +2,27 @@
 
 **Sunray** is a comprehensive Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all policies while lightweight edge workers enforce protection. This approach delivers passwordless authentication via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
 
-**Security-first protection** is at the heart of Sunray's design. The system has been specifically engineered to defend web sites and applications from all kinds of attacks, with particular strength against zero-day exploits and emerging threats. By integrating multiple layers of security controls and real-time threat detection, Sunray provides robust protection that adapts to the evolving threat landscape.
+---
 
-**API and webhook compatibility** makes Sunray an ideal solution for modern, automated environments. Whether you're protecting human-accessible web applications or machine-to-machine communications, Sunray seamlessly handles API calls, webhooks, and automated services while maintaining the same high security standards across all types of traffic.
+### Why Choose Sunray?
 
-**WebAuthn and Passkeys integration** delivers both exceptional security and outstanding user experience. Users can authenticate using biometric data (fingerprint, face recognition, etc.) or hardware security keys, eliminating passwords while providing stronger authentication than traditional methods. This modern approach reduces the risk of credential-based attacks while making access faster and more convenient for legitimate users.
+• **Security-first protection** is at the heart of Sunray's design. The system has been specifically engineered to defend web sites and applications from all kinds of attacks, with particular strength against zero-day exploits and emerging threats. By integrating multiple layers of security controls and real-time threat detection, Sunray provides robust protection that adapts to the evolving threat landscape.
 
-**Zero modification deployment** means Sunray protects your existing applications without requiring any code changes, configuration updates, or architectural modifications to your hosts or web applications. Your applications continue to operate exactly as they always have, while Sunray transparently provides comprehensive security at the network edge.
+• **API and webhook compatibility** makes Sunray an ideal solution for modern, automated environments. Whether you're protecting human-accessible web applications or machine-to-machine communications, Sunray seamlessly handles API calls, webhooks, and automated services while maintaining the same high security standards across all types of traffic.
 
-**Small team friendly** architecture ensures that organizations with limited IT resources can deploy and maintain enterprise-grade security. Sunray's intuitive management interface, automated security policies, and straightforward deployment process make it accessible to teams that need powerful protection without complex administration overhead.
+• **WebAuthn and Passkeys integration** delivers both exceptional security and outstanding user experience. Users can authenticate using biometric data (fingerprint, face recognition, etc.) or hardware security keys, eliminating passwords while providing stronger authentication than traditional methods. This modern approach reduces the risk of credential-based attacks while making access faster and more convenient for legitimate users.
 
-**Open source transparency** gives you complete visibility into how your security system works, enabling security audits, custom modifications, and community-driven enhancements. The open source model also ensures you're never locked into a proprietary solution and can adapt the system to meet your specific requirements.
+• **Zero modification deployment** means Sunray protects your existing applications without requiring any code changes, configuration updates, or architectural modifications to your hosts or web applications. Your applications continue to operate exactly as they always have, while Sunray transparently provides comprehensive security at the network edge.
 
-**Distributed architecture** separates management from enforcement for maximum security and flexibility. The Sunray Server handles all management, policy decisions, and audit functions while remaining safely isolated from the public internet. Sunray Workers, deployed at network edges, enforce access decisions and handle the direct interaction with users and potential threats, creating a secure and scalable protection system.
+• **Small team friendly** architecture ensures that organizations with limited IT resources can deploy and maintain enterprise-grade security. Sunray's intuitive management interface, automated security policies, and straightforward deployment process make it accessible to teams that need powerful protection without complex administration overhead.
 
-**Complete sovereignty and deployment flexibility** ensures you maintain total control over your security infrastructure while choosing the optimal deployment strategy for your needs. The Sunray Server remains entirely under your control, never exposed to the internet, giving you complete data sovereignty and compliance capability. For the worker layer, you can choose the deployment that best matches your requirements:
-- **Maximum performance and security**: Deploy the Sunray Worker for Cloudflare to leverage global edge infrastructure, DDoS protection, and minimal latency
-- **Total sovereignty**: Deploy the Sunray Worker for Kubernetes to maintain complete control over every component while still benefiting from enterprise-grade security
+• **Open source transparency** gives you complete visibility into how your security system works, enabling security audits, custom modifications, and community-driven enhancements. The open source model also ensures you're never locked into a proprietary solution and can adapt the system to meet your specific requirements.
+
+• **Distributed architecture** separates management from enforcement for maximum security and flexibility. The Sunray Server handles all management, policy decisions, and audit functions while remaining safely isolated from the public internet. Sunray Workers, deployed at network edges, enforce access decisions and handle the direct interaction with users and potential threats, creating a secure and scalable protection system.
+
+• **Complete sovereignty and deployment flexibility** ensures you maintain total control over your security infrastructure while choosing the optimal deployment strategy for your needs. The Sunray Server remains entirely under your control, never exposed to the internet, giving you complete data sovereignty and compliance capability. For the worker layer, you can choose the deployment that best matches your requirements:
+  - **Maximum performance and security**: Deploy the Sunray Worker for Cloudflare to leverage global edge infrastructure, DDoS protection, and minimal latency
+  - **Total sovereignty**: Deploy the Sunray Worker for Kubernetes to maintain complete control over every component while still benefiting from enterprise-grade security
 
 This dual approach means you never have to compromise between sovereignty, performance, and security - you can optimize for your specific regulatory, compliance, and operational requirements.
 
@@ -67,11 +71,11 @@ Internet Traffic → Worker (Edge) → Server API (Internal) → Policy Decision
 ### Deployment Flexibility
 **Current Implementations:**
 - [inouk-sunray-worker-cloudflare](https://gitlab.com/cmorisse/inouk-sunray-worker-cloudflare) - Cloudflare Workers (Production Ready)
-- [inouk-sunray-worker-k8s](https://gitlab.com/cmorisse/inouk-sunray-worker-k8s) - Kubernetes ForwardAuth (Coming Soon)
+- [inouk-sunray-worker-k8s](https://gitlab.com/cmorisse/inouk-sunray-worker-k8s) - Kubernetes / Traefik ForwardAuth (Coming Soon)
 
 **Future Platforms:**
-- NGINX auth_request module
 - Traefik ForwardAuth middleware  
+- NGINX auth_request module
 - Istio service mesh integration
 - AWS Lambda@Edge functions
 - Azure Front Door integration
@@ -86,7 +90,9 @@ inouk-sunray-server/
 ├── config/                    # Configuration examples
 ├── schema/                    # JSON Schema validation
 ├── bin/                       # Executable scripts
-│   └── sunray-srvr           # Odoo launcher script
+│   ├── sunray-srvr           # Odoo launcher script
+│   ├── test_server.sh        # Internal Odoo test runner
+│   └── test_rest_api.sh      # External REST API tester
 └── etc/                       # Configuration files
 ```
 
@@ -133,6 +139,8 @@ inouk-sunray-server/
    - Kubernetes ForwardAuth (coming soon)
 
 ## 🔧 Development
+
+The Sunray Server is built as an Odoo 18 addon, leveraging the robust framework capabilities of Odoo for user management, API development, and administrative interfaces. This means developing for Sunray Server follows standard Odoo development practices and workflows.
 
 ### Sunray Server Development
 
@@ -185,6 +193,7 @@ See [API_CONTRACT.md](./docs/API_CONTRACT.md) for complete API specification.
 
 ## 🧪 Testing
 
+### Internal Tests (Unit/Integration)
 ```bash
 # Run all server tests with comprehensive reporting
 bin/test_server.sh
@@ -197,6 +206,20 @@ bin/test_server.sh --coverage --verbose
 
 # List all available test classes
 bin/test_server.sh --list-tests
+```
+
+### External API Tests
+```bash
+# Test REST API endpoints (simulates Worker-Server communication)
+export SUNRAY_API_URL="https://sunray.example.com"
+export SUNRAY_API_KEY="your-api-key-here"
+bin/test_rest_api.sh
+
+# Run specific endpoint test
+bin/test_rest_api.sh --url https://sunray.example.com --key YOUR_KEY --test config
+
+# List all available API tests
+bin/test_rest_api.sh --list-tests
 ```
 
 ## 🐳 Docker

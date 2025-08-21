@@ -12,7 +12,6 @@ ARG USER_GID=$USER_UID
 ARG PG_APT_KEY_URL=https://www.postgresql.org/media/keys/ACCC4CF8.asc
 ARG PG_APT_REPOSITORY_URL=http://apt.postgresql.org/pub/repos/apt
 ARG MPY_REPO_GIT_TOKEN=${MPY_REPO_GIT_TOKEN:-}
-ARG MPY_REPO_GIT_TOKEN_URL_AUTH=${MPY_REPO_GIT_TOKEN_URL_AUTH:-}
 ARG BRANCH_NAME=main
 
 ENV DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
@@ -125,7 +124,7 @@ RUN mkdir -p $IKB_SRC_DIR \
 #
 WORKDIR /opt/muppy/
 RUN rm -rf /opt/muppy/sunray \
-    && git clone --branch=${BRANCH_NAME} --depth=1 https://${MPY_REPO_GIT_TOKEN_URL_AUTH}gitlab.com/cmorisse/inouk-sunray-server.git /opt/muppy/appserver-sunray
+    && git clone --branch=${BRANCH_NAME} --depth=1 https://dockerfile:${MPY_REPO_GIT_TOKEN}@gitlab.com/cmorisse/inouk-sunray-server.git /opt/muppy/appserver-sunray
 
 #
 # launch buildit

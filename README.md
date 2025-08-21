@@ -1,33 +1,80 @@
-# Sunray Server
+# Sunray
 
-Universal authentication and authorization server supporting multiple edge worker implementations.
+**Sunray** is a comprehensive Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all policies while lightweight edge workers enforce protection. This approach delivers passwordless authentication via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
 
-**Sunray Server** is the core component of the Sunray ecosystem - a lightweight, secure, self-hosted solution for authorizing HTTP access to private cloud services without VPN or fixed IPs. The server provides a rich API that handles all business logic, while workers are thin adapters that translate platform-specific requests to the server's universal API.
+**Security-first protection** is at the heart of Sunray's design. The system has been specifically engineered to defend web sites and applications from all kinds of attacks, with particular strength against zero-day exploits and emerging threats. By integrating multiple layers of security controls and real-time threat detection, Sunray provides robust protection that adapts to the evolving threat landscape.
+
+**API and webhook compatibility** makes Sunray an ideal solution for modern, automated environments. Whether you're protecting human-accessible web applications or machine-to-machine communications, Sunray seamlessly handles API calls, webhooks, and automated services while maintaining the same high security standards across all types of traffic.
+
+**WebAuthn and Passkeys integration** delivers both exceptional security and outstanding user experience. Users can authenticate using biometric data (fingerprint, face recognition, etc.) or hardware security keys, eliminating passwords while providing stronger authentication than traditional methods. This modern approach reduces the risk of credential-based attacks while making access faster and more convenient for legitimate users.
+
+**Zero modification deployment** means Sunray protects your existing applications without requiring any code changes, configuration updates, or architectural modifications to your hosts or web applications. Your applications continue to operate exactly as they always have, while Sunray transparently provides comprehensive security at the network edge.
+
+**Small team friendly** architecture ensures that organizations with limited IT resources can deploy and maintain enterprise-grade security. Sunray's intuitive management interface, automated security policies, and straightforward deployment process make it accessible to teams that need powerful protection without complex administration overhead.
+
+**Open source transparency** gives you complete visibility into how your security system works, enabling security audits, custom modifications, and community-driven enhancements. The open source model also ensures you're never locked into a proprietary solution and can adapt the system to meet your specific requirements.
+
+**Distributed architecture** separates management from enforcement for maximum security and flexibility. The Sunray Server handles all management, policy decisions, and audit functions while remaining safely isolated from the public internet. Sunray Workers, deployed at network edges, enforce access decisions and handle the direct interaction with users and potential threats, creating a secure and scalable protection system.
+
+**Complete sovereignty and deployment flexibility** ensures you maintain total control over your security infrastructure while choosing the optimal deployment strategy for your needs. The Sunray Server remains entirely under your control, never exposed to the internet, giving you complete data sovereignty and compliance capability. For the worker layer, you can choose the deployment that best matches your requirements:
+- **Maximum performance and security**: Deploy the Sunray Worker for Cloudflare to leverage global edge infrastructure, DDoS protection, and minimal latency
+- **Total sovereignty**: Deploy the Sunray Worker for Kubernetes to maintain complete control over every component while still benefiting from enterprise-grade security
+
+This dual approach means you never have to compromise between sovereignty, performance, and security - you can optimize for your specific regulatory, compliance, and operational requirements.
 
 ## ✨ Key Features
 
-- 🔐 **WebAuthn/Passkeys**: Passwordless authentication using biometrics
-- 🎛️ **Odoo 18 Admin Interface**: Centralized user and host management
-- 🔒 **Zero Trust Security**: Default deny, access rules with priority-based evaluation
-- 📊 **Audit Logging**: Complete authentication and access trails
-- 🌐 **Multi-Worker Support**: Server-centric API supports various edge implementations
-- ⚡ **Rich REST API**: Comprehensive endpoints for worker communication
+- 🛡️ **Zero Trust Architecture**: Default deny with granular access control - no user or system is trusted by default
+- 🚫 **Advanced Attack Protection**: Guards against zero-day exploits, injection attacks, and emerging web threats
+- 🔐 **WebAuthn/Passkeys**: Passwordless biometric authentication for maximum security and user convenience  
+- 🔌 **API & Webhook Ready**: Seamless protection for automated systems, microservices, and machine-to-machine communications
+- 📦 **Zero Modification Required**: Protect existing applications without any code changes or architectural modifications
+- 👥 **Small Team Friendly**: Intuitive management interface designed for teams with limited IT resources
+- 🔍 **Comprehensive Audit Trail**: Complete visibility into access attempts, security events, and user activities
+- 🌐 **Multi-Platform Workers**: Support for Cloudflare, Kubernetes, and future edge computing platforms
+- 🎛️ **Centralized Management**: Odoo 18-based admin interface for unified user, policy, and host management
+- ⚡ **High Performance**: Lightweight workers with minimal latency impact on protected applications
 
 ## 🏗️ Architecture
 
-### Server-Centric Design
-The Sunray Server contains all business logic:
-- User management and WebAuthn/Passkeys
-- Access rules and policy evaluation  
-- Session management
-- Audit logging
-- Token validation
+### Security-First Design
+Sunray's architecture prioritizes security through complete separation of concerns and network isolation:
 
-### Supported Workers
-Workers are thin adapters that translate platform-specific requests to our API:
-- [inouk-sunray-worker-cloudflare](https://gitlab.com/cmorisse/inouk-sunray-worker-cloudflare) - Cloudflare Workers
-- [inouk-sunray-worker-k8s](https://gitlab.com/cmorisse/inouk-sunray-worker-k8s) - Kubernetes ForwardAuth (coming soon)
-- Future: nginx, Traefik, Istio, AWS Lambda workers
+**🔒 Sunray Server (Never Internet-Exposed)**
+- **Complete network isolation**: Server never directly faces the public internet, eliminating entire classes of attacks
+- **Centralized management**: User administration, policy configuration, and audit reporting through secure Odoo 18 interface
+- **Policy evaluation engine**: All access control decisions, WebAuthn/Passkeys validation, and security rule processing
+- **Audit and compliance**: Comprehensive logging and monitoring of all access attempts and security events
+- **Session orchestration**: Secure session management and token validation for authenticated users
+
+**🛡️ Sunray Workers (Edge Protection)**
+- **Frontline defense**: Deployed at network edges to intercept and evaluate all incoming requests
+- **Attack mitigation**: First line of defense against malicious traffic, DDoS attacks, and exploit attempts
+- **Platform adaptation**: Translate platform-specific requests (Cloudflare, Kubernetes, etc.) to universal server API calls
+- **Real-time enforcement**: Execute access control decisions with minimal latency impact
+- **Threat intelligence**: Continuous monitoring and reporting of attack patterns to the server
+
+### Communication Flow
+```
+Internet Traffic → Worker (Edge) → Server API (Internal) → Policy Decision → Worker → Protected App
+```
+
+- **Unidirectional communication**: Workers always initiate communication with the server, never the reverse
+- **API-driven**: All interactions use well-defined REST APIs with comprehensive validation
+- **Stateless workers**: Workers maintain no sensitive state, relying entirely on server-side policy decisions
+- **Encrypted channels**: All worker-server communications use secure, authenticated connections
+
+### Deployment Flexibility
+**Current Implementations:**
+- [inouk-sunray-worker-cloudflare](https://gitlab.com/cmorisse/inouk-sunray-worker-cloudflare) - Cloudflare Workers (Production Ready)
+- [inouk-sunray-worker-k8s](https://gitlab.com/cmorisse/inouk-sunray-worker-k8s) - Kubernetes ForwardAuth (Coming Soon)
+
+**Future Platforms:**
+- NGINX auth_request module
+- Traefik ForwardAuth middleware  
+- Istio service mesh integration
+- AWS Lambda@Edge functions
+- Azure Front Door integration
 
 ## 📂 Project Structure
 

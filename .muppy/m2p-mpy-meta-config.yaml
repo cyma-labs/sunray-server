@@ -1,0 +1,132 @@
+mpy_meta_config:
+  parts:
+    gui:  # This is a part
+      type: server
+      dashboard_name: Sunray Server / API
+      deployment: # !required
+        args:
+        - --max-cron-threads=4
+        - --workers=4
+        env_vars:
+        - name: INOUK_SESSION_STORE
+          value: postgresql
+        - name: INOUK_SESSION_STORE_DBNAME
+          value: '@{ obj.dash_pg_database }@'
+        - name: INOUK_SESSION_STORE_DBTABLE
+          value: inouk_odoo_sessions
+        - name: INOUK_SESSION_STORE_SAMEDB
+          value: 'TRUE'      
+      envFrom:
+      - name: muppy-run-env  # are defined as secret in vault and used as ENV Vars
+        secretRef:            
+      resources: # Here you can set different 'resources' applied in debug_mode
+        requests:
+          cpu: 0.2
+          memory: 640M
+        limits:
+          cpu: 0.5
+          memory: 1280M
+
+      ports:
+      - name: odoo
+        port: 8069
+      - name: gevent
+        port: 8072
+      - name: codr
+        port: 8765
+        debug_mode: true
+      routes:
+      - name: gui
+        pathPrefix: PathPrefix(`/`)
+        port_name: odoo
+        priority: 10
+        middlewares:
+          ipwhitelist: true
+      - name: longpolling
+        pathPrefix: PathPrefix(`/websocket`) || PathPrefix(`/longpolling`)
+        port_name: gevent
+        middlewares:
+          ipwhitelist: true
+      - name: codr
+        pathPrefix: PathPrefix(`/`)
+        port_name: codr
+        debug_mode: true
+        middlewares:
+          ipwhitelist: true
+      # Debug Mode
+      # To use, you must define 'debug_config',
+      # then set debug_mode_availabl=true to make debug mode available in 
+      # dashboard
+      # Debug Mode is switched with dashboards.[part].debuf_mode
+      debug_mode_available: codr
+      debug_config:
+        debug_fqdn_prefix: codr-            # only used when debug_mode_available: "codr"
+        command: [/usr/bin/code-server]
+        args: [--bind-addr=0.0.0.0:8765, --auth=password]
+        # For debug_mode_available: basic
+        #command: ["sleep"]
+        #args: ["infinity"]
+        env_vars:
+          # To define code-server password, you can set ip here
+          # or use dashboard.__part__ .debug_env_vars
+          #- name: PASSWORD
+          #  value: "291902"
+        resources: # Here you can set different 'resources' applied in debug_mode
+          requests:
+            cpu: 0.5
+            memory: 768M
+          limits:
+            cpu: 2
+            memory: 1536M
+    workers:
+      type: worker
+      dashboard_name: Workers
+      deployment: # !required
+        args:
+        - imqworker
+        - --queues=*
+        - --max-messages=2000
+        - --workers=1
+        env_vars:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512M    
+          limits:
+            cpu: 400m
+            memory: 1024M
+      envFrom:
+      - name: muppy-run-env  # are defined as secret in vault and used as ENV Vars
+        secretRef:            
+      debug_mode_available: basic
+      debug_config:
+        command: ["sleep"]
+        args: ["infinity"]
+        env_vars:
+
+  # here are the volumes definition
+  volumesDefinition:
+    - name: tailscale-data            # [REQUIRED]
+      description: All Data           # [Optional]
+      claim:                          # [REQUIRED]
+        #storageClassName: emptyDir    # [OPTIONAL] default is values.default_storage_class (eg. microk8s-hostpath)
+        #accessModes: ReadWriteOnce   # [OPTIONAL] Kubernetes Access Modes / default is ReadWriteOnce
+        size: 1Mi                     # [REQUIRED]
+  
+  vault_objects:
+    - name: muppy-run-env
+      scope: qualifier
+      type: secret     
+      default_values:
+        cfgmap_use_renderer: true
+        cfgmap_type: envfile
+        cfgmap_file: |-
+          #APP_PRIMARY_URL is set by common ENV vars
+          # 
+          IKB_SMTP=@{ vault_model.get('muppy-signup-smtp').server }@
+          IKB_SMTP_PORT=587
+          IKB_SMTP_SSL=ON
+          IKB_SMTP_USER=@{ vault_model.get('muppy-signup-smtp').user }@
+          IKB_SMTP_PASSWORD=@{ vault_model.get('muppy-signup-smtp').password }@
+          IKB_EMAIL_FROM=@{ vault_model.get('muppy-signup-smtp').user }@
+

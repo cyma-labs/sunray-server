@@ -85,7 +85,8 @@ mpy_meta_config:
         command: [ 'bin/sunray-srvr' ]
         args:
         - imq-worker
-        - --queues=*
+        - '--database=@{ obj.dash_pg_database }@'
+        - --queue=default
         - --max-messages=2000
         - --observability-port=8000 
         env_vars:

@@ -13,7 +13,8 @@ Webhook tokens complement Sunray's WebAuthn/passkey authentication by providing 
 - **Manual regeneration**: Tokens can be regenerated without breaking existing configurations
 - **Unique constraint**: Each token is globally unique across the system
 
-### < **IP-based Access Control**
+### <
+ **IP-based Access Control**
 - **CIDR block restrictions**: Limit token usage to specific IP addresses or network ranges
 - **Flexible IP filtering**: Support for single IPs (`192.168.1.100`) or CIDR blocks (`192.168.1.0/24`)
 - **Comment support**: Inline documentation for IP restrictions
@@ -28,7 +29,8 @@ Webhook tokens complement Sunray's WebAuthn/passkey authentication by providing 
 - **Last used timestamps**: Monitor token activity patterns
 - **Active/inactive states**: Temporarily disable tokens without deletion
 
-### = **Comprehensive Audit Logging**
+### =
+ **Comprehensive Audit Logging**
 - **Token creation**: Log when tokens are created
 - **Token usage**: Log every token authentication attempt
 - **Token regeneration**: Track when tokens are rotated
@@ -465,4 +467,4 @@ Token: [auto-generated secure token]
 
 ---
 
-For additional support or advanced configuration needs, consult the main Sunray documentation or contact your system administrator.
+For additional support or advanced configuration needs, consult the main Sunray documentation or contact your system administrator. 

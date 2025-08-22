@@ -13,6 +13,7 @@ echo -e "\n"
 #  - In all cases, User is 'base.user_admin' (id=2)
 #
 # Used ENV Vars in this script
+# - MPY_USERINIT_EXTERNAL_ID: external id of the user to setup
 # - MPY_USERINIT_USER_EMAIL: email of the user to setup
 # - MPY_USERINIT_USER_NAME: name of the user to setup
 # - MPY_USERINIT_USER_COMPANY: company name of the user to setup
@@ -45,7 +46,7 @@ bin/sunray-srvr setup-company --name="$MPY_USERINIT_USER_COMPANY" \
 # We check if password is set, if not, we will send a signup email
 if [ -z "$MPY_USERINIT_USER_PASSWORD" ]; then
     echo "No password set, signup email will be sent to $MPY_USERINIT_USER_EMAIL"
-    bin/sunray-srvr setup-user --external-id=muppy_core.main_user \
+    bin/sunray-srvr setup-user --external-id=$MPY_USERINIT_EXTERNAL_ID \
         --login=$MPY_USERINIT_USER_EMAIL \
         --name="$MPY_USERINIT_USER_NAME"
     bin/sunray-srvr send-signup-email --login=$MPY_USERINIT_USER_EMAIL --create-user
@@ -53,7 +54,7 @@ if [ -z "$MPY_USERINIT_USER_PASSWORD" ]; then
 
 else
     echo "Creating user $MPY_USERINIT_USER_EMAIL from supplied password and TOTP secret."
-    bin/sunray-srvr setup-user --external-id=muppy_core.main_user \
+    bin/sunray-srvr setup-user --external-id=$MPY_USERINIT_EXTERNAL_ID \
         --login=$MPY_USERINIT_USER_EMAIL \
         --name="$MPY_USERINIT_USER_NAME" \
         --password=$MPY_USERINIT_USER_PASSWORD

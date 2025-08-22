@@ -103,7 +103,7 @@
                     "type": "git",
                     "repository": "https://gitlab.com/cmorisse/inouk_message_queue.git",
                     "directory": "inouk_message_queue",
-                    "refspec": "18",
+                    "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },
                 "inouk_server_detect": {

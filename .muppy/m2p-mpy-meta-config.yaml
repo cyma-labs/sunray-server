@@ -17,7 +17,7 @@ mpy_meta_config:
         - name: INOUK_SESSION_STORE_SAMEDB
           value: 'TRUE'      
       envFrom:
-      - name: muppy-run-env  # are defined as secret in vault and used as ENV Vars
+      - name: sunray-run-env  # are defined as secret in vault and used as ENV Vars
         secretRef:            
       resources: # Here you can set different 'resources' applied in debug_mode
         requests:

@@ -96,7 +96,7 @@ mpy_meta_config:
             cpu: 400m
             memory: 1024M
       envFrom:
-      - name: muppy-run-env  # are defined as secret in vault and used as ENV Vars
+      - name: sunray-run-env  # are defined as secret in vault and used as ENV Vars
         secretRef:            
       debug_mode_available: basic
       debug_config:

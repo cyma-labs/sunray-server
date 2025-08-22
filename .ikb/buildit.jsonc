@@ -87,7 +87,7 @@
                     "type": "git",
                     "repository": "https://github.com/cmorisse/inouk_session_store.git",
                     "directory": "inouk_session_store",
-                    "refspec": "14.0",
+                    "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },
                 "inouk_attachments_storage": {
@@ -103,8 +103,7 @@
                     "type": "git",
                     "repository": "https://gitlab.com/cmorisse/inouk_message_queue.git",
                     "directory": "inouk_message_queue",
-                    "refspec": "18.0",
-                    "#refspec": "cmo_pg_queue",
+                    "refspec": "18",
                     "group": "parts/inouk_addons"
                 },
                 "inouk_server_detect": {
@@ -112,7 +111,7 @@
                     "type": "git",
                     "repository": "https://gitlab.com/cmorisse/inouk_server_detect.git",
                     "directory": "inouk_server_detect",
-                    "refspec": "14.0",
+                    "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },
                 "inouk_odoo_data_migration_toolkit": {
@@ -158,7 +157,5 @@
                 }
             }
         }
-    },
-    "OVERLOAD_PARSE_ERROR": "JSONDecodeError",
-    "OVERLOAD_PARSE_ERROR_MESSAGE": "Expecting property name enclosed in double quotes: line 28 column 7 (char 637)"
+    }
 }

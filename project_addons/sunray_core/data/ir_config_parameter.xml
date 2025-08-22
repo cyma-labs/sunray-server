@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <data noupdate="0">
+
+        <record id="icp__sunray_stop_cron_workers" model="ir.config_parameter">
+            <field name="key">imq.STOP_CRON_WORKERS</field>
+            <field name="value">*</field>
+        </record>
+    </data>
+</odoo>

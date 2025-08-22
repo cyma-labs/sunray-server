@@ -34,4 +34,10 @@
             <field name="active">True</field>
         </record>
     </data>
+    <data noupdate="0">
+        <function model="ir.cron" name="write">
+            <value eval="[ref('inouk_message_queue.ir_cron__worker_default')]"/>
+            <value eval="{'active': False}"/>
+        </function>
+    </data>
 </odoo>

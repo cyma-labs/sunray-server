@@ -40,6 +40,7 @@ Technical Components:
         'security/ir.model.access.csv',
         
         # Data
+        'data/ir_config_parameter.xml',
         'data/sunray_data.xml',
         
         # Views (actions must be defined before menu)

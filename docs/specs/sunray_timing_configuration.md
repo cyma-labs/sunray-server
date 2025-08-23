@@ -8,8 +8,8 @@ This document provides a comprehensive reference for all timing parameters, dela
 
 | Parameter | Default | Range | Configuration | Purpose |
 |-----------|---------|-------|---------------|---------|
-| **Session Duration** | 8h (28800s) | 1h-24h | Host UI/CLI | User session lifetime |
-| **WAF Bypass Revalidation** | 15min | 1-60min | Host UI | Security cookie refresh |
+| **Session Duration** | 1h (3600s) | 60s-24h | Host UI | User session lifetime |
+| **WAF Bypass Revalidation** | 15min (900s) | 60s-1h | Host UI | Security cookie refresh |
 | **Setup Token Validity** | 24h | 1h-168h | UI/CLI | Passkey registration window |
 | **Webhook Token Expiration** | Never | Any date | Token UI | API token lifetime |
 | **Session Expiration** | Auto | - | Calculated | Absolute session cutoff |
@@ -34,6 +34,24 @@ Automated cleanup and maintenance timing parameters.
 ### ⚡ Performance Tuning
 Timeouts and refresh intervals that affect system performance and responsiveness.
 
+## 🔧 System Parameters
+
+Sunray uses system parameters to control maximum allowed values for timing configurations:
+
+### `sunray.max_session_duration_s`
+- **Default**: 86400 (24 hours)
+- **Purpose**: Maximum allowed session duration for any host
+- **Configuration**: System Parameters (Admin → Settings → Parameters)
+- **Impact**: Prevents administrators from setting excessively long session durations
+
+### `sunray.max_waf_bypass_revalidation_s`
+- **Default**: 3600 (1 hour) 
+- **Purpose**: Maximum allowed WAF bypass revalidation period
+- **Configuration**: System Parameters (Admin → Settings → Parameters)
+- **Impact**: Enforces security constraints on WAF cookie lifetimes
+
+These parameters ensure system-wide security policies while allowing per-host customization within safe limits.
+
 ---
 
 ## 📖 Detailed Parameter Reference
@@ -52,38 +70,40 @@ Timeouts and refresh intervals that affect system performance and responsiveness
 - **API**: Inherited by worker from host configuration
 
 **Values**:
-- **Default**: System default (28800 seconds = 8 hours)
+- **Default**: 3600 seconds (1 hour)
+- **Range**: 60 seconds minimum to system parameter maximum (default 86400 seconds)
 - **Common Values**:
-  - 1 hour = 3600 seconds (high security)
-  - 4 hours = 14400 seconds (balanced)
-  - 8 hours = 28800 seconds (standard)
-  - 24 hours = 86400 seconds (convenience)
+  - 1 hour = 3600 seconds (default, balanced security)
+  - 4 hours = 14400 seconds (longer work sessions)
+  - 8 hours = 28800 seconds (full work day)
+  - 24 hours = 86400 seconds (convenience, maximum default)
 
 **Impact**: Shorter durations increase security but require more frequent user authentication. Longer durations improve user experience but extend potential exposure time.
 
 ---
 
-### 2. WAF Bypass Revalidation Period (`waf_bypass_revalidation_minutes`)
+### 2. WAF Bypass Revalidation Period (`waf_bypass_revalidation_s`)
 
-**Location**: `sunray_host.py:84-90`  
+**Location**: `sunray_host.py:87-94`  
 **Model**: `sunray.host`  
-**Field**: `waf_bypass_revalidation_minutes`
+**Field**: `waf_bypass_revalidation_s`
 
 **Purpose**: Forces sublimation cookie refresh after this period to maintain security binding between user, IP address, and User-Agent. This prevents cookie theft and session hijacking.
 
 **Configuration**:
-- **Admin UI**: Host Settings → WAF Bypass Revalidation Period (minutes)
-- **Default**: 15 minutes
+- **Admin UI**: Host Settings → WAF Bypass Revalidation Period (seconds)
+- **Default**: 900 seconds (15 minutes)
+- **Range**: 60 seconds minimum to system parameter maximum (default 3600 seconds)
 
 **Security Considerations**:
-- **Shorter periods** (5-10 minutes): Higher security, more frequent validation
-- **Longer periods** (30-60 minutes): Less secure but fewer interruptions
-- **Very long periods** (>60 minutes): Not recommended for security reasons
+- **Shorter periods** (300-600s / 5-10 minutes): Higher security, more frequent validation
+- **Standard periods** (900-1800s / 15-30 minutes): Balanced security and user experience
+- **Longer periods** (>1800s / >30 minutes): Less secure but fewer interruptions
 
 **Use Cases**:
-- **High-security environments**: 5-10 minutes
-- **Standard environments**: 15 minutes (default)
-- **Development/testing**: 30+ minutes for convenience
+- **High-security environments**: 300-600 seconds (5-10 minutes)
+- **Standard environments**: 900 seconds (15 minutes, default)
+- **Development/testing**: 1800+ seconds (30+ minutes) for convenience
 
 ---
 
@@ -320,14 +340,16 @@ Webhook Token Expiration: 90 days (with rotation)
 ## 🔧 Troubleshooting Common Timing Issues
 
 ### Users Frequently Re-authenticate
-- **Cause**: Session duration too short
-- **Solution**: Increase `session_duration_s` in Host settings
+- **Cause**: Session duration too short (default changed from 8h to 1h)
+- **Solution**: Increase `session_duration_s` in Host settings (now shows actual values, not 0)
 - **Check**: Review audit logs for session expiration patterns
+- **Note**: New default is 1 hour for better security; adjust based on your needs
 
 ### WAF Bypass Cookie Issues
 - **Cause**: Revalidation period too short for user workflow
-- **Solution**: Increase `waf_bypass_revalidation_minutes`
+- **Solution**: Increase `waf_bypass_revalidation_s` (now in seconds, not minutes)
 - **Check**: Monitor sublimation audit events
+- **Note**: Field renamed from minutes to seconds for consistency
 
 ### Users Re-authenticating Despite Valid Session
 - **Cause**: IP address or User-Agent changed (security feature, not a bug)

@@ -27,6 +27,7 @@ class SunrayAuditLog(models.Model):
         ('passkey.registered', 'Passkey Registered'),
         ('passkey.revoked', 'Passkey Revoked'),
         ('config.fetched', 'Config Fetched'),
+        ('config.session_duration_changed', 'Session Duration Changed'),
         ('session.created', 'Session Created'),
         ('session.revoked', 'Session Revoked'),
         ('session.expired', 'Session Expired'),

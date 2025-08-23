@@ -61,7 +61,7 @@ X-API-Key: your_worker_api_key_here
       "worker_url": "https://sunray-worker.example.workers.dev",
       "backend": "https://backend.example.com",
       "authorized_users": ["user@example.com"],
-      "session_duration_override": 28800,
+      "session_duration_s": 3600,
       "exceptions_tree": {
         "public_patterns": ["/health", "/status"],
         "cidr_rules": [
@@ -86,7 +86,7 @@ X-API-Key: your_worker_api_key_here
         ]
       },
       "bypass_waf_for_authenticated": true,
-      "waf_bypass_revalidation_minutes": 15
+      "waf_bypass_revalidation_s": 900
     }
   ]
 }
@@ -106,10 +106,10 @@ X-API-Key: your_worker_api_key_here
 - `worker_url`: Worker URL for this host
 - `backend`: Backend service URL to proxy to
 - `authorized_users`: List of usernames allowed access
-- `session_duration_override`: Session duration in seconds (null uses default)
+- `session_duration_s`: Session duration in seconds (always present, default: 3600)
 - `exceptions_tree`: Access rules for public, CIDR, and token-based access
 - `bypass_waf_for_authenticated`: Enable WAF bypass for authenticated users
-- `waf_bypass_revalidation_minutes`: WAF bypass cookie revalidation period
+- `waf_bypass_revalidation_s`: WAF bypass cookie revalidation period in seconds (always present, default: 900)
 
 **Version Tracking**:
 - `host_versions` and `user_versions` allow workers to detect configuration changes
@@ -367,6 +367,97 @@ Common HTTP status codes:
 - **v2**: Future version with additional features
 - Workers should specify API version in `Accept` header: `application/vnd.sunray.v1+json`
 - Server maintains backward compatibility for at least one major version
+
+## Session Management Instructions for Worker Implementers
+
+### **Overview**
+
+Sunray Server provides two critical timing parameters per host that control session and security cookie behavior. Both are managed identically: server-authoritative, pre-validated, and required.
+
+### **Timing Parameters**
+
+#### **Session Duration (`session_duration_s`)**
+- **Purpose**: Controls how long a user session remains valid after authentication
+- **Unit**: Seconds
+- **Server Default**: 3600 (1 hour)
+- **Valid Range**: 60 to system-configured maximum (default 86400)
+- **Usage**: Set session cookie Max-Age, calculate session expiration
+
+#### **WAF Bypass Revalidation Period (`waf_bypass_revalidation_s`)**
+- **Purpose**: Controls how often the WAF bypass cookie must be refreshed
+- **Unit**: Seconds
+- **Server Default**: 900 (15 minutes)
+- **Valid Range**: 60 to system-configured maximum (default 3600)
+- **Usage**: Set WAF bypass cookie expiration, trigger re-authentication
+
+### **Key Principles**
+
+1. **Unified Management**: Both parameters follow identical patterns
+2. **Server Authority**: Server provides validated values, no worker-side defaults needed
+3. **Always Present**: Both fields are guaranteed in host configuration
+4. **Pre-validated**: Values are within acceptable ranges (server enforces constraints)
+5. **No Fallbacks**: Workers must not implement any default logic
+
+### **Implementation Requirements**
+
+Workers receive both parameters in the host configuration from `/sunray-srvr/v1/config`:
+```json
+{
+  "domain": "example.com",
+  "session_duration_s": 3600,        // Always present, always valid
+  "waf_bypass_revalidation_s": 900,  // Always present, always valid
+  // ... other host fields
+}
+```
+
+#### **Configuration Handling**
+Workers must:
+- Extract both `session_duration_s` and `waf_bypass_revalidation_s` values from host config
+- Store these values for use in session and cookie management
+- Log received values for debugging (e.g., "Host example.com: session_duration_s=3600, waf_bypass_revalidation_s=900")
+- Treat absence of either field as a critical configuration error
+
+#### **Session Cookie Management**
+When creating sessions after successful authentication:
+- Set session cookie `Max-Age` to `session_duration_s` seconds
+- Calculate expiry: `current_time + session_duration_s`
+- Include duration in session creation request to server
+- Never override server-provided duration values
+
+#### **WAF Bypass Cookie Management** (if enabled)
+When managing WAF bypass cookies:
+- Set cookie `Max-Age` to `waf_bypass_revalidation_s` seconds
+- Calculate expiry: `current_time + waf_bypass_revalidation_s`
+- Refresh cookie before expiration during active sessions
+- Include IP address and User-Agent binding for security
+
+#### **Validation and Error Handling**
+Workers must NOT validate timing values:
+- Server guarantees all values are within acceptable ranges
+- Do not implement min/max checks (server handles all validation)
+- Do not attempt to "correct" unusual values
+- Trust server-provided values completely
+
+If timing fields are missing from configuration:
+1. Log critical error indicating server configuration problem
+2. Refuse to process authentication requests for that host
+3. Return appropriate error responses to clients
+4. Do not use hardcoded default values
+
+#### **Logging Requirements**
+Workers should log:
+- Timing values received during configuration updates
+- Session creation events with duration used
+- WAF cookie refresh events with revalidation period
+- Configuration errors for missing timing fields
+
+Example log entries:
+```
+INFO: Config updated for host example.com: session_duration_s=3600, waf_bypass_revalidation_s=900
+INFO: Created session for user@example.com with duration 3600s, expires at 2024-01-01T13:00:00Z
+INFO: WAF bypass cookie refreshed for user@example.com, expires in 900s
+ERROR: Host example.com missing required field 'session_duration_s' in configuration
+```
 
 ## Worker Implementation Requirements
 

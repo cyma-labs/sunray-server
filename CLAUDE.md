@@ -26,6 +26,14 @@ Muppy Sunray is a lightweight, secure, self-hosted solution for authorizing HTTP
 3. **Sunray CLI (part of Sunray Server)**: An odoo CLI to manage Sunray server's components
 4. **Protected Hosts**: Web sites/app to protect
 
+## Development Guidelines
+
+### API Development
+- **When implementing Server API calls, always refer to the API Contract in `/docs/API_CONTRACT.md`**
+- The API Contract is the authoritative source of truth for all worker implementations
+- Server enforces all business logic and validation; workers are thin translation layers
+- Follow server-centric design principles: no worker-side validation or default values
+
 ## Environment Configuration
 
 **Note**: Sensitive environment-specific information (URLs, API keys, credentials) should be stored in `.claude.local.md` which is not committed to the repository. Create this file locally with your specific environment details.
@@ -352,6 +360,8 @@ sunray_core/
 ### Development Guidelines
 
 - **Feature-First Approach**: When you need to manipulate Sunray server data and no feature exists for that purpose, you MUST propose to develop a proper feature (GUI or CLI) instead of writing SQL or creating ad-hoc Odoo/Python scripts. Only if the user rejects the feature development option can you propose ad-hoc scripts/commands.
+
+- **API Contract Updates**: When updating any code in the Sunray server REST API controller (`project_addons/sunray_core/controllers/main.py`), you MUST update `docs/API_CONTRACT.md` with the changes if they affect the API contract (new endpoints, changed parameters, modified responses, etc.).
 
 ### Coding Conventions
 

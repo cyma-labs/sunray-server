@@ -657,15 +657,15 @@ class SunrayCommand(Command):
                 print("No hosts found")
                 return
             
-            print(f"{'DOMAIN':<25} {'WORKER URL':<35} {'ACTIVE':<8} {'CIDR':<10} {'PUBLIC':<10} {'USERS'}")
-            print("-" * 110)
+            print(f"{'DOMAIN':<25} {'WORKER URL':<35} {'ACTIVE':<8} {'RULES':<10} {'USERS':<8} {'SESSION':<8}")
+            print("-" * 100)
             for host in hosts:
                 active = '✓' if host.is_active else '✗'
                 worker_url = host.worker_url[:32] + '...' if len(host.worker_url) > 35 else host.worker_url
-                cidr_count = len(host.allowed_cidrs.split('\n')) if host.allowed_cidrs else 0
-                public_count = len(host.public_url_patterns.split('\n')) if host.public_url_patterns else 0
+                rules_count = len(host.access_rule_ids)
                 user_count = len(host.user_ids)
-                print(f"{host.domain:<25} {worker_url:<35} {active:<8} {cidr_count:<10} {public_count:<10} {user_count}")
+                session_duration = f"{host.session_duration_s}s"
+                print(f"{host.domain:<25} {worker_url:<35} {active:<8} {rules_count:<10} {user_count:<8} {session_duration:<8}")
         
         elif args.action == 'get':
             # Search by domain
@@ -675,27 +675,30 @@ class SunrayCommand(Command):
                 print(f"Host '{args.name}' not found")
                 return
             
-            print(f"Domain:      {host.domain}")
-            print(f"Worker URL:  {host.worker_url}")
-            print(f"Backend URL: {host.backend_url or 'Not configured'}")
-            print(f"Active:      {'Yes' if host.is_active else 'No'}")
-            print(f"Users:       {len(host.user_ids)}")
-            print(f"Created:     {host.create_date}")
+            print(f"Domain:                     {host.domain}")
+            print(f"Worker URL:                 {host.worker_url}")
+            print(f"Backend URL:                {host.backend_url or 'Not configured'}")
+            print(f"Active:                     {'Yes' if host.is_active else 'No'}")
+            print(f"Users:                      {len(host.user_ids)}")
+            print(f"Session Duration:           {host.session_duration_s}s ({host.session_duration_s//3600}h {(host.session_duration_s%3600)//60}m)")
+            print(f"WAF Bypass Revalidation:    {host.waf_bypass_revalidation_s}s ({host.waf_bypass_revalidation_s//60}m)")
+            print(f"WAF Bypass Enabled:         {'Yes' if host.bypass_waf_for_authenticated else 'No'}")
+            print(f"Created:                    {host.create_date}")
             
-            if host.allowed_cidrs:
-                print(f"\nAllowed CIDR ranges:")
-                for cidr in host.allowed_cidrs.split('\n'):
-                    if cidr.strip():
-                        print(f"  - {cidr.strip()}")
-            
-            if host.public_url_patterns:
-                print(f"\nPublic URL Patterns:")
-                for pattern in host.public_url_patterns.split('\n'):
-                    if pattern.strip():
-                        print(f"  - {pattern.strip()}")
+            if host.access_rule_ids:
+                print(f"\nAccess Rules: {len(host.access_rule_ids)}")
+                for rule in host.access_rule_ids.sorted('priority'):
+                    access_type = rule.access_type.replace('_', ' ').title()
+                    patterns = ', '.join(rule.get_url_patterns()[:2])  # Show first 2 patterns
+                    if len(rule.get_url_patterns()) > 2:
+                        patterns += f" (+ {len(rule.get_url_patterns())-2} more)"
+                    print(f"  - Priority {rule.priority}: {access_type} - {patterns}")
             
             if host.webhook_token_ids:
                 print(f"\nWebhook Tokens: {len(host.webhook_token_ids)}")
+                for token in host.webhook_token_ids:
+                    status = "Active" if not token.expires_at or token.expires_at > fields.Datetime.now() else "Expired"
+                    print(f"  - {token.name}: {status}")
         
         elif args.action == 'create':
             data = {
@@ -705,17 +708,18 @@ class SunrayCommand(Command):
                 'is_active': True
             }
             
-            if args.sr_cidr:
-                data['allowed_cidrs'] = '\n'.join(args.sr_cidr.split(','))
-            
-            if args.sr_public:
-                data['public_url_patterns'] = '\n'.join(args.sr_public.split(','))
-            
             host = Host.create([data])
             
             print(f"Host created successfully!")
             print(f"Domain: {host.domain}")
             print(f"ID:     {host.id}")
+            print(f"Session Duration: {host.session_duration_s}s (default)")
+            print(f"WAF Revalidation: {host.waf_bypass_revalidation_s}s (default)")
+            
+            # Note: Access rules can be added via the UI or separate commands
+            if args.sr_cidr or args.sr_public:
+                print("\nNote: --sr-cidr and --sr-public options are no longer supported.")
+                print("Please use the Sunray admin UI to configure Access Rules for this host.")
         
         elif args.action == 'delete':
             host = Host.search([('domain', '=', args.domain)], limit=1)

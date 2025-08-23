@@ -213,14 +213,14 @@ class SunrayRESTController(http.Controller):
                 'worker_url': host_obj.worker_url,
                 'backend': host_obj.backend_url,
                 'authorized_users': host_obj.user_ids.mapped('username'),
-                'session_duration_override': host_obj.session_duration_s,
+                'session_duration_s': host_obj.session_duration_s,
                 
                 # NEW: Access Rules - unified exceptions tree
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 
                 # WAF integration
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
-                'waf_bypass_revalidation_minutes': host_obj.waf_bypass_revalidation_minutes or 15,
+                'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
                 
             }
             
@@ -477,8 +477,8 @@ class SunrayRESTController(http.Controller):
             ('domain', '=', host_domain)
         ])
         
-        # Calculate expiration
-        duration = data.get('duration', 28800)  # Default 8 hours
+        # Calculate expiration using host's session duration
+        duration = host_obj.session_duration_s if host_obj else 3600  # Use host setting or server default
         expires_at = fields.Datetime.now() + timedelta(seconds=duration)
         
         # Create session

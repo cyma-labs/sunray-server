@@ -176,7 +176,7 @@
                             
                             <group string="WAF Integration">
                                 <field name="bypass_waf_for_authenticated"/>
-                                <field name="waf_bypass_revalidation_minutes" invisible="not bypass_waf_for_authenticated"/>
+                                <field name="waf_bypass_revalidation_s" invisible="not bypass_waf_for_authenticated"/>
                             </group>
                             
                         </page>

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 import json
 import ipaddress
 import re
@@ -65,11 +65,14 @@ class SunrayHost(models.Model):
     # Session overrides
     session_duration_s = fields.Integer(
         string='Session Duration (seconds)',
-        help='Session timeout in seconds. Examples:\n'
+        default=3600,
+        help='Session timeout in seconds. Default: 1 hour (3600s).\n'
+             'Examples:\n'
              '- 1h = 3600\n'
              '- 4h = 14400\n'
              '- 8h = 28800\n'
-             '- 24h = 86400'
+             '- 24h = 86400\n'
+             'Min: 60s, Max: configured by system parameter'
     )
     
     # WAF integration
@@ -81,12 +84,13 @@ class SunrayHost(models.Model):
              'to skip WAF processing. Worker still validates authentication for security. '
              'Requires manual Cloudflare firewall rule configuration.'
     )
-    waf_bypass_revalidation_minutes = fields.Integer(
-        string='WAF Bypass Revalidation Period (minutes)',
-        default=15,
-        help='Force cookie revalidation after this period. '
+    waf_bypass_revalidation_s = fields.Integer(
+        string='WAF Bypass Revalidation Period (seconds)',
+        default=900,
+        help='Force cookie revalidation after this period. Default: 15 minutes (900s). '
              'Users must re-authenticate if their WAF bypass cookie is older than this. '
-             'Shorter periods increase security but may require more frequent re-authentication.'
+             'Shorter periods increase security but may require more frequent re-authentication. '
+             'Min: 60s, Max: configured by system parameter'
     )
     
     # Version tracking for cache invalidation
@@ -99,6 +103,28 @@ class SunrayHost(models.Model):
     _sql_constraints = [
         ('domain_unique', 'UNIQUE(domain)', 'Domain must be unique!')
     ]
+    
+    @api.constrains('session_duration_s')
+    def _check_session_duration(self):
+        """Validate session duration against system parameters"""
+        max_duration = int(self.env['ir.config_parameter'].sudo().get_param(
+            'sunray.max_session_duration_s', '86400'))
+        for record in self:
+            if record.session_duration_s < 60:
+                raise ValidationError("Session duration must be at least 60 seconds (1 minute)")
+            if record.session_duration_s > max_duration:
+                raise ValidationError(f"Session duration cannot exceed {max_duration} seconds")
+    
+    @api.constrains('waf_bypass_revalidation_s')
+    def _check_waf_bypass_revalidation(self):
+        """Validate WAF bypass revalidation period against system parameters"""
+        max_revalidation = int(self.env['ir.config_parameter'].sudo().get_param(
+            'sunray.max_waf_bypass_revalidation_s', '3600'))
+        for record in self:
+            if record.waf_bypass_revalidation_s < 60:
+                raise ValidationError("WAF bypass revalidation period must be at least 60 seconds (1 minute)")
+            if record.waf_bypass_revalidation_s > max_revalidation:
+                raise ValidationError(f"WAF bypass revalidation period cannot exceed {max_revalidation} seconds")
     
     def _parse_line_separated_field(self, field_value):
         """Parse line-separated field with comment support
@@ -143,7 +169,31 @@ class SunrayHost(models.Model):
     
     
     def write(self, vals):
-        """Override to update config_version on any change"""
+        """Override to update config_version on any change and audit timing changes"""
+        # Track timing field changes for audit logging
+        for record in self:
+            # Log session duration changes
+            if 'session_duration_s' in vals and vals['session_duration_s'] != record.session_duration_s:
+                old_value = record.session_duration_s or 'unset'
+                new_value = vals['session_duration_s']
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type='config.session_duration_changed',
+                    severity='info',
+                    details=f'Session duration changed for host {record.domain}: {old_value}s → {new_value}s',
+                    admin_user_id=self.env.user.id
+                )
+                
+            # Log WAF revalidation period changes
+            if 'waf_bypass_revalidation_s' in vals and vals['waf_bypass_revalidation_s'] != record.waf_bypass_revalidation_s:
+                old_value = record.waf_bypass_revalidation_s or 'unset'
+                new_value = vals['waf_bypass_revalidation_s']
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type='config.waf_revalidation_changed',
+                    severity='info',
+                    details=f'WAF bypass revalidation period changed for host {record.domain}: {old_value}s → {new_value}s',
+                    admin_user_id=self.env.user.id
+                )
+        
         # Don't update version if we're only updating the version itself
         if vals and not (len(vals) == 1 and 'config_version' in vals):
             vals['config_version'] = fields.Datetime.now()

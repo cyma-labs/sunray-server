@@ -33,6 +33,19 @@
             <field name="interval_type">hours</field>
             <field name="active">True</field>
         </record>
+        
+        <!-- System Parameters for Timing Constraints -->
+        <!-- Maximum session duration: 24 hours (86400 seconds) -->
+        <record id="param_max_session_duration" model="ir.config_parameter">
+            <field name="key">sunray.max_session_duration_s</field>
+            <field name="value">86400</field>
+        </record>
+        
+        <!-- Maximum WAF bypass revalidation period: 1 hour (3600 seconds) -->
+        <record id="param_max_waf_bypass_revalidation" model="ir.config_parameter">
+            <field name="key">sunray.max_waf_bypass_revalidation_s</field>
+            <field name="value">3600</field>
+        </record>
     </data>
     <data noupdate="0">
         <function model="ir.cron" name="write">

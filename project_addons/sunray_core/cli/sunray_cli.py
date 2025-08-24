@@ -43,7 +43,7 @@ class SunrayCommand(Command):
         
         # apikey get
         apikey_get = apikey_sub.add_parser('get', help='Get API key details')
-        apikey_get.add_argument('name', help='API key name or ID')
+        apikey_get.add_argument('identifier', help='API key name or ID')
         apikey_get.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
                                default='table', help='Output format (default: table)')
         
@@ -57,7 +57,7 @@ class SunrayCommand(Command):
         
         # apikey delete
         apikey_delete = apikey_sub.add_parser('delete', help='Delete API key')
-        apikey_delete.add_argument('name', help='API key name or ID')
+        apikey_delete.add_argument('identifier', help='API key name or ID')
         
         # User commands
         user = subparsers.add_parser('user', help='Manage users')
@@ -361,13 +361,15 @@ class SunrayCommand(Command):
         
         elif args.action == 'get':
             # Search by name or ID
-            if args.name.isdigit():
-                key = ApiKey.browse(int(args.name))
+            if args.identifier.isdigit():
+                key = ApiKey.browse(int(args.identifier))
+                if not key.exists():
+                    key = False
             else:
-                key = ApiKey.search([('name', '=', args.name)], limit=1)
+                key = ApiKey.search([('name', '=', args.identifier)], limit=1)
             
-            if not key or not key.exists():
-                print(f"API key '{args.name}' not found")
+            if not key:
+                print(f"API key '{args.identifier}' not found")
                 return
             
             # Format output
@@ -379,6 +381,12 @@ class SunrayCommand(Command):
                 self._output_apikey_detailed(key)
         
         elif args.action == 'create':
+            # Check if API key with same name already exists
+            existing_key = ApiKey.search([('name', '=', args.name)], limit=1)
+            if existing_key:
+                print(f"Error: API key with name '{args.name}' already exists (ID: {existing_key.id})")
+                return
+            
             data = {
                 'name': args.name,
                 'is_active': True
@@ -397,6 +405,7 @@ class SunrayCommand(Command):
             key = ApiKey.create([data])
             
             print(f"API key created successfully!")
+            print(f"ID:   {key.id}")
             print(f"Name: {key.name}")
             print(f"Key:  {key.key}")
             
@@ -408,13 +417,15 @@ class SunrayCommand(Command):
         
         elif args.action == 'delete':
             # Search by name or ID
-            if args.name.isdigit():
-                key = ApiKey.browse(int(args.name))
+            if args.identifier.isdigit():
+                key = ApiKey.browse(int(args.identifier))
+                if not key.exists():
+                    key = False
             else:
-                key = ApiKey.search([('name', '=', args.name)], limit=1)
+                key = ApiKey.search([('name', '=', args.identifier)], limit=1)
             
-            if not key or not key.exists():
-                print(f"API key '{args.name}' not found")
+            if not key:
+                print(f"API key '{args.identifier}' not found")
                 return
             
             name = key.name
@@ -929,24 +940,14 @@ class SunrayCommand(Command):
         """Handle cache operations"""
         
         if args.action == 'status':
-            # For status, we need to determine which worker to query
-            if args.sr_scope == 'host' and args.sr_target:
-                # Get specific host's worker
-                Host = env['sunray.host']
-                host = Host.search([('domain', '=', args.sr_target)], limit=1)
-                if not host:
-                    print(f"Error: Host '{args.sr_target}' not found")
-                    return
-                worker_urls = [host.worker_url]
-            else:
-                # Get all unique worker URLs
-                Host = env['sunray.host']
-                hosts = Host.search([('is_active', '=', True)])
-                worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
-                
-                if not worker_urls:
-                    print("Error: No active hosts with worker URLs found")
-                    return
+            # For status, get all unique worker URLs
+            Host = env['sunray.host']
+            hosts = Host.search([('is_active', '=', True)])
+            worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
+            
+            if not worker_urls:
+                print("Error: No active hosts with worker URLs found")
+                return
             
             # Query each worker
             for worker_url in worker_urls:
@@ -1642,13 +1643,13 @@ class SunrayCommand(Command):
     
     def _output_apikeys_table(self, keys):
         """Output API keys in table format"""
-        print(f"{'NAME':<30} {'ACTIVE':<8} {'CREATED':<20} {'DESCRIPTION'}")
-        print("-" * 80)
+        print(f"{'ID':<6} {'NAME':<30} {'ACTIVE':<8} {'CREATED':<20} {'DESCRIPTION'}")
+        print("-" * 90)
         for key in keys:
             active = '✓' if key.is_active else '✗'
             created = key.create_date.strftime('%Y-%m-%d %H:%M:%S')
             desc = (key.description or '')[:30]
-            print(f"{key.name:<30} {active:<8} {created:<20} {desc}")
+            print(f"{key.id:<6} {key.name:<30} {active:<8} {created:<20} {desc}")
     
     def _output_apikeys_json(self, keys):
         """Output API keys in JSON format"""
@@ -1692,6 +1693,7 @@ class SunrayCommand(Command):
     
     def _output_apikey_detailed(self, key):
         """Output detailed API key information"""
+        print(f"ID:          {key.id}")
         print(f"Name:        {key.name}")
         print(f"Key:         {key.key}")
         print(f"Active:      {'Yes' if key.is_active else 'No'}")

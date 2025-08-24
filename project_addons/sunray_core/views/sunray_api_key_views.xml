@@ -5,13 +5,14 @@
         <field name="name">sunray.api.key.list</field>
         <field name="model">sunray.api.key</field>
         <field name="arch" type="xml">
-            <list>
+            <list string="API Keys" create="true" edit="true">
                 <field name="name"/>
-                <field name="description"/>
-                <field name="scopes"/>
+                <field name="key_display" string="API Key"/>
+                <field name="description" optional="show"/>
+                <field name="scopes" optional="show"/>
                 <field name="is_active" widget="boolean_toggle"/>
-                <field name="last_used"/>
-                <field name="usage_count"/>
+                <field name="last_used" optional="show"/>
+                <field name="usage_count" optional="show"/>
             </list>
         </field>
     </record>
@@ -39,21 +40,55 @@
         <field name="model">sunray.api.key</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="regenerate_key" 
+                            type="object" 
+                            string="Regenerate Key" 
+                            class="btn-warning"
+                            invisible="not id"
+                            confirm="Are you sure? The old key will stop working immediately."/>
+                </header>
                 <sheet>
                     <group>
                         <group>
-                            <field name="name"/>
-                            <field name="key" readonly="1" password="True" groups="sunray_core.group_sunray_admin"/>
+                            <field name="name" required="1"/>
+                            
+                            <!-- For new records: editable key field -->
+                            <field name="key" 
+                                   invisible="id"
+                                   placeholder="Leave empty to auto-generate"
+                                   help="Leave empty for secure auto-generation (recommended)"/>
+                            
+                            <!-- For existing records: display with toggle -->
+                            <div class="o_row" invisible="not id">
+                                <field name="show_full_key" widget="boolean_toggle"/>
+                                <span>Show Full Key</span>
+                            </div>
+                            
+                            <!-- Partial display when toggle is off -->
+                            <field name="key_display" 
+                                   readonly="1"
+                                   invisible="not id or show_full_key"
+                                   string="API Key (Partial)"/>
+                            
+                            <!-- Full key with clipboard widget when toggle is on -->
+                            <field name="key" 
+                                   readonly="1"
+                                   invisible="not id or not show_full_key"
+                                   widget="CopyClipboardChar"
+                                   string="API Key (Full)"
+                                   groups="sunray_core.group_sunray_admin"/>
+                            
                             <field name="description"/>
                         </group>
                         <group>
                             <field name="is_active" widget="boolean_toggle"/>
-                            <field name="scopes"/>
+                            <field name="scopes" placeholder="e.g., config:read,user:write"/>
                             <field name="last_used" readonly="1"/>
+                            <field name="usage_count" readonly="1"/>
                             <field name="create_date" readonly="1"/>
                         </group>
                     </group>
-                    
                 </sheet>
             </form>
         </field>

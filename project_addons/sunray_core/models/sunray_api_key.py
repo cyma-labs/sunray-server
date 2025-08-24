@@ -16,7 +16,7 @@ class SunrayApiKey(models.Model):
     )
     key = fields.Char(
         string='API Key', 
-        required=True, 
+        required=False,  # Allow empty for auto-generation in GUI
         index=True,
         help='The API key value'
     )
@@ -35,6 +35,19 @@ class SunrayApiKey(models.Model):
         default='all'
     )
     
+    # Display fields
+    key_display = fields.Char(
+        string='API Key',
+        compute='_compute_key_display',
+        help='Partial view of API key for security'
+    )
+    
+    show_full_key = fields.Boolean(
+        string='Show Full Key',
+        default=False,
+        help='Toggle to show full API key'
+    )
+    
     # Usage tracking
     last_used = fields.Datetime(
         string='Last Used',
@@ -47,15 +60,54 @@ class SunrayApiKey(models.Model):
     )
     
     _sql_constraints = [
-        ('key_unique', 'UNIQUE(key)', 'API key must be unique!')
+        ('key_unique', 'UNIQUE(key)', 'API key must be unique!'),
+        ('key_required', 'CHECK(key IS NOT NULL AND key != \'\')', 'API key cannot be empty!')
     ]
     
+    @api.depends('key', 'show_full_key')
+    def _compute_key_display(self):
+        for record in self:
+            if not record.key:
+                record.key_display = ''
+            elif record.show_full_key:
+                record.key_display = record.key
+            else:
+                # Show first 8 and last 4 characters
+                if len(record.key) > 16:
+                    record.key_display = f"{record.key[:8]}...{record.key[-4:]}"
+                else:
+                    record.key_display = record.key[:4] + '...' if len(record.key) > 4 else record.key
+    
+    @api.model_create_multi
     def create(self, vals_list):
         """Override create to auto-generate key if not provided"""
-        for vals in vals_list:
+        # Track which keys were auto-generated
+        auto_generated = []
+        for i, vals in enumerate(vals_list):
             if 'key' not in vals or not vals['key']:
                 vals['key'] = self.generate_key()
-        return super().create(vals_list)
+                auto_generated.append(True)
+            else:
+                auto_generated.append(False)
+            # Reset show_full_key to False for new records
+            vals['show_full_key'] = False
+        
+        # Create the records
+        records = super().create(vals_list)
+        
+        # Log creation for each record
+        for i, record in enumerate(records):
+            self.env['sunray.audit.log'].create_admin_event(
+                event_type='api_key.created',
+                details={
+                    'key_name': record.name,
+                    'key_id': record.id,
+                    'scopes': record.scopes,
+                    'auto_generated': auto_generated[i]  # Track if auto-generated
+                }
+            )
+        
+        return records
     
     @api.model
     def generate_key(self):
@@ -73,8 +125,22 @@ class SunrayApiKey(models.Model):
             details={'key_name': self.name}
         )
         
-        self.key = new_key
-        return new_key
+        self.write({
+            'key': new_key,
+            'show_full_key': True  # Show full key after regeneration
+        })
+        
+        # Return notification
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Key Regenerated',
+                'message': 'New API key generated. Copy it now as it won\'t be shown again in full.',
+                'type': 'warning',
+                'sticky': True,
+            }
+        }
     
     def track_usage(self):
         """Update usage statistics"""
@@ -106,3 +172,21 @@ class SunrayApiKey(models.Model):
                 return True
         
         return False
+    
+    def unlink(self):
+        """Override unlink to audit API key deletion"""
+        # Collect info before deletion
+        for record in self:
+            self.env['sunray.audit.log'].create_admin_event(
+                event_type='api_key.deleted',
+                details={
+                    'key_name': record.name,
+                    'key_id': record.id,
+                    'was_active': record.is_active,
+                    'usage_count': record.usage_count,
+                    'last_used': record.last_used.isoformat() if record.last_used else None
+                }
+            )
+        
+        # Perform the deletion
+        return super().unlink()

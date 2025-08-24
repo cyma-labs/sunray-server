@@ -41,7 +41,9 @@ class SunrayAuditLog(models.Model):
         ('webhook.used', 'Webhook Token Used'),
         ('webhook.regenerated', 'Webhook Token Regenerated'),
         # API Key Events
+        ('api_key.created', 'API Key Created'),
         ('api_key.regenerated', 'API Key Regenerated'),
+        ('api_key.deleted', 'API Key Deleted'),
         # Cache Events
         ('cache_invalidation', 'Cache Invalidation'),
         # WAF Bypass Events

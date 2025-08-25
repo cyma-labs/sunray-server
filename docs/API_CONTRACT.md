@@ -478,31 +478,91 @@ The `/config/register` endpoint handles all migration logic:
 
 ### POST /sunray-srvr/v1/setup-tokens/validate
 
-**Purpose**: Validates setup tokens for new device registration.
+**Purpose**: Validates and consumes setup tokens for new device registration. **⚠️ CRITICAL**: This endpoint increments token usage count and will consume the token when usage limit is reached. Every token is bound to a specific host and MUST be validated against that host.
 
 **Request Body**:
 ```json
 {
   "username": "user@example.com",
-  "token": "setup_token_string"
+  "token_hash": "sha512:hex_hash_value",
+  "client_ip": "192.168.1.100",
+  "host_domain": "app.example.com"
 }
 ```
+
+**Required Fields**:
+- `username`: Username associated with the token
+- `token_hash`: SHA-512 hash of the token (format: "sha512:hex_value")
+- `client_ip`: Client IP address for CIDR validation
+- `host_domain`: Domain where token is being used (MUST match token's bound host)
+
+**Token Consumption Behavior**:
+- Each successful validation increments `current_uses` counter
+- Token becomes consumed when `current_uses >= max_uses`
+- Default `max_uses` is 1 (single-use token)
+- Consumed tokens return error on subsequent validation attempts
+- Audit event `token.consumed` is logged on each successful validation
+- **Important**: Token consumption happens even if subsequent operations fail
+
+**Validation Steps**:
+1. Verify all required fields are present
+2. Check user exists and is active
+3. Verify token exists and hasn't expired
+4. Check token isn't already consumed
+5. **Validate host binding** - token MUST be for the specified host_domain
+6. Check client IP against allowed CIDRs (if configured)
+7. Verify usage limit not exceeded
+8. Increment usage count and mark consumed if limit reached
 
 **Response** (Success):
 ```json
 {
-  "success": true,
-  "user_id": 123,
-  "device_name": "laptop"
+  "valid": true,
+  "user": {
+    "username": "user@example.com",
+    "email": "user@example.com",
+    "display_name": "User Name"
+  }
 }
 ```
 
 **Response** (Error):
 ```json
 {
-  "success": false,
-  "error": "Invalid or expired setup token"
+  "valid": false,
+  "error": "<error_message>"
 }
+```
+
+**Possible Error Messages**:
+- `"Missing required fields"` - One or more required fields not provided
+- `"User not found"` - Username doesn't exist or inactive
+- `"Invalid or expired token"` - Token not found, expired, or already consumed
+- `"Unknown host"` - host_domain not recognized in system
+- `"Token not valid for this host"` - Token is bound to a different host
+- `"IP not allowed"` - Client IP doesn't match CIDR restrictions
+- `"Token usage limit exceeded"` - Token already consumed (reached max_uses)
+
+**Security Considerations**:
+- **Host Binding**: Every token is cryptographically bound to a specific host - this is enforced
+- **Token Storage**: Tokens are stored as SHA-512 hashes, never in plaintext
+- **IP Validation**: Optional CIDR blocks restrict token usage to specific networks
+- **Single Use Default**: Tokens are single-use by default for security
+- **Audit Trail**: All validation attempts are logged with IP, host, and outcome
+- **Zero Trust**: Each validation requires full context (user, host, IP) - no assumptions
+
+**Example Usage**:
+```bash
+# Worker validates a setup token for user registration
+curl -X POST https://sunray-server.example.com/sunray-srvr/v1/setup-tokens/validate \
+  -H "Authorization: Bearer your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user@example.com",
+    "token_hash": "sha512:a1b2c3d4e5f6...",
+    "client_ip": "192.168.1.100",
+    "host_domain": "app.example.com"
+  }'
 ```
 
 ### POST /sunray-srvr/v1/users/{username}/passkeys

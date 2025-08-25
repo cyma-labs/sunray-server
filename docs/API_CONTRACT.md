@@ -28,7 +28,9 @@ Workers making their first API call will be automatically registered if they inc
 
 ### GET /sunray-srvr/v1/config
 
-**Purpose**: Returns complete configuration for all hosts and users. Workers fetch and cache this for authentication and authorization decisions.
+**Purpose**: Returns complete configuration for all hosts and users. 
+
+**⚠️ IMPORTANT**: This endpoint is intended for administrative monitoring purposes only. Workers MUST NOT use this endpoint as it exposes configuration data for all hosts and users, creating security and efficiency concerns. Workers should use the host-specific `/config/{hostname}` endpoint instead.
 
 **Query Parameters**: None
 
@@ -123,6 +125,106 @@ Workers making their first API call will be automatically registered if they inc
 - `host_versions` and `user_versions` allow workers to detect configuration changes
 - Workers can use these for cache invalidation strategies
 - Only recently modified users (last 5 minutes) appear in `user_versions`
+
+### GET /sunray-srvr/v1/config/{hostname}
+
+**Purpose**: Get configuration for a specific host only. This is the recommended endpoint for workers to fetch configuration updates after initial registration.
+
+**Path Parameters**:
+- `hostname`: The domain name of the host to get configuration for (e.g., "example.com")
+
+**Headers Required**:
+- `Authorization: Bearer your_api_key`
+- `X-Worker-ID: your_worker_name`
+
+**Security**: Only workers bound to the specified host can access its configuration.
+
+**Response** (Success):
+```json
+{
+  "version": 4,
+  "generated_at": "2024-01-01T12:00:00Z",
+  "worker_id": 42,
+  "worker_name": "demo-worker-001",
+  "host": {
+    "domain": "example.com",
+    "backend": "https://backend.example.com",
+    "authorized_users": ["user@example.com"],
+    "session_duration_s": 3600,
+    "exceptions_tree": {
+      "public_patterns": ["/health", "/status"],
+      "cidr_rules": [
+        {
+          "priority": 200,
+          "patterns": ["/admin/*"],
+          "cidrs": ["192.168.1.0/24"]
+        }
+      ],
+      "token_rules": [
+        {
+          "priority": 300,
+          "patterns": ["/api/*", "/webhook/*"],
+          "tokens": [
+            {
+              "name": "API_Token_1",
+              "header_name": "X-API-Key",
+              "token_source": "header"
+            }
+          ]
+        }
+      ]
+    },
+    "bypass_waf_for_authenticated": true,
+    "waf_bypass_revalidation_s": 900,
+    "config_version": "2024-01-01T11:55:00Z"
+  },
+  "users": {
+    "user@example.com": {
+      "email": "user@example.com",
+      "display_name": "User Name",
+      "created_at": "2023-01-01T00:00:00Z",
+      "passkeys": [
+        {
+          "credential_id": "credential_id_base64",
+          "public_key": "public_key_base64",
+          "name": "MacBook Pro",
+          "created_at": "2023-01-01T00:00:00Z",
+          "backup_eligible": true,
+          "backup_state": true
+        }
+      ]
+    }
+  }
+}
+```
+
+**Response** (Errors):
+```json
+{
+  "error": "Worker 'worker-name' not found"
+}
+```
+```json
+{
+  "error": "Host 'hostname' not found"
+}
+```
+```json
+{
+  "error": "Worker 'worker-name' not authorized for host 'hostname'"
+}
+```
+
+**Benefits**:
+- **Security**: Workers only access configuration for their assigned host
+- **Efficiency**: Minimal data transfer (only relevant host and users)
+- **Performance**: Faster response times with focused data
+- **Privacy**: No exposure of other hosts' configurations
+
+**Recommended Worker Flow**:
+1. **Initial Setup**: `POST /config/register` to bind worker to host
+2. **Configuration Updates**: `GET /config/{hostname}` for periodic updates
+3. **Cache Management**: Use `host.config_version` for cache invalidation
 
 ### POST /sunray-srvr/v1/config/register
 

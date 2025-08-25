@@ -211,6 +211,30 @@
                             
                         </page>
                         
+                        <page string="Helpers">
+                            <div class="alert alert-info" role="alert">
+                                <p><strong>API Testing Commands</strong></p>
+                                <p>Use these curl commands to check Sunray Server API connectivity. Adjust the endpoint path as needed for different API calls.</p>
+                                <p>Note: If server URL shows "YOUR_SERVER_URL", set the system parameter 'web.base.url' in Settings → Technical → Parameters.</p>
+                            </div>
+                            
+                            <group string="Server API Test">
+                                <field name="server_curl_helper" 
+                                       widget="CopyClipboardChar" 
+                                       nolabel="1"
+                                       readonly="1"
+                                       style="font-family: monospace; background-color: #f5f5f5; padding: 10px;"/>
+                            </group>
+                            
+                            <group string="Worker Status Test">
+                                <field name="worker_curl_helper" 
+                                       widget="CopyClipboardChar"
+                                       nolabel="1" 
+                                       readonly="1"
+                                       style="font-family: monospace; background-color: #f5f5f5; padding: 10px;"/>
+                            </group>
+                        </page>
+                        
                     </notebook>
                 </sheet>
             </form>

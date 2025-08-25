@@ -101,6 +101,21 @@ class SunrayHost(models.Model):
         help='Timestamp of last configuration change, used for cache invalidation'
     )
     
+    # cURL helper fields
+    server_curl_helper = fields.Text(
+        string='Server cURL Helper',
+        compute='_compute_server_curl_helper',
+        readonly=True,
+        help='cURL command to test Server API connectivity'
+    )
+    
+    worker_curl_helper = fields.Text(
+        string='Worker cURL Helper', 
+        compute='_compute_worker_curl_helper',
+        readonly=True,
+        help='cURL command to test Worker status endpoint'
+    )
+    
     # Worker migration fields
     pending_worker_name = fields.Char(
         string='Pending Worker ID',
@@ -172,6 +187,43 @@ class SunrayHost(models.Model):
             return f'{hours} hour{"s" if hours != 1 else ""}, {minutes} minute{"s" if minutes != 1 else ""}'
         else:
             return f'{minutes} minute{"s" if minutes != 1 else ""}'
+    
+    def _compute_server_curl_helper(self):
+        """Generate cURL command for server API config endpoint"""
+        # Get server URL from system parameter
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        
+        if not base_url:
+            # If not set, provide instructions
+            base_url = "https://YOUR_SERVER_URL"
+        
+        for record in self:
+            api_key = "UNDEFINED_API_KEY"
+            worker_id = "UNDEFINED_WORKER"
+            
+            # Get API key and worker ID from bound worker
+            if record.sunray_worker_id and record.sunray_worker_id.api_key_id:
+                api_key = record.sunray_worker_id.api_key_id.key
+                worker_id = record.sunray_worker_id.name
+            
+            record.server_curl_helper = f'''curl -X GET "{base_url}/sunray-srvr/v1/config" \\
+    -H "Authorization: Bearer {api_key}" \\
+    -H "Content-Type: application/json" \\
+    -H "X-Worker-ID: {worker_id}"'''
+
+    def _compute_worker_curl_helper(self):
+        """Generate cURL command for worker status endpoint"""
+        for record in self:
+            api_key = "UNDEFINED_API_KEY"
+            
+            # Get API key from bound worker
+            if record.sunray_worker_id and record.sunray_worker_id.api_key_id:
+                api_key = record.sunray_worker_id.api_key_id.key
+            
+            # Use the host's domain for the worker endpoint
+            record.worker_curl_helper = f'''curl -X GET "https://{record.domain}/sunray-wrkr/v1/health" \\
+    -H "Authorization: Bearer {api_key}" \\
+    -H "Content-Type: application/json"'''
     
     def set_pending_worker(self, worker_name):
         """Set pending worker for migration

@@ -618,7 +618,7 @@ class SunrayRESTController(http.Controller):
         for host in user_obj.host_ids.filtered('is_active'):
             authorized_hosts.append({
                 'domain': host.domain,
-                'name': host.name
+                'name': host.domain
             })
         
         # Build response data

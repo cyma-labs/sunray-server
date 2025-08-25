@@ -4,7 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Muppy Sunray is a lightweight, secure, self-hosted solution for authorizing HTTP access to private cloud services without VPN or fixed IPs. The project integrates with Cloudflare's infrastructure to provide enterprise-grade security at a fraction of traditional costs.
+**Sunray** is a comprehensive and affordable Web/HTTP Zero Trust access solution that integrates with various edge platforms to provide enterprise-grade security at a fraction of traditional costs.
+
+### ⚠️ IMPORTANT: What Sunray Is and Is Not
+
+**Sunray is NOT an authentication system.** It is a Web/HTTP Zero Trust access solution that controls who can reach protected applications. Key distinctions:
+
+- **Sunray**: Decides if you can REACH the application (access control)
+- **Application**: Decides WHO you are and WHAT you can do (authentication & authorization)
+
+Think of Sunray as a security bouncer at a club entrance:
+- The bouncer (Sunray) checks if you're on the guest list to enter the club
+- Once inside, you still need to pay for drinks, show ID at the bar, etc. (application authentication)
+
+**Always refer to Sunray as:**
+- "Web/HTTP Zero Trust access solution"
+- "Access control system" 
+- "Security gateway"
+
+**Never refer to Sunray as:**
+- "Authentication system"
+- "Login system" 
+- "Identity provider"
 
 ### Architecture: Server-Centric Design
 

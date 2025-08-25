@@ -1,11 +1,13 @@
 # Sunray Server API Contract v1
 
-This document defines the API that ALL Sunray workers must use. The server provides a rich, comprehensive API that handles all business logic, while workers are thin translation layers.
+**Sunray** is a comprehensive and affordable Web/HTTP Zero Trust access solution.
+
+This document defines the API that ALL Sunray workers must use. The server provides a rich, comprehensive API that handles all access control business logic, while workers are thin translation layers that enforce access decisions at the edge.
 
 ## Design Principles
 
-1. **Server contains ALL business logic** - Workers are stateless translators
-2. **Workers query server for decisions** - No local policy evaluation
+1. **Server contains ALL access control logic** - Workers are stateless translators
+2. **Workers query server for access decisions** - No local policy evaluation
 3. **Server responses are cacheable** - Workers can cache for performance
 4. **API versioning for backward compatibility** - Ensures worker stability
 5. **Consistent error handling** - Standard error responses across endpoints
@@ -23,6 +25,138 @@ Authorization: Bearer your_worker_api_key_here
 - `X-Worker-Version`: Worker version information
 
 Workers making their first API call will be automatically registered if they include the `X-Worker-ID` header.
+
+## Worker Management
+
+### Auto-Registration System
+
+Workers automatically register with the server on their first API call when they include the `X-Worker-ID` header. This eliminates manual worker setup and ensures immediate visibility in the admin interface.
+
+**Registration Process**:
+1. Worker makes first API call with `X-Worker-ID: unique-worker-name`
+2. Server automatically creates worker record
+3. Worker is linked to the API key being used
+4. Worker appears in admin interface immediately
+5. Audit event `worker.auto_registered` is logged
+
+**Worker Object Fields**:
+- `name`: Unique worker identifier (from X-Worker-ID header)
+- `worker_type`: Detected automatically ('cloudflare', 'kubernetes', etc.)
+- `api_key_id`: Associated API key
+- `first_seen_ts`: Initial registration timestamp
+- `last_seen_ts`: Most recent API call timestamp
+- `is_active`: Health status based on recent activity
+- `version`: Worker version (from headers if provided)
+
+### Host-Worker Binding
+
+**Binding Rules**:
+- One worker can protect multiple hosts
+- One host can only be protected by one worker
+- Binding occurs during worker registration to specific host
+- Unauthorized binding attempts are blocked and audited
+
+**Binding States**:
+- **Unbound Host**: No worker assigned, first worker binds immediately
+- **Bound Host**: Protected by assigned worker, other workers blocked
+- **Pending Migration**: Admin has authorized worker replacement
+
+### Worker Health Monitoring
+
+Workers are continuously monitored for health status:
+
+- **Active**: Regular API calls within expected timeframe
+- **Idle**: Reduced API activity but within acceptable bounds
+- **Offline**: No API calls for extended period
+- **Error**: Recent API failures or configuration issues
+
+Health status affects:
+- Admin dashboard indicators
+- Migration eligibility
+- Audit alerting thresholds
+- Cache invalidation strategies
+
+## Worker Migration System
+
+### Migration Overview
+
+The migration system enables controlled replacement of workers without service interruption. This supports scaling, version upgrades, geographic relocation, and disaster recovery scenarios.
+
+### Migration Workflow
+
+**Phase 1: Preparation**
+1. Admin identifies need for worker replacement
+2. New worker is deployed with unique identifier
+3. Admin sets `pending_worker_name` on target host
+4. System prepares for automatic migration
+
+**Phase 2: Execution**
+1. New worker attempts registration to host
+2. System detects pending worker matches registering worker
+3. Migration occurs automatically
+4. Old worker binding is replaced
+5. Old worker receives error on next API call
+
+**Phase 3: Completion**
+1. Old worker stops serving traffic
+2. New worker takes over completely
+3. Migration timing and success are logged
+4. Admin can verify successful migration
+
+### Migration CLI Commands
+
+```bash
+# Set up pending migration
+bin/sunray-srvr srctl host set-pending-worker <hostname> <new-worker-name>
+
+# Check migration status
+bin/sunray-srvr srctl host migration-status <hostname>
+
+# List all pending migrations
+bin/sunray-srvr srctl host list-pending-migrations
+
+# Cancel migration (before it occurs)
+bin/sunray-srvr srctl host clear-pending-worker <hostname>
+```
+
+### Migration API Behavior
+
+The `/config/register` endpoint handles all migration logic:
+
+**Same Worker Re-registering**:
+- Returns current configuration (idempotent)
+- Logs `worker.re_registered` event
+- No service interruption
+
+**Authorized Pending Worker**:
+- Performs automatic migration
+- Updates host binding
+- Logs detailed migration events
+- Returns new configuration
+
+**Unauthorized Worker**:
+- Registration blocked
+- Detailed error returned with current status
+- Logs `worker.registration_blocked` event
+- Provides migration guidance
+
+### Migration Audit Events
+
+| Event Type | Description | When Logged |
+|------------|-------------|-------------|
+| `worker.migration_requested` | Admin sets pending worker | Pre-migration setup |
+| `worker.migration_started` | New worker begins registration | Migration start |
+| `worker.migration_completed` | Successful migration | Migration success |
+| `worker.migration_cancelled` | Admin cancels migration | Manual cancellation |
+| `worker.registration_blocked` | Unauthorized registration attempt | Security event |
+
+### Migration Use Cases
+
+**Version Upgrades**: Replace worker with newer version containing bug fixes or features
+**Scaling**: Deploy additional workers for load distribution
+**Geographic Migration**: Move worker to different region for performance
+**Disaster Recovery**: Quickly replace failed worker with emergency replacement
+**Maintenance**: Replace worker during planned maintenance windows
 
 ## Core Endpoints
 
@@ -460,7 +594,7 @@ Workers making their first API call will be automatically registered if they inc
 
 ### POST /sunray-srvr/v1/auth/verify
 
-**Purpose**: Verifies WebAuthn authentication response (does NOT create session).
+**Purpose**: Verifies WebAuthn access control response (does NOT create session).
 
 **Request Body**:
 ```json
@@ -497,7 +631,7 @@ Workers making their first API call will be automatically registered if they inc
 
 ### POST /sunray-srvr/v1/sessions
 
-**Purpose**: Creates a new session after successful authentication.
+**Purpose**: Creates a new session after successful access control verification.
 
 **Request Body**:
 ```json
@@ -541,7 +675,7 @@ Workers making their first API call will be automatically registered if they inc
 ```
 
 **Event Types**: For a complete list of supported `event_type` values, refer to the `event_type` field definition in `/project_addons/sunray_core/models/sunray_audit_log.py`. The event types are organized into categories:
-- Authentication Events (e.g., `auth.success`, `auth.failure`)
+- Access Control Events (e.g., `auth.success`, `auth.failure`)
 - Token Management Events (e.g., `token.generated`, `token.consumed`)
 - Configuration Events (e.g., `config.fetched`, `config.session_duration_changed`)
 - Session Events (e.g., `session.created`, `session.expired`)
@@ -696,10 +830,10 @@ ERROR: Host example.com missing required field 'session_duration_s' in configura
 
 ## Worker Implementation Requirements
 
-1. **Always query server for authentication decisions**
+1. **Always query server for access control decisions**
 2. **Implement proper caching with TTL**
 3. **Handle server unavailability gracefully**
-4. **Log all authentication events via audit endpoint**
+4. **Log all access control events via audit endpoint**
 5. **Validate server responses before acting**
 6. **Use secure defaults (deny access) on errors**
 

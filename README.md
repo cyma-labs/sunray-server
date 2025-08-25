@@ -1,10 +1,10 @@
 # Sunray
 
-**Sunray** is a comprehensive Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. 
+**Sunray** is a comprehensive and affordable Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. 
 
-Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all policies while lightweight edge workers enforce protection. 
+Designed to protect web applications and APIs from all types of attacks—especially zero-day exploits—Sunray implements a unique distributed architecture where a secure, self-hosted server manages all access policies while lightweight edge workers enforce protection at the network edge. 
 
-This approach delivers passwordless authentication via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
+This approach delivers passwordless access control via WebAuthn, requires zero modification to existing applications, remains accessible to small teams, and offers complete sovereignty over your security infrastructure—all while maintaining the transparency of open source software.
 
 ---
 
@@ -14,7 +14,7 @@ This approach delivers passwordless authentication via WebAuthn, requires zero m
 
 • **API and webhook compatibility** makes Sunray an ideal solution for modern, automated environments. Whether you're protecting human-accessible web applications or machine-to-machine communications, Sunray seamlessly handles API calls, webhooks, and automated services while maintaining the same high security standards across all types of traffic.
 
-• **WebAuthn and Passkeys integration** delivers both exceptional security and outstanding user experience. Users can authenticate using biometric data (fingerprint, face recognition, etc.) or hardware security keys, eliminating passwords while providing stronger authentication than traditional methods. This modern approach reduces the risk of credential-based attacks while making access faster and more convenient for legitimate users.
+• **WebAuthn and Passkeys integration** delivers both exceptional security and outstanding user experience. Users must prove their identity using biometric data (fingerprint, face recognition, etc.) or hardware security keys to reach protected applications, eliminating passwords while providing stronger access control than traditional methods. This modern approach reduces the risk of credential-based attacks while making access faster and more convenient for legitimate users.
 
 • **Zero modification deployment** means Sunray protects your existing applications without requiring any code changes, configuration updates, or architectural modifications to your hosts or web applications. Your applications continue to operate exactly as they always have, while Sunray transparently provides comprehensive security at the network edge.
 
@@ -42,6 +42,9 @@ This dual approach means you never have to compromise between sovereignty, perfo
 - 🌐 **Multi-Platform Workers**: Support for Cloudflare, Kubernetes, and future edge computing platforms
 - 🎛️ **Centralized Management**: Odoo 18-based admin interface for unified user, policy, and host management
 - ⚡ **High Performance**: Lightweight workers with minimal latency impact on protected applications
+- 🤖 **Intelligent Worker Management**: Auto-registration, health monitoring, and zero-downtime migration
+- 🔄 **Zero-Downtime Migration**: Controlled worker replacement without service interruption
+- 🛡️ **WAF Bypass for Authenticated Users**: Reduced friction for legitimate users while maintaining security
 
 ## 🏗️ Architecture
 
@@ -61,6 +64,7 @@ Sunray's architecture prioritizes security through complete separation of concer
 - **Platform adaptation**: Translate platform-specific requests (Cloudflare, Kubernetes, etc.) to universal server API calls
 - **Real-time enforcement**: Execute access control decisions with minimal latency impact
 - **Threat intelligence**: Continuous monitoring and reporting of attack patterns to the server
+- **Intelligent management**: Auto-registration, health monitoring, and zero-downtime replacement capabilities
 
 ### Communication Flow
 ```
@@ -166,10 +170,20 @@ bin/test_server.sh --coverage --verbose    # With coverage
 Manage Sunray objects via command line:
 
 ```bash
-# Usage: bin/sunray-srvr srctl <object> <action> [options]
+# Core object management
 bin/sunray-srvr srctl apikey list
 bin/sunray-srvr srctl user create "username" --sr-email "user@example.com"
 bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hours 24
+
+# Worker management
+bin/sunray-srvr srctl worker list                    # List all workers
+bin/sunray-srvr srctl worker get worker-name         # Get worker details
+
+# Host-worker binding and migration
+bin/sunray-srvr srctl host set-pending-worker app.example.com new-worker-001
+bin/sunray-srvr srctl host migration-status app.example.com
+bin/sunray-srvr srctl host list-pending-migrations
+bin/sunray-srvr srctl host clear-pending-worker app.example.com
 ```
 
 ## 🔐 Security Model
@@ -181,13 +195,17 @@ bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hou
   - **Token Access**: API/webhook token authentication
 - **WebAuthn/Passkeys**: Primary authentication method
 - **Session Management**: Secure cookies with configurable TTL
+- **WAF Bypass**: Authenticated users can bypass WAF rules for improved performance
+- **Worker Security**: Auto-registration with comprehensive audit trails
 
 ## 📡 API Documentation
 
 The server provides a comprehensive REST API at `/sunray-srvr/v1/*`:
 
 ### Core Endpoints
-- `/config` - Get configuration and access rules (Worker → Server)
+- `/config` - Get global configuration (Admin monitoring only)
+- `/config/{hostname}` - Get host-specific configuration (Recommended for Workers)
+- `/config/register` - Register worker and bind to host
 - `/setup-tokens/validate` - Validate setup tokens
 - `/users/<username>/passkeys` - Register passkeys
 - `/sessions/validate` - Validate sessions
@@ -238,9 +256,17 @@ docker run -e IKB_ODOO_ADMIN_PASSWORD="admin" -it sunray-srvr18:latest
 
 ## 📚 Documentation
 
+### Core Documentation
 - [CLAUDE.md](./CLAUDE.md) - Complete development guide
-- [docs/specs/](./docs/specs/) - Technical specifications
 - [API_CONTRACT.md](./docs/API_CONTRACT.md) - API specification for workers
+- [Sunray Introduction](./docs/sunray_introduction.md) - System overview and concepts
+
+### Feature Guides
+- [Worker Management and Migration](./docs/worker_management_and_migration.md) - Complete worker lifecycle guide
+- [WAF Bypass Guide](./docs/waf_bypass_guide.md) - Enhanced security for authenticated users
+
+### Technical Specifications
+- [docs/specs/](./docs/specs/) - Detailed technical specifications
 
 ## 🤝 Contributing
 

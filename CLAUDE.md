@@ -444,6 +444,12 @@ sunray_core/
 
 - **API Contract Updates**: When updating any code in the Sunray server REST API controller (`project_addons/sunray_core/controllers/main.py`), you MUST update `docs/API_CONTRACT.md` with the changes if they affect the API contract (new endpoints, changed parameters, modified responses, etc.).
 
+- **Audit Logging Policy**: All audit events MUST be created using the `sunray.audit.log` model's `create_audit_event()` method. DO NOT create new logging methods - use the existing unified method with appropriate parameters:
+  - **Required parameters**: `event_type`, `details`, `severity`
+  - **Optional parameters**: `sunray_admin_user_id`, `sunray_user_id`, `sunray_worker`, `ip_address`, `user_agent`, `request_id`, `event_source`, `username`
+  - **Severity levels**: 'info', 'warning', 'error', 'critical' (use 'critical' for security events)
+  - **Example usage**: `audit_log.create_audit_event(event_type='security.cross_domain_session', details={'original_domain': 'app1.com', 'requested_domain': 'app2.com'}, severity='critical')`
+
 ### Coding Conventions
 
 - **Odoo 18 View Syntax**: Use new attribute syntax instead of `attrs`

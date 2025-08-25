@@ -849,7 +849,7 @@ curl -X POST https://sunray-server.example.com/sunray-srvr/v1/setup-tokens/valid
 - Configuration Events (e.g., `config.fetched`, `config.session_duration_changed`)
 - Session Events (e.g., `session.created`, `session.expired`)
 - WAF Bypass Events (e.g., `waf_bypass.created`, `waf_bypass.tamper.*`)
-- Security Events (e.g., `security.alert`, `SESSION_IP_CHANGED`)
+- Security Events (e.g., `security.alert`, `security.cross_domain_session`, `security.host_id_mismatch`, `security.unmanaged_host_access`, `SESSION_IP_CHANGED`)
 - Worker Migration Events (e.g., `worker.migration_requested`, `worker.migration_completed`, `worker.registration_blocked`)
 
 **Response**:
@@ -1000,6 +1000,25 @@ Workers should log:
 - Session creation events with duration used
 - WAF cookie refresh events with revalidation period
 - Configuration errors for missing timing fields
+
+#### **Security Event Logging Requirements**
+
+Workers must log these critical security events using the audit log endpoint:
+
+**security.cross_domain_session** (Critical):
+- **When**: User attempts to use authenticated session from domain A on domain B
+- **Details**: `{"original_domain": "app1.company.com", "requested_domain": "app2.company.com", "username": "user", "session_id": "xxx"}`
+- **Indicates**: Potential session hijacking, credential stuffing, or misconfigured client
+
+**security.host_id_mismatch** (Critical):
+- **When**: Valid session's host_id claim doesn't match expected host_id from configuration
+- **Details**: `{"session_host_id": "host123", "expected_host_id": "host456", "username": "user", "session_id": "xxx"}`
+- **Indicates**: Session replay attack, host configuration change, or worker synchronization issue
+
+**security.unmanaged_host_access** (Warning):
+- **When**: Worker receives request for hostname not registered as Protected Host
+- **Details**: `{"hostname": "unknown.company.com", "path": "/admin", "method": "GET", "client_ip": "10.0.0.1", "user_agent": "Mozilla/..."}`
+- **Indicates**: Misconfigured DNS/routes, reconnaissance attempts, or forgotten host registrations
 
 Example log entries:
 ```

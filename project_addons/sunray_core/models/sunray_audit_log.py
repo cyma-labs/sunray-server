@@ -32,6 +32,7 @@ class SunrayAuditLog(models.Model):
         # Configuration Events
         ('config.fetched', 'Config Fetched'),
         ('config.host_fetched', 'Host Config Fetched'),
+        ('config.fetched_invalid', 'Config fetched is Invalid'),
         ('config.session_duration_changed', 'Session Duration Changed'),
         ('config.waf_revalidation_changed', 'WAF Revalidation Changed'),
         # Session Management Events
@@ -73,6 +74,9 @@ class SunrayAuditLog(models.Model):
         ('worker.deleted', 'Worker Deleted'),
         # Security Events
         ('security.alert', 'Security Alert'),
+        ('security.cross_domain_session', 'Cross-Domain Session Attempt'),
+        ('security.host_id_mismatch', 'Host ID Mismatch'),
+        ('security.unmanaged_host_access', 'Unmanaged Host Access'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
         ('SESSION_IP_CHANGED', 'Session IP Changed'),
         ('SESSION_COUNTRY_CHANGED', 'Session Country Changed'),

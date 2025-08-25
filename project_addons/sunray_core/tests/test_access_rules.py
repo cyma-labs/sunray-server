@@ -9,10 +9,26 @@ class TestAccessRules(TransactionCase):
     def setUp(self):
         super().setUp()
         
+        # Create test API key
+        self.api_key = self.env['sunray.api.key'].create({
+            'name': 'test_worker_key',
+            'is_active': True,
+            'scopes': 'config:read'
+        })
+        
+        # Create test worker
+        self.worker = self.env['sunray.worker'].create({
+            'name': 'Test Worker',
+            'worker_type': 'cloudflare',
+            'worker_url': 'https://worker.example.com',
+            'api_key_id': self.api_key.id,
+            'is_active': True
+        })
+        
         # Create a test host
         self.host = self.env['sunray.host'].create({
             'domain': 'api.example.com',
-            'worker_url': 'https://worker.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'https://backend.example.com',
             'is_active': True
         })

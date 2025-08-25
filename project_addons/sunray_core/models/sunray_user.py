@@ -137,78 +137,78 @@ class SunrayUser(models.Model):
         }
     
     def force_cache_refresh(self):
-        """Trigger immediate cache refresh for this user via Worker API"""
+        """Trigger immediate cache refresh for this user on all allowed hosts"""
         for record in self:
-            try:
-                # Call worker's cache invalidation endpoint
-                self._call_worker_cache_invalidate(
-                    scope='user',
-                    target=record.username,
-                    reason=f'Manual refresh by {self.env.user.name}'
-                )
+            # Get all hosts this user has access to
+            host_objs = record.host_ids
+            
+            if not host_objs:
+                raise UserError(f"User {record.username} has no assigned hosts. "
+                               "Assign the user to hosts first.")
+            
+            success_count = 0
+            failed_hosts = []
+            unbound_hosts = []
+            
+            for host_obj in host_objs:
+                # Check if host is bound to a worker
+                if not host_obj.sunray_worker_id:
+                    unbound_hosts.append(host_obj.domain)
+                    continue
                 
-                # Log the action
-                self.env['sunray.audit.log'].create_admin_event(
-                    event_type='cache_invalidation',
-                    severity='info',
-                    details=f'Cache refresh triggered for user {record.username}',
-                    sunray_user_id=record.id,
-                    username=record.username,
-                    admin_user_id=self.env.user.id
-                )
-            except Exception as e:
-                _logger.error(f"Failed to trigger cache refresh for user {record.username}: {str(e)}")
-                raise UserError(f"Failed to trigger cache refresh: {str(e)}")
+                try:
+                    # Call worker's cache invalidation endpoint for this host
+                    host_obj._call_worker_cache_invalidate(
+                        scope='user',
+                        target=record.username,
+                        reason=f'Manual user refresh by {self.env.user.name}'
+                    )
+                    success_count += 1
+                except Exception as e:
+                    _logger.error(f"Failed to refresh cache for user {record.username} on host {host_obj.domain}: {str(e)}")
+                    failed_hosts.append(f'{host_obj.domain}: {str(e)}')
+            
+            # Log the action
+            self.env['sunray.audit.log'].create_admin_event(
+                event_type='cache_invalidation',
+                severity='info',
+                details=f'Cache refresh triggered for user {record.username} on {success_count} host(s)',
+                sunray_user_id=record.id,
+                username=record.username,
+                admin_user_id=self.env.user.id
+            )
+            
+            # Handle errors and warnings
+            if unbound_hosts and not success_count:
+                raise UserError(f"Cannot refresh cache for user {record.username}. "
+                               f"All hosts ({', '.join(unbound_hosts)}) are not yet bound to workers. "
+                               "Worker binding happens automatically when workers first call the API.")
+            elif failed_hosts and not success_count:
+                raise UserError(f"Failed to refresh cache for user {record.username} on all hosts: "
+                               f"{', '.join(failed_hosts)}")
+        
+        # Build result message
+        message_parts = []
+        if success_count:
+            message_parts.append(f'Successfully refreshed {success_count} host(s)')
+        if unbound_hosts:
+            message_parts.append(f'{len(unbound_hosts)} host(s) not bound to workers: {', '.join(unbound_hosts)}')
+        if failed_hosts:
+            message_parts.append(f'{len(failed_hosts)} host(s) failed: {', '.join(failed_hosts)}')
+        
+        notification_type = 'success'
+        if failed_hosts or unbound_hosts:
+            notification_type = 'warning'
         
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Cache Refresh Triggered',
-                'message': f'Worker caches will refresh for {len(self)} user(s) within 60 seconds',
-                'type': 'warning',
+                'title': 'Cache Refresh Results',
+                'message': '. '.join(message_parts),
+                'type': notification_type,
+                'sticky': bool(failed_hosts),  # Stick error messages
             }
         }
     
-    def _call_worker_cache_invalidate(self, scope, target=None, reason=''):
-        """Call Worker API to trigger cache invalidation"""
-        # Get configuration
-        ICP = self.env['ir.config_parameter'].sudo()
-        worker_url = ICP.get_param('sunray.worker_url')
-        
-        if not worker_url:
-            # Try to get from environment or use a default
-            worker_url = 'https://sunray-worker.oursbleu.workers.dev'
-            _logger.warning(f"sunray.worker_url not configured, using default: {worker_url}")
-        
-        # Get API key
-        api_key_obj = self.env['sunray.api.key'].sudo().search([
-            ('is_active', '=', True)
-        ], limit=1)
-        
-        if not api_key_obj:
-            raise UserError('No active API key found for Worker communication')
-        
-        # Call the worker's invalidation endpoint
-        url = f"{worker_url}/sunray-wrkr/v1/cache/invalidate"
-        headers = {
-            'Authorization': f'Bearer {api_key_obj.key}',
-            'Content-Type': 'application/json'
-        }
-        payload = {
-            'scope': scope,
-            'target': target,
-            'reason': reason
-        }
-        
-        _logger.info(f"Calling Worker cache invalidation: {url} with scope={scope}, target={target}")
-        
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            response.raise_for_status()
-            result = response.json()
-            _logger.info(f"Worker cache invalidation successful: {result}")
-            return result
-        except requests.exceptions.RequestException as e:
-            _logger.error(f"Worker cache invalidation failed: {str(e)}")
-            raise UserError(f"Failed to trigger cache refresh: {str(e)}")
+    # Removed _call_worker_cache_invalidate method - now uses host's method

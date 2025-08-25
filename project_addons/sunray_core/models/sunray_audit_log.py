@@ -58,6 +58,17 @@ class SunrayAuditLog(models.Model):
         ('waf_bypass.tamper.ua_change', 'WAF Bypass Tamper: User-Agent Changed'),
         ('waf_bypass.error', 'WAF Bypass Error'),
         ('waf_bypass.unknown', 'WAF Bypass Unknown'),
+        # Worker Migration Events
+        ('worker.registered', 'Worker Registered'),
+        ('worker.re_registered', 'Worker Re-registered'),
+        ('worker.host_bound', 'Worker Host Bound'),
+        ('worker.migration_requested', 'Worker Migration Requested'),
+        ('worker.migration_started', 'Worker Migration Started'),
+        ('worker.migration_completed', 'Worker Migration Completed'),
+        ('worker.migration_cancelled', 'Worker Migration Cancelled'),
+        ('worker.registration_failed', 'Worker Registration Failed'),
+        ('worker.registration_blocked', 'Worker Registration Blocked'),
+        ('worker.deleted', 'Worker Deleted'),
         # Security Events
         ('security.alert', 'Security Alert'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),

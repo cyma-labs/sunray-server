@@ -10,19 +10,28 @@ class TestWebhookTokenMultiProvider(TransactionCase):
     def setUp(self):
         super().setUp()
         
-        # Create a test host
-        self.host = self.env['sunray.host'].create({
-            'domain': 'api.example.com',
-            'worker_url': 'https://worker.example.com',
-            'backend_url': 'https://backend.example.com',
-            'is_active': True
-        })
-        
         # Create API key for worker authentication
         self.api_key = self.env['sunray.api.key'].create([{
             'name': 'Test Worker Key',
             'is_active': True
         }])
+        
+        # Create test worker
+        self.worker = self.env['sunray.worker'].create({
+            'name': 'Test Worker',
+            'worker_type': 'cloudflare',
+            'worker_url': 'https://worker.example.com',
+            'api_key_id': self.api_key.id,
+            'is_active': True
+        })
+        
+        # Create a test host
+        self.host = self.env['sunray.host'].create({
+            'domain': 'api.example.com',
+            'sunray_worker_id': self.worker.id,
+            'backend_url': 'https://backend.example.com',
+            'is_active': True
+        })
     
     def test_webhook_token_creation_with_per_token_config(self):
         """Test creating webhook tokens with per-token extraction configuration"""

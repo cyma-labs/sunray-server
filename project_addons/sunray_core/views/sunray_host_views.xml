@@ -7,9 +7,12 @@
         <field name="arch" type="xml">
             <list>
                 <field name="domain"/>
-                <field name="worker_url" optional="show"/>
+                <field name="sunray_worker_id" string="Worker" optional="show"/>
+                <field name="pending_worker_name" string="Pending Worker" optional="show"/>
+                <field name="migration_pending_duration" string="Migration Pending" optional="show"/>
                 <field name="backend_url" optional="show"/>
                 <field name="is_active" widget="boolean_toggle"/>
+                <field name="last_migration_ts" string="Last Migration" optional="show"/>
                 <field name="create_date" optional="show"/>
                 <field name="config_version" optional="show"/>
             </list>
@@ -24,11 +27,18 @@
             <search>
                 <field name="domain"/>
                 <field name="backend_url"/>
+                <field name="sunray_worker_id"/>
+                <field name="pending_worker_name"/>
                 <separator/>
                 <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
+                <filter name="bound" string="Worker Bound" domain="[('sunray_worker_id', '!=', False)]"/>
+                <filter name="unbound" string="Unbound" domain="[('sunray_worker_id', '=', False)]"/>
+                <filter name="pending_migration" string="Pending Migration" domain="[('pending_worker_name', '!=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
+                    <filter string="Worker" name="group_by_worker" context="{'group_by': 'sunray_worker_id'}"/>
+                    <filter string="Migration Status" name="group_by_migration" context="{'group_by': 'pending_worker_name'}"/>
                 </group>
             </search>
         </field>
@@ -43,12 +53,15 @@
                 <header>
                     <button name="force_cache_refresh" string="Force Cache Refresh" icon="fa-refresh" type="object" class="btn-warning"
                             confirm="This will immediately invalidate cached configuration for this host. Continue?"/>
+                    <button name="action_clear_pending_migration" string="Clear Pending Migration" icon="fa-times" type="object" class="btn-danger"
+                            invisible="not pending_worker_name"
+                            confirm="This will cancel the pending worker migration. Continue?"/>
                 </header>
                 <sheet>
                     <group>
                         <group>
                             <field name="domain"/>
-                            <field name="worker_url" widget="url"/>
+                            <field name="sunray_worker_id" readonly="1" help="Worker is automatically assigned when it first contacts the server"/>
                             <field name="backend_url" widget="url"/>
                         </group>
                         <group>
@@ -56,6 +69,23 @@
                             <field name="create_date" readonly="1"/>
                             <field name="config_version" readonly="1"/>
                         </group>
+                    </group>
+                    
+                    <group string="Worker Migration" invisible="not pending_worker_name">
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Migration Pending:</strong> This host will migrate to worker 
+                            <field name="pending_worker_name" readonly="1" nolabel="1" style="display:inline;"/> 
+                            when it registers.
+                        </div>
+                        <group>
+                            <field name="migration_requested_at" readonly="1"/>
+                            <field name="migration_pending_duration" readonly="1"/>
+                        </group>
+                    </group>
+                    
+                    <group string="Worker Migration Control">
+                        <field name="pending_worker_name" placeholder="Enter worker ID to migrate to"/>
+                        <field name="last_migration_ts" readonly="1" invisible="not last_migration_ts"/>
                     </group>
                     
                     <notebook>

@@ -27,10 +27,11 @@ class SunrayHost(models.Model):
         required=True,
         help='Backend service URL to proxy requests to'
     )
-    worker_url = fields.Char(
-        string='Worker URL',
-        required=True,
-        help='Cloudflare Worker URL protecting this domain (e.g., https://sunray-worker.example.workers.dev)'
+    
+    sunray_worker_id = fields.Many2one(
+        'sunray.worker',
+        string='Sunray Worker',
+        help='Worker that protects this host. A host can be protected by only one worker, but a worker can protect several hosts.'
     )
     is_active = fields.Boolean(
         string='Is Sunray Active?', 
@@ -100,6 +101,28 @@ class SunrayHost(models.Model):
         help='Timestamp of last configuration change, used for cache invalidation'
     )
     
+    # Worker migration fields
+    pending_worker_name = fields.Char(
+        string='Pending Worker ID',
+        help='Worker ID that will replace current worker on next registration. '
+             'Used for controlled worker migration (e.g., scaling, version upgrade).'
+    )
+    migration_requested_at = fields.Datetime(
+        string='Migration Requested At',
+        readonly=True,
+        help='Timestamp when pending worker was set. Helps track migration delays.'
+    )
+    last_migration_ts = fields.Datetime(
+        string='Last Migration',
+        readonly=True,
+        help='Timestamp of the last successful worker migration for this host.'
+    )
+    migration_pending_duration = fields.Char(
+        string='Migration Pending For',
+        compute='_compute_migration_pending_duration',
+        help='How long the migration has been pending (human-readable)'
+    )
+    
     _sql_constraints = [
         ('domain_unique', 'UNIQUE(domain)', 'Domain must be unique!')
     ]
@@ -125,6 +148,138 @@ class SunrayHost(models.Model):
                 raise ValidationError("WAF bypass revalidation period must be at least 60 seconds (1 minute)")
             if record.waf_bypass_revalidation_s > max_revalidation:
                 raise ValidationError(f"WAF bypass revalidation period cannot exceed {max_revalidation} seconds")
+    
+    @api.depends('migration_requested_at')
+    def _compute_migration_pending_duration(self):
+        """Compute human-readable duration for pending migrations"""
+        for record in self:
+            if not record.migration_requested_at:
+                record.migration_pending_duration = False
+            else:
+                now = fields.Datetime.now()
+                delta = now - record.migration_requested_at
+                record.migration_pending_duration = self._format_time_delta(delta)
+    
+    def _format_time_delta(self, delta):
+        """Format timedelta to human-readable string"""
+        days = delta.days
+        hours = delta.seconds // 3600
+        minutes = (delta.seconds % 3600) // 60
+        
+        if days > 0:
+            return f'{days} day{"s" if days > 1 else ""}, {hours} hour{"s" if hours != 1 else ""}'
+        elif hours > 0:
+            return f'{hours} hour{"s" if hours != 1 else ""}, {minutes} minute{"s" if minutes != 1 else ""}'
+        else:
+            return f'{minutes} minute{"s" if minutes != 1 else ""}'
+    
+    def set_pending_worker(self, worker_name):
+        """Set pending worker for migration
+        
+        Args:
+            worker_name: The worker ID that will replace current worker
+            
+        Raises:
+            ValidationError: If migration already pending or worker name invalid
+        """
+        self.ensure_one()
+        
+        if not worker_name or not worker_name.strip():
+            raise ValidationError('Worker name cannot be empty')
+            
+        if self.pending_worker_name:
+            raise ValidationError(
+                f'Migration already pending to "{self.pending_worker_name}". '
+                'Clear existing migration first.'
+            )
+        
+        # Check if worker exists
+        worker_obj = self.env['sunray.worker'].search([('name', '=', worker_name)], limit=1)
+        if not worker_obj:
+            # Allow setting pending worker even if not registered yet
+            # This supports the workflow where admin sets pending before deploying
+            pass
+        
+        self.write({
+            'pending_worker_name': worker_name,
+            'migration_requested_at': fields.Datetime.now()
+        })
+        
+        # Audit log the migration request
+        self.env['sunray.audit.log'].create_admin_event(
+            event_type='worker.migration_requested',
+            details={
+                'host': self.domain,
+                'current_worker': self.sunray_worker_id.name if self.sunray_worker_id else 'none',
+                'pending_worker': worker_name,
+                'host_id': self.id
+            }
+        )
+    
+    def clear_pending_worker(self):
+        """Clear pending migration (cancel migration)"""
+        self.ensure_one()
+        
+        if not self.pending_worker_name:
+            raise ValidationError('No pending migration to clear')
+        
+        pending_worker = self.pending_worker_name
+        
+        self.write({
+            'pending_worker_name': False,
+            'migration_requested_at': False
+        })
+        
+        # Audit log the migration cancellation
+        self.env['sunray.audit.log'].create_admin_event(
+            event_type='worker.migration_cancelled',
+            details={
+                'host': self.domain,
+                'current_worker': self.sunray_worker_id.name if self.sunray_worker_id else 'none',
+                'cancelled_worker': pending_worker,
+                'host_id': self.id
+            }
+        )
+    
+    def action_clear_pending_migration(self):
+        """UI action to clear pending migration"""
+        self.ensure_one()
+        
+        if not self.pending_worker_name:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Pending Migration',
+                    'message': 'There is no pending migration to clear.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            pending_worker = self.pending_worker_name
+            self.clear_pending_worker()
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Migration Cleared',
+                    'message': f'Pending migration to "{pending_worker}" has been cleared.',
+                    'type': 'success',
+                }
+            }
+        except Exception as e:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Error',
+                    'message': f'Failed to clear pending migration: {str(e)}',
+                    'type': 'danger',
+                    'sticky': True,
+                }
+            }
     
     def _parse_line_separated_field(self, field_value):
         """Parse line-separated field with comment support
@@ -202,8 +357,13 @@ class SunrayHost(models.Model):
     def force_cache_refresh(self):
         """Trigger immediate cache refresh for this host via Worker API"""
         for record in self:
+            # Check if host is bound to a worker
+            if not record.sunray_worker_id:
+                raise UserError(f"Host {record.domain} is not yet bound to a worker. "
+                               "Worker binding happens automatically when the worker first calls the API.")
+            
             try:
-                # Call worker's cache invalidation endpoint
+                # Call worker's cache invalidation endpoint via protected host URL
                 record._call_worker_cache_invalidate(
                     scope='host',
                     target=record.domain,
@@ -235,19 +395,18 @@ class SunrayHost(models.Model):
         """Call Worker API to trigger cache invalidation"""
         self.ensure_one()
         
-        if not self.worker_url:
-            raise UserError(f"Worker URL not configured for host {self.domain}")
+        if not self.sunray_worker_id:
+            raise UserError(f"Host {self.domain} is not bound to a worker")
         
-        # Get API key
-        api_key_obj = self.env['sunray.api.key'].sudo().search([
-            ('is_active', '=', True)
-        ], limit=1)
+        # Get the worker's API key
+        api_key_obj = self.sunray_worker_id.api_key_id
         
-        if not api_key_obj:
-            raise UserError('No active API key found for Worker communication')
+        if not api_key_obj or not api_key_obj.is_active:
+            raise UserError(f'No active API key found for worker {self.sunray_worker_id.name}')
         
-        # Call the worker's invalidation endpoint
-        url = f"{self.worker_url}/sunray-wrkr/v1/cache/invalidate"
+        # Call the worker's invalidation endpoint using protected host URL
+        # We use the protected host URL, not the worker.dev URL
+        url = f"https://{self.domain}/sunray-wrkr/v1/cache/invalidate"
         headers = {
             'Authorization': f'Bearer {api_key_obj.key}',
             'Content-Type': 'application/json'

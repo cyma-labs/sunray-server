@@ -10,12 +10,28 @@ class TestTimingConfiguration(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        
+        # Create test API key
+        self.api_key = self.env['sunray.api.key'].create({
+            'name': 'test_worker_key',
+            'is_active': True,
+            'scopes': 'config:read'
+        })
+        
+        # Create test worker
+        self.worker = self.env['sunray.worker'].create({
+            'name': 'Test Worker',
+            'worker_type': 'cloudflare',
+            'worker_url': 'https://worker.example.com',
+            'api_key_id': self.api_key.id,
+            'is_active': True
+        })
+        
         # Create test host
         self.host_obj = self.env['sunray.host'].create({
-            'name': 'test.example.com',
             'domain': 'test.example.com',
             'backend_url': 'https://backend.example.com',
-            'worker_url': 'https://worker.example.com',
+            'sunray_worker_id': self.worker.id,
         })
 
     def test_session_duration_default_value(self):
@@ -68,7 +84,7 @@ class TestTimingConfiguration(TransactionCase):
         # Check audit log was created
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.session_duration_changed'),
-            ('admin_user_id', '=', self.env.user.id)
+            ('sunray_admin_user_id', '=', self.env.user.id)
         ])
         
         self.assertEqual(len(audit_logs), 1)
@@ -83,7 +99,7 @@ class TestTimingConfiguration(TransactionCase):
         # Check audit log was created
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.waf_revalidation_changed'),
-            ('admin_user_id', '=', self.env.user.id)
+            ('sunray_admin_user_id', '=', self.env.user.id)
         ])
         
         self.assertEqual(len(audit_logs), 1)
@@ -143,7 +159,7 @@ class TestTimingConfiguration(TransactionCase):
         # Should not create audit log
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.session_duration_changed'),
-            ('admin_user_id', '=', self.env.user.id)
+            ('sunray_admin_user_id', '=', self.env.user.id)
         ])
         
         self.assertEqual(len(audit_logs), 0)

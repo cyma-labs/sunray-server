@@ -16,6 +16,7 @@ class TestCacheInvalidation(TransactionCase):
         self.User = self.env['sunray.user']
         self.Host = self.env['sunray.host']
         self.ApiKey = self.env['sunray.api.key']
+        self.Worker = self.env['sunray.worker']
         
         # Create test API key
         self.api_key = self.ApiKey.create([{
@@ -24,10 +25,19 @@ class TestCacheInvalidation(TransactionCase):
             'scopes': 'config:read'
         }])
         
+        # Create test worker
+        self.worker = self.Worker.create({
+            'name': 'Test Worker',
+            'worker_type': 'cloudflare',
+            'worker_url': 'https://test-worker.example.com',
+            'api_key_id': self.api_key.id,
+            'is_active': True
+        })
+        
         # Create test host
         self.host = self.Host.create({
             'domain': 'test.example.com',
-            'worker_url': 'https://test-worker.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'http://backend.example.com',
             'is_active': True
         })
@@ -133,10 +143,7 @@ class TestCacheInvalidation(TransactionCase):
         }
         mock_post.return_value = mock_response
         
-        # Set worker URL
-        self.env['ir.config_parameter'].sudo().set_param(
-            'sunray.worker_url', 'https://test-worker.example.com'
-        )
+        # Worker URL is now taken from the host's worker relationship
         
         # Call force_cache_refresh
         result = self.host.force_cache_refresh()
@@ -145,10 +152,10 @@ class TestCacheInvalidation(TransactionCase):
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         
-        # Check URL
+        # Check URL - cache invalidation goes through the protected host URL
         self.assertEqual(
             call_args[0][0],
-            'https://test-worker.example.com/sunray-wrkr/v1/cache/invalidate'
+            'https://test.example.com/sunray-wrkr/v1/cache/invalidate'
         )
         
         # Check headers
@@ -185,10 +192,7 @@ class TestCacheInvalidation(TransactionCase):
         }
         mock_post.return_value = mock_response
         
-        # Set worker URL
-        self.env['ir.config_parameter'].sudo().set_param(
-            'sunray.worker_url', 'https://test-worker.example.com'
-        )
+        # Worker URL is now taken from the host's worker relationship
         
         # Call force_cache_refresh
         result = self.user.force_cache_refresh()
@@ -201,7 +205,7 @@ class TestCacheInvalidation(TransactionCase):
         payload = call_args[1]['json']
         self.assertEqual(payload['scope'], 'user')
         self.assertEqual(payload['target'], 'testuser')
-        self.assertIn('Manual refresh', payload['reason'])
+        self.assertIn('Manual user refresh', payload['reason'])
         
         # Check audit log was created
         audit_log = self.env['sunray.audit.log'].search([
@@ -216,10 +220,7 @@ class TestCacheInvalidation(TransactionCase):
         # Configure mock to raise exception
         mock_post.side_effect = Exception('Network error')
         
-        # Set worker URL
-        self.env['ir.config_parameter'].sudo().set_param(
-            'sunray.worker_url', 'https://test-worker.example.com'
-        )
+        # Worker URL is now taken from the host's worker relationship
         
         # Call should raise UserError
         from odoo.exceptions import UserError
@@ -231,14 +232,10 @@ class TestCacheInvalidation(TransactionCase):
     @patch('requests.post')
     def test_force_cache_refresh_no_api_key(self, mock_post):
         """Test force_cache_refresh when no API key exists"""
-        # Delete ALL active API keys to ensure the test condition
-        all_api_keys = self.env['sunray.api.key'].sudo().search([('is_active', '=', True)])
-        all_api_keys.unlink()
+        # Make the worker's API key inactive instead of deleting all keys
+        self.host.sunray_worker_id.api_key_id.is_active = False
         
-        # Set worker URL
-        self.env['ir.config_parameter'].sudo().set_param(
-            'sunray.worker_url', 'https://test-worker.example.com'
-        )
+        # Worker URL is now taken from the host's worker relationship
         
         # Call should raise UserError
         from odoo.exceptions import UserError
@@ -252,13 +249,13 @@ class TestCacheInvalidation(TransactionCase):
         # Create additional hosts
         host2 = self.Host.create({
             'domain': 'test2.example.com',
-            'worker_url': 'https://test-worker.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'http://backend2.example.com'
         })
         
         host3 = self.Host.create({
             'domain': 'test3.example.com',
-            'worker_url': 'https://test-worker.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'http://backend3.example.com'
         })
         
@@ -324,14 +321,11 @@ class TestCacheInvalidation(TransactionCase):
         # Create additional hosts
         host2 = self.Host.create({
             'domain': 'test2.example.com',
-            'worker_url': 'https://test-worker.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'http://backend2.example.com'
         })
         
-        # Set worker URL
-        self.env['ir.config_parameter'].sudo().set_param(
-            'sunray.worker_url', 'https://test-worker.example.com'
-        )
+        # Worker URL is now taken from the host's worker relationship
         
         # Call on multiple hosts
         hosts = self.host | host2

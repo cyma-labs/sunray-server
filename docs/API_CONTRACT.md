@@ -445,6 +445,7 @@ Workers making their first API call will be automatically registered if they inc
 - Session Events (e.g., `session.created`, `session.expired`)
 - WAF Bypass Events (e.g., `waf_bypass.created`, `waf_bypass.tamper.*`)
 - Security Events (e.g., `security.alert`, `SESSION_IP_CHANGED`)
+- Worker Migration Events (e.g., `worker.migration_requested`, `worker.migration_completed`, `worker.registration_blocked`)
 
 **Response**:
 ```json

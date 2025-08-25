@@ -14,6 +14,27 @@ class SunrayApiKey(models.Model):
         required=True,
         help='Descriptive name for this API key'
     )
+    
+    api_key_type = fields.Selection([
+        ('worker', 'Worker'),
+        ('admin', 'Administrative'),
+        ('cli', 'CLI Tool'),
+    ], string='Key Type',
+        default='worker',
+        required=True,
+        help='Type of API key usage'
+    )
+    
+    owner_name = fields.Char(
+        string='Owner Name',
+        help='Worker identifier for worker type, admin username for admin type, CLI user for cli type'
+    )
+    
+    worker_id = fields.Many2one(
+        'sunray.worker',
+        string='Associated Worker',
+        help='The worker that uses this API key (auto-populated)'
+    )
     key = fields.Char(
         string='API Key', 
         required=False,  # Allow empty for auto-generation in GUI
@@ -91,6 +112,10 @@ class SunrayApiKey(models.Model):
                 auto_generated.append(False)
             # Reset show_full_key to False for new records
             vals['show_full_key'] = False
+            
+            # Auto-populate owner_name for worker type if not provided
+            if vals.get('api_key_type') == 'worker' and not vals.get('owner_name'):
+                vals['owner_name'] = vals.get('name', '')
         
         # Create the records
         records = super().create(vals_list)
@@ -102,6 +127,8 @@ class SunrayApiKey(models.Model):
                 details={
                     'key_name': record.name,
                     'key_id': record.id,
+                    'key_type': record.api_key_type,
+                    'owner_name': record.owner_name,
                     'scopes': record.scopes,
                     'auto_generated': auto_generated[i]  # Track if auto-generated
                 }
@@ -142,12 +169,35 @@ class SunrayApiKey(models.Model):
             }
         }
     
-    def track_usage(self):
-        """Update usage statistics"""
+    def track_usage(self, worker_name=None, ip_address=None):
+        """Update usage statistics and auto-register worker if needed
+        
+        Args:
+            worker_name: Optional worker identifier from X-Worker-ID header
+            ip_address: Optional IP address of the requester
+        """
+        # Update usage stats
         self.write({
             'last_used': fields.Datetime.now(),
             'usage_count': self.usage_count + 1
         })
+        
+        # Auto-register worker if worker_name provided and this is a worker key
+        if worker_name and self.api_key_type == 'worker':
+            worker_obj = self.env['sunray.worker'].auto_register(
+                worker_name=worker_name,
+                api_key_obj=self,
+                ip_address=ip_address
+            )
+            
+            # Link this API key to the worker if not already linked
+            if not self.worker_id and worker_obj:
+                self.worker_id = worker_obj
+                
+                # Update owner_name if not set
+                if not self.owner_name:
+                    self.owner_name = worker_name
+        
         return True
     
     def has_scope(self, required_scope):

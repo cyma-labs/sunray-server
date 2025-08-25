@@ -7,6 +7,9 @@
         <field name="arch" type="xml">
             <list string="API Keys" create="true" edit="true">
                 <field name="name"/>
+                <field name="api_key_type" string="Type"/>
+                <field name="owner_name" string="Owner" optional="show"/>
+                <field name="worker_id" string="Worker" optional="show"/>
                 <field name="key_display" string="API Key"/>
                 <field name="description" optional="show"/>
                 <field name="scopes" optional="show"/>
@@ -24,10 +27,18 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name"/>
+                <field name="api_key_type"/>
+                <field name="owner_name"/>
+                <field name="worker_id"/>
                 <separator/>
                 <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="worker_keys" string="Worker Keys" domain="[('api_key_type', '=', 'worker')]"/>
+                <filter name="admin_keys" string="Admin Keys" domain="[('api_key_type', '=', 'admin')]"/>
+                <filter name="cli_keys" string="CLI Keys" domain="[('api_key_type', '=', 'cli')]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Key Type" name="group_by_type" context="{'group_by': 'api_key_type'}"/>
                     <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
                 </group>
             </search>
@@ -52,6 +63,9 @@
                     <group>
                         <group>
                             <field name="name" required="1"/>
+                            <field name="api_key_type" required="1"/>
+                            <field name="owner_name" placeholder="Worker name, admin username, or CLI user"/>
+                            <field name="worker_id" readonly="1" invisible="api_key_type != 'worker'"/>
                             
                             <!-- For new records: editable key field -->
                             <field name="key" 

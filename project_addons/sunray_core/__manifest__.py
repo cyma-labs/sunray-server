@@ -50,6 +50,7 @@ Technical Components:
         'views/sunray_session_views.xml',
         'views/sunray_audit_log_views.xml',
         'views/sunray_api_key_views.xml',
+        'views/sunray_worker_views.xml',
         
         # Wizards
         'wizards/setup_token_wizard_views.xml',

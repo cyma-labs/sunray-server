@@ -85,6 +85,10 @@ class SunrayCommand(Command):
         user_delete = user_sub.add_parser('delete', help='Delete user')
         user_delete.add_argument('username', help='Username to delete')
         
+        # user force-cache-refresh
+        user_cache = user_sub.add_parser('force-cache-refresh', help='Force cache refresh for user')
+        user_cache.add_argument('username', help='Username')
+        
         # Session commands
         session = subparsers.add_parser('session', help='Manage sessions')
         session_sub = session.add_subparsers(dest='action', help='Action')
@@ -143,15 +147,51 @@ class SunrayCommand(Command):
         host_create = host_sub.add_parser('create', help='Create host')
         host_create.add_argument('domain', help='Domain')
         host_create.add_argument('--sr-backend', help='Backend URL', default='')
-        host_create.add_argument('--sr-worker-url', help='Cloudflare Worker URL', required=True)
-        host_create.add_argument('--sr-cidr', help='CIDR whitelist (comma-separated)')
-        host_create.add_argument('--sr-public', help='Public URL patterns (comma-separated)')
         
         # host delete
         host_delete = host_sub.add_parser('delete', help='Delete host')
         host_delete.add_argument('domain', help='Host domain to delete')
         host_delete.add_argument('--sr-force', action='store_true',
                                 help='Force delete even if users exist')
+        
+        # host force-cache-refresh
+        host_cache = host_sub.add_parser('force-cache-refresh', help='Force cache refresh for host')
+        host_cache.add_argument('domain', help='Host domain')
+        
+        # host set-pending-worker
+        host_set_pending = host_sub.add_parser('set-pending-worker', help='Set pending worker for migration')
+        host_set_pending.add_argument('domain', help='Host domain')
+        host_set_pending.add_argument('worker_name', help='Worker ID that will replace current worker')
+        
+        # host clear-pending-worker
+        host_clear_pending = host_sub.add_parser('clear-pending-worker', help='Clear pending migration')
+        host_clear_pending.add_argument('domain', help='Host domain')
+        
+        # host migration-status
+        host_migration_status = host_sub.add_parser('migration-status', help='Show migration status for host')
+        host_migration_status.add_argument('domain', help='Host domain')
+        host_migration_status.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
+                                          default='table', help='Output format (default: table)')
+        
+        # host list-pending-migrations
+        host_list_pending = host_sub.add_parser('list-pending-migrations', help='List all pending migrations')
+        host_list_pending.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
+                                      default='table', help='Output format (default: table)')
+        
+        # Worker commands
+        worker = subparsers.add_parser('worker', help='Manage workers')
+        worker_sub = worker.add_subparsers(dest='action', help='Action')
+        
+        # worker list
+        worker_list = worker_sub.add_parser('list', help='List workers')
+        worker_list.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
+                                default='table', help='Output format (default: table)')
+        
+        # worker get
+        worker_get = worker_sub.add_parser('get', help='Get worker details')
+        worker_get.add_argument('name', help='Worker name')
+        worker_get.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
+                               default='table', help='Output format (default: table)')
         
         # Cron commands
         cron = subparsers.add_parser('cron', help='Manage cron jobs')
@@ -204,28 +244,6 @@ class SunrayCommand(Command):
         # setuptoken delete
         setuptoken_delete = setuptoken_sub.add_parser('delete', help='Delete setup token')
         setuptoken_delete.add_argument('token_id', help='Setup token ID')
-        
-        # Cache commands
-        cache = subparsers.add_parser('cache', help='Manage worker cache')
-        cache_sub = cache.add_subparsers(dest='action', help='Action')
-        
-        # cache status
-        cache_status = cache_sub.add_parser('status', help='Get cache status from worker')
-        
-        # cache invalidate
-        cache_invalidate = cache_sub.add_parser('invalidate', help='Trigger cache invalidation')
-        cache_invalidate.add_argument('--sr-scope', required=True,
-                                     choices=['global', 'user', 'host', 'config'],
-                                     help='Invalidation scope')
-        cache_invalidate.add_argument('--sr-target', help='Target for user/host scope')
-        cache_invalidate.add_argument('--sr-reason', help='Reason for invalidation')
-        
-        # cache clear
-        cache_clear = cache_sub.add_parser('clear', help='Clear cache directly')
-        cache_clear.add_argument('--sr-scope', required=True,
-                               choices=['all', 'config', 'sessions'],
-                               help='Cache scope to clear')
-        cache_clear.add_argument('--sr-target', help='Target for sessions scope')
         
         # Audit log commands
         auditlog = subparsers.add_parser('auditlog', help='Manage audit logs')
@@ -320,17 +338,17 @@ class SunrayCommand(Command):
                     self._handle_session(env, parsed_args)
                 elif parsed_args.resource == 'host':
                     self._handle_host(env, parsed_args)
+                elif parsed_args.resource == 'worker':
+                    self._handle_worker(env, parsed_args)
                 elif parsed_args.resource == 'cron':
                     self._handle_cron(env, parsed_args)
                 elif parsed_args.resource == 'setuptoken':
                     self._handle_setuptoken(env, parsed_args)
-                elif parsed_args.resource == 'cache':
-                    self._handle_cache(env, parsed_args)
                 elif parsed_args.resource == 'auditlog':
                     self._handle_auditlog(env, parsed_args)
                 
                 # Commit changes for write operations
-                if parsed_args.action in ['create', 'delete', 'revoke', 'create-token', 'cleanup', 'trigger']:
+                if parsed_args.action in ['create', 'delete', 'revoke', 'create-token', 'cleanup', 'trigger', 'force-cache-refresh']:
                     cr.commit()
                     
             return 0
@@ -554,6 +572,20 @@ class SunrayCommand(Command):
                 print(f"  - {passkey_count} passkey(s) removed")
             if token_count:
                 print(f"  - {token_count} setup token(s) removed")
+        
+        elif args.action == 'force-cache-refresh':
+            user = User.search([('username', '=', args.username)], limit=1)
+            
+            if not user:
+                print(f"User '{args.username}' not found")
+                return
+            
+            try:
+                # Use the user's force_cache_refresh method
+                user.force_cache_refresh()
+                print(f"Cache refresh triggered for user '{args.username}'")
+            except Exception as e:
+                print(f"Error refreshing cache for user '{args.username}': {e}")
     
     def _handle_session(self, env, args):
         """Handle session operations"""
@@ -668,15 +700,16 @@ class SunrayCommand(Command):
                 print("No hosts found")
                 return
             
-            print(f"{'DOMAIN':<25} {'WORKER URL':<35} {'ACTIVE':<8} {'RULES':<10} {'USERS':<8} {'SESSION':<8}")
+            print(f"{'DOMAIN':<25} {'WORKER':<20} {'PENDING':<15} {'ACTIVE':<8} {'RULES':<6} {'USERS':<6} {'SESSION':<8}")
             print("-" * 100)
             for host in hosts:
                 active = '✓' if host.is_active else '✗'
-                worker_url = host.worker_url[:32] + '...' if len(host.worker_url) > 35 else host.worker_url
+                worker_name = host.sunray_worker_id.name if host.sunray_worker_id else 'none'
+                pending_worker = host.pending_worker_name[:12] + '...' if host.pending_worker_name and len(host.pending_worker_name) > 15 else host.pending_worker_name or ''
                 rules_count = len(host.access_rule_ids)
                 user_count = len(host.user_ids)
                 session_duration = f"{host.session_duration_s}s"
-                print(f"{host.domain:<25} {worker_url:<35} {active:<8} {rules_count:<10} {user_count:<8} {session_duration:<8}")
+                print(f"{host.domain:<25} {worker_name:<20} {pending_worker:<15} {active:<8} {rules_count:<6} {user_count:<6} {session_duration:<8}")
         
         elif args.action == 'get':
             # Search by domain
@@ -687,7 +720,13 @@ class SunrayCommand(Command):
                 return
             
             print(f"Domain:                     {host.domain}")
-            print(f"Worker URL:                 {host.worker_url}")
+            print(f"Current Worker:             {host.sunray_worker_id.name if host.sunray_worker_id else 'none'}")
+            if host.pending_worker_name:
+                print(f"Pending Worker:             {host.pending_worker_name}")
+                print(f"Migration Requested:        {host.migration_requested_at}")
+                print(f"Migration Pending:          {host.migration_pending_duration}")
+            if host.last_migration_ts:
+                print(f"Last Migration:             {host.last_migration_ts}")
             print(f"Backend URL:                {host.backend_url or 'Not configured'}")
             print(f"Active:                     {'Yes' if host.is_active else 'No'}")
             print(f"Users:                      {len(host.user_ids)}")
@@ -715,7 +754,6 @@ class SunrayCommand(Command):
             data = {
                 'domain': args.domain,
                 'backend_url': args.sr_backend or '',
-                'worker_url': args.sr_worker_url,
                 'is_active': True
             }
             
@@ -724,13 +762,13 @@ class SunrayCommand(Command):
             print(f"Host created successfully!")
             print(f"Domain: {host.domain}")
             print(f"ID:     {host.id}")
+            print(f"Worker: none (will be assigned when worker registers)")
             print(f"Session Duration: {host.session_duration_s}s (default)")
             print(f"WAF Revalidation: {host.waf_bypass_revalidation_s}s (default)")
-            
-            # Note: Access rules can be added via the UI or separate commands
-            if args.sr_cidr or args.sr_public:
-                print("\nNote: --sr-cidr and --sr-public options are no longer supported.")
-                print("Please use the Sunray admin UI to configure Access Rules for this host.")
+            print(f"\nNext steps:")
+            print(f"1. Configure Access Rules via the Sunray admin UI")
+            print(f"2. Deploy a worker with this host's domain")
+            print(f"3. Worker will auto-register and bind to this host")
         
         elif args.action == 'delete':
             host = Host.search([('domain', '=', args.domain)], limit=1)
@@ -774,6 +812,150 @@ class SunrayCommand(Command):
                 print(f"  - {len(users)} user association(s) removed")
             if webhook_count:
                 print(f"  - {webhook_count} webhook token(s) removed")
+        
+        elif args.action == 'force-cache-refresh':
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+            
+            try:
+                # Use the host's force_cache_refresh method
+                host.force_cache_refresh()
+                print(f"Cache refresh triggered for host '{args.domain}'")
+            except Exception as e:
+                print(f"Error refreshing cache for host '{args.domain}': {e}")
+        
+        elif args.action == 'set-pending-worker':
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+            
+            try:
+                host.set_pending_worker(args.worker_name)
+                print(f"✓ Pending worker set for host '{args.domain}'")
+                print(f"  Current worker: {host.sunray_worker_id.name if host.sunray_worker_id else 'none'}")
+                print(f"  Pending worker: {args.worker_name}")
+                print(f"  Migration will occur when the new worker registers")
+            except Exception as e:
+                print(f"✗ Error setting pending worker: {e}")
+        
+        elif args.action == 'clear-pending-worker':
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+            
+            try:
+                host.clear_pending_worker()
+                print(f"✓ Pending migration cleared for host '{args.domain}'")
+            except Exception as e:
+                print(f"✗ Error clearing pending worker: {e}")
+        
+        elif args.action == 'migration-status':
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+            
+            self._output_host_migration_status(host, args.output)
+        
+        elif args.action == 'list-pending-migrations':
+            hosts = Host.search([('pending_worker_name', '!=', False)])
+            
+            if not hosts:
+                print("No pending migrations found")
+                return
+            
+            if args.output == 'table':
+                print(f"{'HOST':<25} {'CURRENT WORKER':<20} {'PENDING WORKER':<20} {'REQUESTED':<12} {'DURATION':<15}")
+                print("-" * 100)
+                for host in hosts:
+                    current_worker = host.sunray_worker_id.name if host.sunray_worker_id else 'none'
+                    requested = host.migration_requested_at.strftime('%Y-%m-%d') if host.migration_requested_at else 'unknown'
+                    duration = host.migration_pending_duration or 'unknown'
+                    print(f"{host.domain:<25} {current_worker:<20} {host.pending_worker_name:<20} {requested:<12} {duration:<15}")
+            elif args.output == 'json':
+                import json
+                data = []
+                for host in hosts:
+                    data.append({
+                        'host': host.domain,
+                        'current_worker': host.sunray_worker_id.name if host.sunray_worker_id else None,
+                        'pending_worker': host.pending_worker_name,
+                        'requested_at': host.migration_requested_at.isoformat() if host.migration_requested_at else None,
+                        'pending_duration': host.migration_pending_duration
+                    })
+                print(json.dumps(data, indent=2))
+            elif args.output == 'yaml':
+                import yaml
+                data = []
+                for host in hosts:
+                    data.append({
+                        'host': host.domain,
+                        'current_worker': host.sunray_worker_id.name if host.sunray_worker_id else None,
+                        'pending_worker': host.pending_worker_name,
+                        'requested_at': host.migration_requested_at.isoformat() if host.migration_requested_at else None,
+                        'pending_duration': host.migration_pending_duration
+                    })
+                print(yaml.dump(data, default_flow_style=False))
+    
+    def _output_host_migration_status(self, host, output_format):
+        """Output migration status for a host"""
+        if output_format == 'table':
+            print(f"Host: {host.domain}")
+            print(f"Current Worker: {host.sunray_worker_id.name if host.sunray_worker_id else 'none'}")
+            if host.sunray_worker_id and host.sunray_worker_id.last_seen_ts:
+                print(f"Worker Last Seen: {host.sunray_worker_id.last_seen_ts}")
+            
+            if host.pending_worker_name:
+                print(f"Pending Worker: {host.pending_worker_name}")
+                print(f"Migration Requested: {host.migration_requested_at}")
+                print(f"Pending Duration: {host.migration_pending_duration}")
+                print()
+                print("⚠️  Migration is pending. The migration will occur when the new worker registers.")
+                if host.migration_pending_duration and 'hour' in host.migration_pending_duration:
+                    print("⚠️  Migration has been pending for over an hour. Please check worker deployment.")
+            else:
+                print("Pending Worker: none")
+                print()
+                print("✓ No pending migration")
+            
+            if host.last_migration_ts:
+                print(f"Last Migration: {host.last_migration_ts}")
+            else:
+                print("Last Migration: never")
+                
+        elif output_format == 'json':
+            import json
+            data = {
+                'host': host.domain,
+                'current_worker': host.sunray_worker_id.name if host.sunray_worker_id else None,
+                'current_worker_last_seen': host.sunray_worker_id.last_seen_ts.isoformat() if host.sunray_worker_id and host.sunray_worker_id.last_seen_ts else None,
+                'pending_worker': host.pending_worker_name,
+                'migration_requested_at': host.migration_requested_at.isoformat() if host.migration_requested_at else None,
+                'migration_pending_duration': host.migration_pending_duration,
+                'last_migration_ts': host.last_migration_ts.isoformat() if host.last_migration_ts else None
+            }
+            print(json.dumps(data, indent=2))
+            
+        elif output_format == 'yaml':
+            import yaml
+            data = {
+                'host': host.domain,
+                'current_worker': host.sunray_worker_id.name if host.sunray_worker_id else None,
+                'current_worker_last_seen': host.sunray_worker_id.last_seen_ts.isoformat() if host.sunray_worker_id and host.sunray_worker_id.last_seen_ts else None,
+                'pending_worker': host.pending_worker_name,
+                'migration_requested_at': host.migration_requested_at.isoformat() if host.migration_requested_at else None,
+                'migration_pending_duration': host.migration_pending_duration,
+                'last_migration_ts': host.last_migration_ts.isoformat() if host.last_migration_ts else None
+            }
+            print(yaml.dump(data, default_flow_style=False))
     
     def _handle_setuptoken(self, env, args):
         """Handle setup token operations"""
@@ -936,130 +1118,6 @@ class SunrayCommand(Command):
             print(f"  User: {user}")
             print(f"  Device: {device}")
     
-    def _handle_cache(self, env, args):
-        """Handle cache operations"""
-        
-        if args.action == 'status':
-            # For status, get all unique worker URLs
-            Host = env['sunray.host']
-            hosts = Host.search([('is_active', '=', True)])
-            worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
-            
-            if not worker_urls:
-                print("Error: No active hosts with worker URLs found")
-                return
-            
-            # Query each worker
-            for worker_url in worker_urls:
-                print(f"\n=== Worker: {worker_url} ===")
-                self._query_worker_status(env, worker_url)
-                
-        elif args.action == 'invalidate':
-            # Use model method for invalidation
-            self._handle_cache_invalidate(env, args)
-            
-        elif args.action == 'clear':
-            print("Clear cache not implemented - use invalidate instead")
-    
-    def _query_worker_status(self, env, worker_url):
-        """Query a single worker's cache status"""
-        import requests
-        
-        # Get API key
-        api_key_obj = env['sunray.api.key'].sudo().search([
-            ('is_active', '=', True)
-        ], limit=1)
-        
-        if not api_key_obj:
-            print("Error: No active API key found")
-            return
-        
-        headers = {
-            'Authorization': f'Bearer {api_key_obj.key}',
-            'Content-Type': 'application/json'
-        }
-        
-        url = f"{worker_url}/sunray-wrkr/v1/cache"
-        try:
-            response = requests.get(url, headers=headers, timeout=5)
-            response.raise_for_status()
-            status = response.json()
-            
-            print("Cache Status:")
-            print(f"  Worker ID: {status.get('worker_id', 'N/A')}")
-            print(f"  Timestamp: {status.get('timestamp', 'N/A')}")
-            
-            if 'caches' in status:
-                caches = status['caches']
-                if 'config' in caches:
-                    config = caches['config']
-                    print("\nConfiguration Cache:")
-                    print(f"  Exists: {config.get('exists', False)}")
-                    if config.get('exists'):
-                        print(f"  Age: {config.get('age_seconds', 0)} seconds")
-                        print(f"  TTL: {config.get('ttl_seconds', 0)} seconds")
-                        print(f"  Last Version Check: {config.get('last_version_check', 'N/A')}")
-            
-            if 'invalidation_tracker' in status:
-                tracker = status['invalidation_tracker']
-                print("\nInvalidation Tracker:")
-                print(f"  Processed Count: {tracker.get('processed_count', 0)}")
-                print(f"  Last Invalidation: {tracker.get('last_invalidation', 'Never')}")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"Error getting cache status: {e}")
-    
-    def _handle_cache_invalidate(self, env, args):
-        """Handle cache invalidation using model methods"""
-        if args.sr_scope == 'host':
-            # Invalidate specific host cache
-            if not args.sr_target:
-                print("Error: --sr-target required for host scope")
-                return
-                
-            Host = env['sunray.host']
-            host = Host.search([('domain', '=', args.sr_target)], limit=1)
-            if not host:
-                print(f"Error: Host '{args.sr_target}' not found")
-                return
-            
-            try:
-                result = host._call_worker_cache_invalidate(
-                    scope=args.sr_scope,
-                    target=args.sr_target,
-                    reason=args.sr_reason or f'CLI invalidation by {env.user.name}'
-                )
-                print(f"✓ Cache invalidation triggered for host {args.sr_target}")
-                print(f"  Message: {result.get('message', 'Success')}")
-            except Exception as e:
-                print(f"✗ Cache invalidation failed: {e}")
-        
-        else:
-            # For global/user scope, invalidate across all workers
-            Host = env['sunray.host']
-            hosts = Host.search([('is_active', '=', True)])
-            worker_urls = list(set(host.worker_url for host in hosts if host.worker_url))
-            
-            if not worker_urls:
-                print("Error: No active hosts with worker URLs found")
-                return
-            
-            success_count = 0
-            for worker_url in worker_urls:
-                # Pick any host with this worker_url to call the method
-                host = hosts.filtered(lambda h: h.worker_url == worker_url)[0]
-                try:
-                    result = host._call_worker_cache_invalidate(
-                        scope=args.sr_scope,
-                        target=args.sr_target,
-                        reason=args.sr_reason or f'CLI invalidation by {env.user.name}'
-                    )
-                    print(f"✓ Cache invalidation triggered on {worker_url}")
-                    success_count += 1
-                except Exception as e:
-                    print(f"✗ Failed to invalidate cache on {worker_url}: {e}")
-            
-            print(f"\nInvalidated cache on {success_count}/{len(worker_urls)} workers")
 
     def _handle_auditlog(self, env, args):
         """Handle audit log commands"""
@@ -1640,6 +1698,122 @@ class SunrayCommand(Command):
             result.append(entry)
         
         print(yaml.dump(result, default_flow_style=False))
+    
+    def _handle_worker(self, env, args):
+        """Handle worker operations"""
+        Worker = env['sunray.worker']
+        
+        if args.action == 'list':
+            workers = Worker.search([])
+            
+            if not workers:
+                print("No workers found")
+                return
+            
+            if args.output == 'table':
+                self._output_workers_table(workers)
+            elif args.output == 'json':
+                self._output_workers_json(workers)
+            elif args.output == 'yaml':
+                self._output_workers_yaml(workers)
+        
+        elif args.action == 'get':
+            worker = Worker.search([('name', '=', args.name)], limit=1)
+            if not worker:
+                print(f"Worker '{args.name}' not found")
+                return
+            
+            if args.output == 'table':
+                self._output_worker_detailed(worker)
+            elif args.output == 'json':
+                self._output_workers_json([worker])
+            elif args.output == 'yaml':
+                self._output_workers_yaml([worker])
+    
+    def _output_workers_table(self, workers):
+        """Output workers in table format"""
+        print(f"{'NAME':<25} {'TYPE':<12} {'STATUS':<15} {'HOSTS':<8} {'LAST SEEN':<20} {'VERSION':<10}")
+        print("-" * 100)
+        for worker in workers:
+            status = worker.health_status[:13] + '..' if len(worker.health_status) > 15 else worker.health_status
+            last_seen = worker.last_seen_ts.strftime('%Y-%m-%d %H:%M') if worker.last_seen_ts else 'Never'
+            version = (worker.version[:8] + '..') if worker.version and len(worker.version) > 10 else (worker.version or 'Unknown')
+            print(f"{worker.name:<25} {worker.worker_type:<12} {status:<15} {worker.host_count:<8} {last_seen:<20} {version:<10}")
+    
+    def _output_workers_json(self, workers):
+        """Output workers in JSON format"""
+        import json
+        
+        result = []
+        for worker in workers:
+            entry = {
+                'id': worker.id,
+                'name': worker.name,
+                'worker_type': worker.worker_type,
+                'worker_url': worker.worker_url,
+                'api_key_id': worker.api_key_id.id if worker.api_key_id else None,
+                'api_key_name': worker.api_key_id.name if worker.api_key_id else None,
+                'host_count': worker.host_count,
+                'host_names': [host.domain for host in worker.host_ids],
+                'first_seen_ts': worker.first_seen_ts.isoformat() if worker.first_seen_ts else None,
+                'last_seen_ts': worker.last_seen_ts.isoformat() if worker.last_seen_ts else None,
+                'is_active': worker.is_active,
+                'is_healthy': worker.is_healthy,
+                'health_status': worker.health_status,
+                'version': worker.version,
+                'last_ip': worker.last_ip,
+                'create_date': worker.create_date.isoformat() if worker.create_date else None,
+            }
+            result.append(entry)
+        
+        print(json.dumps(result, indent=2))
+    
+    def _output_workers_yaml(self, workers):
+        """Output workers in YAML format"""
+        import yaml
+        
+        result = []
+        for worker in workers:
+            entry = {
+                'id': worker.id,
+                'name': worker.name,
+                'worker_type': worker.worker_type,
+                'worker_url': worker.worker_url,
+                'api_key_id': worker.api_key_id.id if worker.api_key_id else None,
+                'api_key_name': worker.api_key_id.name if worker.api_key_id else None,
+                'host_count': worker.host_count,
+                'host_names': [host.domain for host in worker.host_ids],
+                'first_seen_ts': worker.first_seen_ts.isoformat() if worker.first_seen_ts else None,
+                'last_seen_ts': worker.last_seen_ts.isoformat() if worker.last_seen_ts else None,
+                'is_active': worker.is_active,
+                'is_healthy': worker.is_healthy,
+                'health_status': worker.health_status,
+                'version': worker.version,
+                'last_ip': worker.last_ip,
+                'create_date': worker.create_date.isoformat() if worker.create_date else None,
+            }
+            result.append(entry)
+        
+        print(yaml.dump(result, default_flow_style=False))
+    
+    def _output_worker_detailed(self, worker):
+        """Output detailed worker information"""
+        print(f"ID:               {worker.id}")
+        print(f"Name:             {worker.name}")
+        print(f"Type:             {worker.worker_type}")
+        print(f"URL:              {worker.worker_url or 'Not set'}")
+        print(f"API Key:          {worker.api_key_id.name if worker.api_key_id else 'Not set'}")
+        print(f"Version:          {worker.version or 'Unknown'}")
+        print(f"Status:           {worker.health_status}")
+        print(f"Active:           {'Yes' if worker.is_active else 'No'}")
+        print(f"Protected Hosts:  {worker.host_count}")
+        if worker.host_ids:
+            for host in worker.host_ids:
+                print(f"  - {host.domain}")
+        print(f"First Seen:       {worker.first_seen_ts or 'Never'}")
+        print(f"Last Seen:        {worker.last_seen_ts or 'Never'}")
+        print(f"Last IP:          {worker.last_ip or 'Unknown'}")
+        print(f"Created:          {worker.create_date}")
     
     def _output_apikeys_table(self, keys):
         """Output API keys in table format"""

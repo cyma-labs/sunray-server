@@ -42,7 +42,11 @@ class SunrayRESTController(http.Controller):
         }
     
     def _authenticate_api(self, req):
-        """Authenticate API request using Bearer token"""
+        """Authenticate API request using Bearer token
+        
+        Returns:
+            api_key_obj if authenticated, False otherwise
+        """
         auth_header = req.httprequest.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
             return False
@@ -55,8 +59,17 @@ class SunrayRESTController(http.Controller):
         ])
         
         if api_key_obj:
-            api_key_obj.track_usage()
-            return True
+            # Get worker info from headers
+            worker_name = req.httprequest.headers.get('X-Worker-ID')
+            worker_version = req.httprequest.headers.get('X-Worker-Version')
+            ip_address = req.httprequest.environ.get('REMOTE_ADDR')
+            
+            # Track usage and auto-register worker if needed
+            api_key_obj.track_usage(
+                worker_name=worker_name,
+                ip_address=ip_address
+            )
+            return api_key_obj
         return False
     
     def _json_response(self, data, status=200):
@@ -133,7 +146,8 @@ class SunrayRESTController(http.Controller):
         }
         
         # Add detailed info if authenticated
-        if self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if api_key_obj:
             try:
                 # Check database connectivity
                 request.env['sunray.host'].sudo().search_count([])
@@ -158,7 +172,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/config', type='http', auth='none', methods=['GET'], cors='*')
     def get_config(self, **kwargs):
         """Get configuration for Worker"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Build configuration with version tracking
@@ -210,7 +225,6 @@ class SunrayRESTController(http.Controller):
             
             host_config = {
                 'domain': host_obj.domain,
-                'worker_url': host_obj.worker_url,
                 'backend': host_obj.backend_url,
                 'authorized_users': host_obj.user_ids.mapped('username'),
                 'session_duration_s': host_obj.session_duration_s,
@@ -222,6 +236,9 @@ class SunrayRESTController(http.Controller):
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
                 
+                # Worker information (if bound)
+                'worker_id': host_obj.sunray_worker_id.id if host_obj.sunray_worker_id else None,
+                'worker_name': host_obj.sunray_worker_id.name if host_obj.sunray_worker_id else None,
             }
             
             
@@ -238,10 +255,251 @@ class SunrayRESTController(http.Controller):
         
         return self._json_response(config)
     
+    @http.route('/sunray-srvr/v1/config/register', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
+    def register_worker(self, **kwargs):
+        """Register worker to a specific host and return host-specific configuration
+        
+        Requires:
+        - hostname parameter: The hostname of the protected host
+        - X-Worker-ID header: Worker identifier
+        - Valid API key
+        
+        Returns:
+        - Host-specific configuration data
+        - Error if worker or host not found
+        """
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
+            return self._error_response('Unauthorized', 401)
+        
+        # Get JSON data
+        try:
+            data = json.loads(request.httprequest.data) if request.httprequest.data else {}
+        except json.JSONDecodeError:
+            return self._error_response('Invalid JSON payload', 400)
+        
+        hostname = data.get('hostname') or request.params.get('hostname')
+        if not hostname:
+            return self._error_response('hostname parameter required', 400)
+        
+        # Get worker ID from header
+        worker_name = request.httprequest.headers.get('X-Worker-ID')
+        if not worker_name:
+            return self._error_response('X-Worker-ID header required', 400)
+        
+        # Find the worker (should exist due to auto-registration in authentication)
+        worker_obj = request.env['sunray.worker'].sudo().search([
+            ('name', '=', worker_name)
+        ], limit=1)
+        
+        if not worker_obj:
+            # Audit log the failed registration attempt
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.registration_failed',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_name': worker_name,
+                    'hostname': hostname,
+                    'reason': 'Worker not found (auto-registration failed)'
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            return self._error_response(f'Worker "{worker_name}" not found', 404)
+        
+        # Find the host
+        host_obj = request.env['sunray.host'].sudo().search([
+            ('domain', '=', hostname)
+        ], limit=1)
+        
+        if not host_obj:
+            # Audit log the failed registration attempt
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.registration_failed',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'hostname': hostname,
+                    'reason': 'Host not found'
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            return self._error_response(f'Host "{hostname}" not found', 404)
+        
+        # Handle worker-host binding with migration support
+        if not host_obj.sunray_worker_id:
+            # Host has no worker - bind immediately
+            host_obj.sunray_worker_id = worker_obj.id
+            
+            # Audit log the binding
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.host_bound',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            
+        elif host_obj.sunray_worker_id.id == worker_obj.id:
+            # Same worker re-registering (idempotent operation)
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.re_registered',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            
+        elif host_obj.pending_worker_name == worker_name:
+            # Pending worker registering - perform migration
+            old_worker = host_obj.sunray_worker_id
+            migration_duration = None
+            
+            # Calculate migration duration if available
+            if host_obj.migration_requested_at:
+                delta = fields.Datetime.now() - host_obj.migration_requested_at
+                migration_duration = str(delta)
+            
+            # Audit log migration start
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.migration_started',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname,
+                    'old_worker_id': old_worker.id,
+                    'old_worker_name': old_worker.name,
+                    'migration_requested_at': host_obj.migration_requested_at.isoformat() if host_obj.migration_requested_at else None
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            
+            # Perform the migration
+            host_obj.write({
+                'sunray_worker_id': worker_obj.id,
+                'pending_worker_name': False,
+                'migration_requested_at': False,
+                'last_migration_ts': fields.Datetime.now()
+            })
+            
+            # Audit log successful migration
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.migration_completed',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname,
+                    'old_worker_id': old_worker.id,
+                    'old_worker_name': old_worker.name,
+                    'migration_duration': migration_duration
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            
+        else:
+            # Unauthorized worker trying to register
+            request.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.registration_blocked',
+                api_key_id=api_key_obj.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname,
+                    'current_worker_id': host_obj.sunray_worker_id.id,
+                    'current_worker_name': host_obj.sunray_worker_id.name,
+                    'pending_worker': host_obj.pending_worker_name or 'none',
+                    'reason': 'Unauthorized worker registration attempt'
+                },
+                ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+            )
+            
+            # Return detailed error response
+            error_details = {
+                'error': 'registration_blocked',
+                'message': 'Host is bound to another worker',
+                'details': {
+                    'current_worker': host_obj.sunray_worker_id.name,
+                    'pending_worker': host_obj.pending_worker_name or None,
+                    'host': hostname,
+                    'action_required': 'Contact administrator for migration approval'
+                },
+                'timestamp': fields.Datetime.now().isoformat()
+            }
+            return self._json_response(error_details, status=409)
+        
+        # Build host-specific configuration
+        config = {
+            'version': 4,  # API version
+            'generated_at': fields.Datetime.now().isoformat(),
+            'worker_id': worker_obj.id,
+            'worker_name': worker_obj.name,
+            'host': {
+                'domain': host_obj.domain,
+                'backend': host_obj.backend_url,
+                'authorized_users': host_obj.user_ids.mapped('username'),
+                'session_duration_s': host_obj.session_duration_s,
+                'exceptions_tree': host_obj.get_exceptions_tree(),
+                'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
+                'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
+                'config_version': host_obj.config_version.isoformat() if host_obj.config_version else None
+            },
+            'users': {}
+        }
+        
+        # Add user data for authorized users only
+        for user_obj in host_obj.user_ids.filtered(lambda u: u.is_active):
+            config['users'][user_obj.username] = {
+                'email': user_obj.email,
+                'display_name': user_obj.display_name or user_obj.username,
+                'created_at': user_obj.create_date.isoformat(),
+                'passkeys': []
+            }
+            
+            # Add passkeys
+            for passkey in user_obj.passkey_ids:
+                config['users'][user_obj.username]['passkeys'].append({
+                    'credential_id': passkey.credential_id,
+                    'public_key': passkey.public_key,
+                    'name': passkey.name,
+                    'created_at': passkey.create_date.isoformat(),
+                    'backup_eligible': passkey.backup_eligible,
+                    'backup_state': passkey.backup_state
+                })
+        
+        # Audit log successful registration
+        request.env['sunray.audit.log'].sudo().create_api_event(
+            event_type='worker.registration_success',
+            api_key_id=api_key_obj.id,
+            details={
+                'worker_id': worker_obj.id,
+                'worker_name': worker_name,
+                'host_id': host_obj.id,
+                'hostname': hostname,
+                'user_count': len(config['users'])
+            },
+            ip_address=request.httprequest.environ.get('REMOTE_ADDR')
+        )
+        
+        return self._json_response(config)
+    
     @http.route('/sunray-srvr/v1/users/check', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def check_user_exists(self, **kwargs):
         """Check if a user exists"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -261,7 +519,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/setup-tokens/validate', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def validate_token(self, **kwargs):
         """Validate setup token"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -347,7 +606,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/users/<string:username>/passkeys', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def register_passkey(self, username, **kwargs):
         """Register a new passkey"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -386,7 +646,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/auth/verify', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def verify_authentication(self, **kwargs):
         """Verify passkey authentication"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -458,7 +719,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/sessions', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def create_session(self, **kwargs):
         """Create new session record"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -510,7 +772,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/sessions/<string:session_id>/revoke', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def revoke_session(self, session_id, **kwargs):
         """Revoke a session"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data if any
@@ -534,7 +797,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/security-events', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def log_security_event(self, **kwargs):
         """Log security event from Worker"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -556,7 +820,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/audit/sublimation-manipulation', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def report_sublimation_manipulation(self, **kwargs):
         """Report sublimation cookie manipulation attempts"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
@@ -617,7 +882,8 @@ class SunrayRESTController(http.Controller):
     @http.route('/sunray-srvr/v1/webhooks/track-usage', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def track_webhook_usage(self, **kwargs):
         """Track webhook token usage"""
-        if not self._authenticate_api(request):
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data

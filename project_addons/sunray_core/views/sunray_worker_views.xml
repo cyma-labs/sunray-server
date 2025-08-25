@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_sunray_worker_tree" model="ir.ui.view">
+        <field name="name">sunray.worker.list</field>
+        <field name="model">sunray.worker</field>
+        <field name="arch" type="xml">
+            <list string="Sunray Workers" create="false" edit="false">
+                <field name="name"/>
+                <field name="worker_type" optional="show"/>
+                <field name="worker_url" optional="show"/>
+                <field name="api_key_id" optional="show"/>
+                <field name="host_count" string="Hosts"/>
+                <field name="last_seen_ts" string="Last Seen"/>
+                <field name="first_seen_ts" string="First Seen" optional="show"/>
+                <field name="health_status" string="Status"/>
+                <field name="is_healthy" invisible="1"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="version" optional="show"/>
+                <field name="last_ip" string="Last IP" optional="show"/>
+            </list>
+        </field>
+    </record>
+    
+    <!-- Search View -->
+    <record id="view_sunray_worker_search" model="ir.ui.view">
+        <field name="name">sunray.worker.search</field>
+        <field name="model">sunray.worker</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="worker_type"/>
+                <field name="api_key_id"/>
+                <separator/>
+                <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="cloudflare" string="Cloudflare Workers" domain="[('worker_type', '=', 'cloudflare')]"/>
+                <filter name="kubernetes" string="Kubernetes" domain="[('worker_type', '=', 'kubernetes')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Worker Type" name="group_by_type" context="{'group_by': 'worker_type'}"/>
+                    <filter string="Active Status" name="group_by_active" context="{'group_by': 'is_active'}"/>
+                    <filter string="API Key" name="group_by_api_key" context="{'group_by': 'api_key_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    
+    <!-- Form View -->
+    <record id="view_sunray_worker_form" model="ir.ui.view">
+        <field name="name">sunray.worker.form</field>
+        <field name="model">sunray.worker</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false">
+                <header>
+                    <button name="force_cache_refresh" 
+                            type="object" 
+                            string="Refresh Worker Cache" 
+                            class="btn-warning"
+                            invisible="not id or host_count == 0"
+                            confirm="This will refresh cache on all hosts protected by this worker. Continue?"/>
+                    <field name="health_status" widget="badge" decoration-success="is_healthy == True" decoration-danger="is_healthy == False"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_hosts" type="object" class="oe_stat_button" icon="fa-server" invisible="host_count == 0">
+                            <field name="host_count" widget="statinfo" string="Protected Hosts"/>
+                        </button>
+                    </div>
+                    
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    
+                    <group>
+                        <group name="basic_info" string="Worker Information">
+                            <field name="worker_type" readonly="1"/>
+                            <field name="worker_url" readonly="1"/>
+                            <field name="api_key_id" readonly="1"/>
+                            <field name="version" readonly="1"/>
+                            <field name="is_active" widget="boolean_toggle"/>
+                        </group>
+                        <group name="timestamps" string="Activity">
+                            <field name="first_seen_ts" readonly="1"/>
+                            <field name="last_seen_ts" readonly="1"/>
+                            <field name="last_ip" readonly="1"/>
+                            <field name="is_healthy" invisible="1"/>
+                        </group>
+                    </group>
+                    
+                    <notebook>
+                        <page string="Protected Hosts" name="hosts">
+                            <field name="host_ids" readonly="1">
+                                <list>
+                                    <field name="domain"/>
+                                    <field name="backend_url"/>
+                                    <field name="is_active" widget="boolean_toggle"/>
+                                    <field name="session_duration_s" string="Session Duration (s)"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Action -->
+    <record id="action_sunray_workers" model="ir.actions.act_window">
+        <field name="name">Workers</field>
+        <field name="res_model">sunray.worker</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_sunray_worker_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No workers registered yet
+            </p>
+            <p>
+                Workers are automatically registered when they make their first API call to the server.
+                Deploy your Cloudflare Worker with the proper configuration to see it appear here.
+            </p>
+        </field>
+    </record>
+</odoo>

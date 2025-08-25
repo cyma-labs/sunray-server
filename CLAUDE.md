@@ -337,6 +337,66 @@ bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hou
 - **WebAuthn/Passkeys**: Primary authentication method
 - **Session Management**: Secure cookies with configurable TTL
 
+### Worker Migration System
+
+**Purpose**: Enables controlled replacement of workers serving protected hosts without service interruption.
+
+**Key Features**:
+- **Controlled Migration**: Admin sets pending worker, migration occurs when new worker registers
+- **Automatic Cutover**: Old worker receives error on next request and stops serving
+- **Complete Audit Trail**: All migration events logged for compliance and troubleshooting
+- **Safety Mechanisms**: No accidental replacements, explicit admin approval required
+
+**Migration Workflow**:
+1. **Preparation**: Admin identifies need for new worker (scaling, version upgrade, replacement)
+2. **Deployment**: Admin creates and deploys new worker with unique worker ID
+3. **Authorization**: Admin sets pending worker ID in Sunray Server (UI or CLI)
+4. **Activation**: New worker registers → automatic migration occurs
+5. **Deactivation**: Old worker gets error response → stops serving traffic
+6. **Verification**: Admin monitors audit logs and worker health status
+
+**CLI Commands**:
+```bash
+# Set pending worker for controlled migration
+bin/sunray-srvr srctl host set-pending-worker app.example.com new-worker-001
+
+# Monitor migration status
+bin/sunray-srvr srctl host migration-status app.example.com
+
+# List all pending migrations
+bin/sunray-srvr srctl host list-pending-migrations
+
+# Cancel pending migration if needed
+bin/sunray-srvr srctl host clear-pending-worker app.example.com
+```
+
+**UI Features**:
+- Migration status banner in host form view
+- Pending worker field for setting migration target
+- Clear pending migration button for cancellation
+- List view columns showing migration status and duration
+- Search filters for hosts with pending migrations
+
+**Audit Events**:
+- `worker.migration_requested`: Admin sets pending worker
+- `worker.migration_started`: New worker begins registration
+- `worker.migration_completed`: Successful migration with timing data
+- `worker.migration_cancelled`: Admin cancels pending migration
+- `worker.re_registered`: Same worker re-registers (idempotent)
+- `worker.registration_blocked`: Unauthorized registration attempt
+
+**Registration API Behavior**:
+- **Same Worker**: Idempotent (returns configuration)
+- **Pending Worker**: Performs migration automatically
+- **Unauthorized Worker**: Returns detailed error with current status
+- **Unbound Host**: Binds worker immediately
+
+**Use Cases**:
+- **Scaling**: Deploy additional workers for load distribution
+- **Version Updates**: Replace workers with newer versions
+- **Geographic Migration**: Move workers to different regions
+- **Disaster Recovery**: Replace failed workers quickly
+
 ## Odoo Development Guidelines
 
 ### Module Structure

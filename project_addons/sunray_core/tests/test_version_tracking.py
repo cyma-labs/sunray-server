@@ -10,6 +10,23 @@ class TestVersionTracking(TransactionCase):
     
     def setUp(self):
         super().setUp()
+        
+        # Create test API key
+        self.api_key = self.env['sunray.api.key'].create({
+            'name': 'test_worker_key',
+            'is_active': True,
+            'scopes': 'config:read'
+        })
+        
+        # Create test worker
+        self.worker = self.env['sunray.worker'].create({
+            'name': 'Test Worker',
+            'worker_type': 'cloudflare',
+            'worker_url': 'https://worker.test-version.example.com',
+            'api_key_id': self.api_key.id,
+            'is_active': True
+        })
+        
         # Create test user
         self.test_user = self.env['sunray.user'].create({
             'username': 'test_version_user',
@@ -20,7 +37,7 @@ class TestVersionTracking(TransactionCase):
         # Create test host
         self.test_host = self.env['sunray.host'].create({
             'domain': 'test-version.example.com',
-            'worker_url': 'https://worker.test-version.example.com',
+            'sunray_worker_id': self.worker.id,
             'backend_url': 'http://backend.example.com',
             'is_active': True
         })

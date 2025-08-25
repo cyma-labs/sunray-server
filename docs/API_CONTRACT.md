@@ -565,6 +565,45 @@ curl -X POST https://sunray-server.example.com/sunray-srvr/v1/setup-tokens/valid
   }'
 ```
 
+### GET /sunray-srvr/v1/users/{username}
+
+**Purpose**: Retrieves detailed information about a specific user.
+
+**Authentication**: API key required
+
+**Path Parameters**:
+- `username`: The username to retrieve information for
+
+**Response** (User found):
+```json
+{
+  "username": "user@example.com",
+  "email": "user@example.com",
+  "display_name": "user@example.com",
+  "is_active": true,
+  "passkey_count": 2,
+  "active_session_count": 1,
+  "last_login": "2024-01-15T10:30:00Z",
+  "authorized_hosts": [
+    {
+      "domain": "app.example.com",
+      "name": "Application Server"
+    }
+  ],
+  "config_version": "2024-01-15T09:00:00Z"
+}
+```
+
+**Error Responses**:
+- `401 Unauthorized`: Invalid or missing API key
+- `404 Not Found`: User not found
+- `400 Bad Request`: Invalid username parameter
+
+**Usage**: 
+- Check user existence (404 = doesn't exist, 200 = exists)
+- Retrieve user details for administrative purposes
+- Get user configuration version for cache invalidation
+
 ### POST /sunray-srvr/v1/users/{username}/passkeys
 
 **Purpose**: Registers a new passkey for a user.

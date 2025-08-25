@@ -895,90 +895,95 @@ class SunrayRESTController(http.Controller):
         session_obj.revoke(reason)
         return self._json_response({'success': True})
     
-    @http.route('/sunray-srvr/v1/security-events', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
-    def log_security_event(self, **kwargs):
-        """Log security event from Worker"""
+    @http.route('/sunray-srvr/v1/logout', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
+    def logout(self, **kwargs):
+        """User-initiated logout endpoint"""
         api_key_obj = self._authenticate_api(request)
         if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
-        data = json.loads(request.httprequest.data)
+        try:
+            data = json.loads(request.httprequest.data) if request.httprequest.data else {}
+        except json.JSONDecodeError:
+            return self._error_response('Invalid JSON payload', 400)
         
-        # Setup request context and create audit log entry
+        session_id = data.get('session_id')
+        if not session_id:
+            return self._error_response('session_id is required', 400)
+        
+        # Find the session
+        session_obj = request.env['sunray.session'].sudo().search([
+            ('session_id', '=', session_id)
+        ])
+        
+        if not session_obj:
+            return self._error_response('Session not found', 404)
+        
+        # Revoke the session with logout-specific reason
+        session_obj.revoke('User logout')
+        
+        # Setup request context and log logout event
         context_data = self._setup_request_context(request)
-        request.env['sunray.audit.log'].sudo().create_security_event(
-            event_type=data.get('type'),
-            details=data.get('details', {}),
-            severity=data.get('severity', 'warning'),
+        request.env['sunray.audit.log'].sudo().create_user_event(
+            event_type='auth.logout',
+            details={'session_id': session_id},
+            sunray_user_id=session_obj.user_id.id,
             sunray_worker=context_data['worker_id'],
-            ip_address=data.get('details', {}).get('ip'),
-            user_agent=data.get('details', {}).get('user_agent')
+            ip_address=data.get('ip_address'),
+            username=session_obj.user_id.username
         )
         
-        return self._json_response({'success': True})
+        return self._json_response({
+            'success': True,
+            'message': 'User logged out successfully'
+        })
     
-    @http.route('/sunray-srvr/v1/audit/sublimation-manipulation', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
-    def report_sublimation_manipulation(self, **kwargs):
-        """Report sublimation cookie manipulation attempts"""
+    
+    @http.route('/sunray-srvr/v1/audit', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
+    def log_audit_event(self, **kwargs):
+        """Log audit events from workers - UNIFIED ENDPOINT"""
         api_key_obj = self._authenticate_api(request)
         if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
         # Get JSON data
-        data = json.loads(request.httprequest.data)
+        try:
+            data = json.loads(request.httprequest.data) if request.httprequest.data else {}
+        except json.JSONDecodeError:
+            return self._error_response('Invalid JSON payload', 400)
         
-        # Setup request context for audit logging
+        # Validate required fields
+        event_type = data.get('event_type')
+        if not event_type:
+            return self._error_response('event_type is required', 400)
+        
+        # Setup request context
         context_data = self._setup_request_context(request)
         
-        # Create detailed audit log entry
-        event_details = {
-            'reason': data.get('reason'),
-            'client_ip': data.get('client_ip'),
-            'details': data.get('details', {}),
-            'worker_id': request.httprequest.headers.get('X-Worker-ID'),
-            'timestamp': data.get('timestamp')
-        }
+        # Prepare details with extra context
+        details = data.get('details', {})
+        if isinstance(details, dict):
+            if data.get('host'):
+                details['host'] = data.get('host')
+            details['api_key_id'] = api_key_obj.id
         
-        # Map reason to event type
-        event_type_map = {
-            'invalid_format': 'waf_bypass.tamper.format',
-            'hmac_mismatch': 'waf_bypass.tamper.hmac',
-            'session_mismatch': 'waf_bypass.tamper.session',
-            'ip_mismatch': 'waf_bypass.tamper.ip_change',
-            'ua_mismatch': 'waf_bypass.tamper.ua_change',
-            'expired': 'waf_bypass.expired',
-            'validation_error': 'waf_bypass.error'
-        }
-        
-        event_type = event_type_map.get(data.get('reason'), 'waf_bypass.unknown')
-        
-        # Find user
-        username = data.get('username')
-        user_obj = request.env['sunray.user'].sudo().search([('username', '=', username)], limit=1)
-        
-        # Determine severity based on event type
-        critical_events = ['hmac_mismatch', 'session_mismatch', 'invalid_format']
-        severity = 'critical' if data.get('reason') in critical_events else 'warning'
-        
-        # Log the manipulation attempt
-        request.env['sunray.audit.log'].sudo().create_security_event(
+        # Create unified audit log entry
+        audit_record = request.env['sunray.audit.log'].sudo().create_audit_event(
             event_type=event_type,
-            event_details=event_details,
-            event_source='worker',
-            sunray_user_id=user_obj.id if user_obj else False,
-            username=username if not user_obj else None,
+            details=details,
+            username=data.get('username'),
+            ip_address=data.get('ip_address') or request.httprequest.environ.get('REMOTE_ADDR'),
+            user_agent=data.get('user_agent'),
+            severity=data.get('severity', 'info'),
             sunray_worker=context_data['worker_id'],
-            severity=severity,
-            ip_address=data.get('client_ip')
+            event_source='worker'
         )
         
-        # Additional actions for critical events
-        if data.get('reason') in ['hmac_mismatch', 'session_mismatch']:
-            # Potential attack - log warning for monitoring
-            _logger.warning(f"Potential sublimation cookie attack from {data.get('client_ip')} for user {username} - reason: {data.get('reason')}")
-        
-        return self._json_response({'status': 'logged'})
+        return self._json_response({
+            'success': True,
+            'audit_id': audit_record.id
+        })
     
     @http.route('/sunray-srvr/v1/webhooks/track-usage', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def track_webhook_usage(self, **kwargs):

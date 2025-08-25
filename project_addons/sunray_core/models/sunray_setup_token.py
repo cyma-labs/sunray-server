@@ -75,7 +75,7 @@ class SunraySetupToken(models.Model):
         
         # Log cleanup
         if expired_objs:
-            self.env['sunray.audit.log'].create_security_event(
+            self.env['sunray.audit.log'].create_audit_event(
                 event_type='token.cleanup',
                 details={
                     'count': len(expired_objs),

@@ -656,6 +656,66 @@ The `/config/register` endpoint handles all migration logic:
 }
 ```
 
+### POST /sunray-srvr/v1/sessions/<session_id>/revoke
+
+**Purpose**: Revokes a specific session (admin/system-initiated).
+
+**Authentication**: API key required
+
+**Request Body**:
+```json
+{
+  "reason": "Admin revocation"  // Optional, defaults to "API revocation"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true
+}
+```
+
+**Error Responses**:
+- `404 Not Found`: Session not found
+- `401 Unauthorized`: Invalid or missing API key
+
+**Usage**: Primarily for administrative session management and system-initiated revocations.
+
+### POST /sunray-srvr/v1/logout
+
+**Purpose**: User-initiated logout endpoint that revokes session and logs logout event.
+
+**Authentication**: API key required
+
+**Request Body**:
+```json
+{
+  "session_id": "session_id_to_logout",
+  "ip_address": "client_ip"  // Optional, for audit logging
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "User logged out successfully"
+}
+```
+
+**Error Responses**:
+- `400 Bad Request`: Missing session_id or invalid JSON
+- `404 Not Found`: Session not found
+- `401 Unauthorized`: Invalid or missing API key
+
+**Usage**: For user-initiated logouts from workers. Creates `auth.logout` audit event.
+
+**Worker Flow**:
+1. Clear session cookies on client
+2. Call logout endpoint
+3. Redirect to logout confirmation page
+
 ### POST /sunray-srvr/v1/audit
 
 **Purpose**: Records audit events from workers.
@@ -665,14 +725,24 @@ The `/config/register` endpoint handles all migration logic:
 {
   "event_type": "auth.success",
   "username": "user@example.com",
-  "host": "example.com",
+  "host": "example.com", 
   "ip_address": "client_ip",
   "user_agent": "client_user_agent",
+  "severity": "info",
   "details": {
     "additional": "context"
   }
 }
 ```
+
+**Parameters**:
+- `event_type` (required): Type of audit event (see event types below)
+- `username` (optional): Username associated with the event
+- `host` (optional): Host domain associated with the event  
+- `ip_address` (optional): Client IP address
+- `user_agent` (optional): Client user agent
+- `severity` (optional): Event severity level - `info` (default), `warning`, `error`, `critical`
+- `details` (optional): Additional context data as JSON object
 
 **Event Types**: For a complete list of supported `event_type` values, refer to the `event_type` field definition in `/project_addons/sunray_core/models/sunray_audit_log.py`. The event types are organized into categories:
 - Access Control Events (e.g., `auth.success`, `auth.failure`)
@@ -727,8 +797,20 @@ Common HTTP status codes:
 
 ### Session Validation
 - Cache duration: 30 seconds
-- Invalidate on: Session revocation, logout
 - Cache key: `session_{session_id}`
+- **Invalidate immediately on**:
+  - Session revocation (via `/sessions/<session_id>/revoke`)
+  - User logout (via `/logout`)
+  - Session expiry (handled by cleanup cron)
+  - Administrative "revoke all sessions" action
+- **Worker responsibilities**:
+  - Clear local cache when receiving 404/invalid session responses
+  - Implement cache-busting for revoked sessions
+  - Use 30-second TTL as safety net for edge cases
+- **Cache invalidation flow**:
+  1. Worker detects invalid session (validation returns false)
+  2. Worker immediately removes from local cache
+  3. Worker redirects user to authentication
 
 ## Version Compatibility
 

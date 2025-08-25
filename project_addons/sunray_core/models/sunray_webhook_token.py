@@ -194,14 +194,14 @@ class SunrayWebhookToken(models.Model):
         })
         
         # Log usage
-        self.env['sunray.audit.log'].create_security_event(
+        self.env['sunray.audit.log'].create_audit_event(
             event_type='webhook.used',
             details={
                 'token_name': self.name,
                 'host': self.host_id.domain
             },
             ip_address=client_ip,
-            event_source='api_webhook'
+            event_source='api'
         )
         
         return True

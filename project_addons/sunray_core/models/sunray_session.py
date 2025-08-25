@@ -103,7 +103,7 @@ class SunraySession(models.Model):
         
         # Log cleanup
         if expired_objs:
-            self.env['sunray.audit.log'].create_security_event(
+            self.env['sunray.audit.log'].create_audit_event(
                 event_type='session.expired',
                 details={
                     'count': len(expired_objs),

@@ -212,7 +212,7 @@ class SunrayAuditLog(models.Model):
         
         # Log the cleanup itself
         if old_log_objs:
-            self.create_security_event(
+            self.create_audit_event(
                 event_type='security.alert',
                 severity='info',
                 details={
@@ -226,16 +226,16 @@ class SunrayAuditLog(models.Model):
         return True
     
     @api.model
-    def create_security_event(self, event_type, details, severity='warning', 
-                            sunray_admin_user_id=None, sunray_user_id=None, 
-                            sunray_worker=None, ip_address=None, user_agent=None,
-                            request_id=None, event_source=None, username=None):
-        """Helper method to create security events with new user tracking
+    def create_audit_event(self, event_type, details, severity='info', 
+                          sunray_admin_user_id=None, sunray_user_id=None, 
+                          sunray_worker=None, ip_address=None, user_agent=None,
+                          request_id=None, event_source=None, username=None):
+        """Unified method to create audit events - PREFERRED METHOD
         
         Args:
-            event_type: Type of security event
+            event_type: Type of audit event
             details: Event details (dict or string)
-            severity: Event severity level
+            severity: Event severity level (info, warning, error, critical)
             sunray_admin_user_id: Admin user ID (res.users)
             sunray_user_id: Sunray user ID (sunray.user)
             sunray_worker: Worker identification
@@ -275,6 +275,26 @@ class SunrayAuditLog(models.Model):
         return self.create(vals)
     
     @api.model
+    def create_security_event(self, event_type, details, severity='warning', 
+                            sunray_admin_user_id=None, sunray_user_id=None, 
+                            sunray_worker=None, ip_address=None, user_agent=None,
+                            request_id=None, event_source=None, username=None):
+        """DEPRECATED: Use create_audit_event instead. Kept for backward compatibility."""
+        return self.create_audit_event(
+            event_type=event_type,
+            details=details,
+            severity=severity,
+            sunray_admin_user_id=sunray_admin_user_id,
+            sunray_user_id=sunray_user_id,
+            sunray_worker=sunray_worker,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+            event_source=event_source,
+            username=username
+        )
+    
+    @api.model
     def create_admin_event(self, event_type, details, admin_user_id=None, **kwargs):
         """Create an event for admin/operator actions
         
@@ -283,7 +303,7 @@ class SunrayAuditLog(models.Model):
         if not admin_user_id:
             admin_user_id = self.env.context.get('sunray_admin_user_id') or self.env.uid
             
-        return self.create_security_event(
+        return self.create_audit_event(
             event_type=event_type,
             details=details,
             sunray_admin_user_id=admin_user_id,
@@ -294,7 +314,7 @@ class SunrayAuditLog(models.Model):
     @api.model
     def create_user_event(self, event_type, details, sunray_user_id, **kwargs):
         """Create an event for end-user actions"""
-        return self.create_security_event(
+        return self.create_audit_event(
             event_type=event_type,
             details=details,
             sunray_user_id=sunray_user_id,
@@ -305,7 +325,7 @@ class SunrayAuditLog(models.Model):
     @api.model
     def create_worker_event(self, event_type, details, sunray_worker, **kwargs):
         """Create an event for worker actions"""
-        return self.create_security_event(
+        return self.create_audit_event(
             event_type=event_type,
             details=details,
             sunray_worker=sunray_worker,
@@ -321,13 +341,13 @@ class SunrayAuditLog(models.Model):
             event_type: Type of event
             details: Event details (dict or string) 
             api_key_id: API key ID for context
-            **kwargs: Additional fields for create_security_event
+            **kwargs: Additional fields for create_audit_event
         """
         # Add API key context to details if provided
         if api_key_id and isinstance(details, dict):
             details['api_key_id'] = api_key_id
         
-        return self.create_security_event(
+        return self.create_audit_event(
             event_type=event_type,
             details=details,
             event_source='api',

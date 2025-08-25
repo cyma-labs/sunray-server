@@ -31,6 +31,7 @@ class SunrayAuditLog(models.Model):
         ('passkey.revoked', 'Passkey Revoked'),
         # Configuration Events
         ('config.fetched', 'Config Fetched'),
+        ('config.host_fetched', 'Host Config Fetched'),
         ('config.session_duration_changed', 'Session Duration Changed'),
         ('config.waf_revalidation_changed', 'WAF Revalidation Changed'),
         # Session Management Events
@@ -68,6 +69,7 @@ class SunrayAuditLog(models.Model):
         ('worker.migration_cancelled', 'Worker Migration Cancelled'),
         ('worker.registration_failed', 'Worker Registration Failed'),
         ('worker.registration_blocked', 'Worker Registration Blocked'),
+        ('worker.registration_success', 'Worker Registration Success'),
         ('worker.deleted', 'Worker Deleted'),
         # Security Events
         ('security.alert', 'Security Alert'),
@@ -308,6 +310,27 @@ class SunrayAuditLog(models.Model):
             details=details,
             sunray_worker=sunray_worker,
             event_source='worker',
+            **kwargs
+        )
+    
+    @api.model
+    def create_api_event(self, event_type, details, api_key_id=None, **kwargs):
+        """Create an event for API actions
+        
+        Args:
+            event_type: Type of event
+            details: Event details (dict or string) 
+            api_key_id: API key ID for context
+            **kwargs: Additional fields for create_security_event
+        """
+        # Add API key context to details if provided
+        if api_key_id and isinstance(details, dict):
+            details['api_key_id'] = api_key_id
+        
+        return self.create_security_event(
+            event_type=event_type,
+            details=details,
+            event_source='api',
             **kwargs
         )
     

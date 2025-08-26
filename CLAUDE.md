@@ -574,6 +574,17 @@ def test_webhook(self, mock_post):
     # Test code here
 ```
 
+#### Important Test Notes
+
+**Expected Database Constraint Violations**: The test `TestWebhookTokenMultiProvider.test_token_validation_constraints` intentionally generates 2 database constraint violation ERRORs in the log as part of testing invalid token configurations. These are expected and do not indicate test failures.
+
+**Test Success Verification**: Always check the final test result lines, not intermediate database errors:
+```
+2025-08-26 16:07:00,241 INFO odoo.tests.stats: sunray_core: 49 tests 9.37s 767 queries 
+2025-08-26 16:07:00,242 INFO odoo.tests.result: 0 failed, 0 error(s) of 41 tests
+```
+The key indicator is `0 failed, 0 error(s)` in the final result line, not database constraint violations that appear during test execution.
+
 ### Test Launcher Scripts
 
 **Policy**: All tools, scripts and utilities that are part of the project must be stored in the `bin/` directory.

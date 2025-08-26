@@ -442,11 +442,16 @@ class SunrayHost(models.Model):
                 )
                 
                 # Log the action
-                self.env['sunray.audit.log'].create_admin_event(
-                    event_type='cache_invalidation',
+                self.env['sunray.audit.log'].create_audit_event(
+                    event_type='cache.cleared',
                     severity='info',
-                    details=f'Cache refresh triggered for host {record.domain}',
-                    admin_user_id=self.env.user.id
+                    details={
+                        'scope': 'host',
+                        'hostname': record.domain,
+                        'operation': 'manual_host_cache_refresh',
+                        'reason': f'Manual host cache refresh by {self.env.user.name}'
+                    },
+                    sunray_admin_user_id=self.env.user.id
                 )
             except Exception as e:
                 _logger.error(f"Failed to trigger cache refresh for host {record.domain}: {str(e)}")

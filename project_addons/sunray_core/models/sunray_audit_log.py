@@ -47,7 +47,13 @@ class SunrayAuditLog(models.Model):
         ('api_key.regenerated', 'API Key Regenerated'),
         ('api_key.deleted', 'API Key Deleted'),
         # Cache Events
-        ('cache_invalidation', 'Cache Invalidation'),
+        ('cache_invalidation', 'Cache Invalidation DEPRECATED'),  # Legacy event type
+        ('cache.cleared', 'Cache Cleared'),
+        ('cache.clear_failed', 'Cache Clear Failed'),
+        ('cache.nuclear_clear', 'Nuclear Cache Clear'),
+        # Session Events  
+        ('session.revoked', 'Session Revoked'),
+        ('session.bulk_revocation', 'Bulk Session Revocation'),
         # WAF Bypass Events
         ('waf_bypass.created', 'WAF Bypass Cookie Created'),
         ('waf_bypass.validated', 'WAF Bypass Validated'),

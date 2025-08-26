@@ -152,10 +152,10 @@ class TestCacheInvalidation(TransactionCase):
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         
-        # Check URL - cache invalidation goes through the protected host URL
+        # Check URL - cache clearing goes through the protected host URL
         self.assertEqual(
             call_args[0][0],
-            'https://test.example.com/sunray-wrkr/v1/cache/invalidate'
+            'https://test.example.com/sunray-wrkr/v1/cache/clear'
         )
         
         # Check headers
@@ -163,15 +163,15 @@ class TestCacheInvalidation(TransactionCase):
         self.assertIn('Authorization', headers)
         self.assertEqual(headers['Authorization'], f'Bearer {self.api_key.key}')
         
-        # Check payload
+        # Check payload - new API format with target object
         payload = call_args[1]['json']
         self.assertEqual(payload['scope'], 'host')
-        self.assertEqual(payload['target'], 'test.example.com')
+        self.assertEqual(payload['target'], {'hostname': 'test.example.com'})
         self.assertIn('Manual refresh', payload['reason'])
         
-        # Check audit log was created
+        # Check audit log was created with new event type
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'cache_invalidation'),
+            ('event_type', '=', 'cache.cleared'),
             ('details', 'like', 'test.example.com')
         ], limit=1)
         self.assertTrue(audit_log)
@@ -201,15 +201,15 @@ class TestCacheInvalidation(TransactionCase):
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         
-        # Check payload
+        # Check payload - new API format with target object
         payload = call_args[1]['json']
-        self.assertEqual(payload['scope'], 'user')
-        self.assertEqual(payload['target'], 'testuser')
+        self.assertEqual(payload['scope'], 'user-protectedhost')
+        self.assertEqual(payload['target'], {'username': 'testuser', 'hostname': 'test.example.com'})
         self.assertIn('Manual user refresh', payload['reason'])
         
-        # Check audit log was created
+        # Check audit log was created with new event type
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'cache_invalidation'),
+            ('event_type', '=', 'cache.cleared'),
             ('sunray_user_id', '=', self.user.id)
         ], limit=1)
         self.assertTrue(audit_log)

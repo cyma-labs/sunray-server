@@ -184,13 +184,19 @@ class SunrayUser(models.Model):
                     failed_hosts.append(f'{host_obj.domain}: {str(e)}')
             
             # Log the action
-            self.env['sunray.audit.log'].create_admin_event(
-                event_type='cache_invalidation',
+            self.env['sunray.audit.log'].create_audit_event(
+                event_type='cache.cleared',
                 severity='info',
-                details=f'Cache refresh triggered for user {record.username} on {success_count} host(s)',
+                details={
+                    'scope': 'user-protectedhost',
+                    'username': record.username,
+                    'hosts_count': success_count,
+                    'operation': 'manual_user_cache_refresh',
+                    'reason': f'Manual user cache refresh by {self.env.user.name}'
+                },
                 sunray_user_id=record.id,
-                username=record.username,
-                admin_user_id=self.env.user.id
+                sunray_admin_user_id=self.env.user.id,
+                username=record.username
             )
             
             # Handle errors and warnings

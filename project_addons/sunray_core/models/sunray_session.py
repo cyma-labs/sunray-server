@@ -136,6 +136,79 @@ class SunraySession(models.Model):
         
         return True
     
+    def action_revoke_session(self, reason=None):
+        """UI action to revoke session with worker cache clear"""
+        self.ensure_one()
+        
+        if not self.is_active:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Session Already Inactive',
+                    'message': 'This session is already inactive.',
+                    'type': 'warning',
+                }
+            }
+        
+        # Get the reason from parameter or default
+        revoke_reason = reason or 'Admin revocation via UI'
+        
+        # Revoke the session locally first
+        self.revoke(revoke_reason)
+        
+        # Clear the session from worker cache using new API
+        try:
+            if self.host_id and self.host_id.sunray_worker_id:
+                self.host_id._call_worker_cache_clear(
+                    scope='user-session',
+                    target={
+                        'hostname': self.host_id.domain,
+                        'username': self.user_id.username,
+                        'sessionId': self.session_id
+                    },
+                    reason=f'Session revocation: {revoke_reason}'
+                )
+        except Exception as e:
+            # Log the error but don't fail the operation
+            # The local session is already revoked
+            self.env['sunray.audit.log'].create_admin_event(
+                event_type='cache.clear_failed',
+                details={
+                    'scope': 'user-session',
+                    'session_id': self.session_id,
+                    'error': str(e),
+                    'note': 'Session revoked locally but worker cache clear failed'
+                },
+                severity='warning',
+                sunray_user_id=self.user_id.id,
+                username=self.user_id.username
+            )
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Session Revoked',
+                'message': f'Session {self.session_id[:8]}... has been revoked successfully.',
+                'type': 'success',
+            }
+        }
+    
+    def action_open_revoke_wizard(self):
+        """Open the revoke session wizard"""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Revoke Session',
+            'res_model': 'sunray.session.revoke.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_session_id': self.id,
+            }
+        }
+    
     def update_activity(self, new_ip=None):
         """Update session last activity timestamp and optionally IP"""
         vals = {'last_activity': fields.Datetime.now()}

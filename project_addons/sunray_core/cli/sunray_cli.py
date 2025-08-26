@@ -89,6 +89,18 @@ class SunrayCommand(Command):
         user_cache = user_sub.add_parser('force-cache-refresh', help='Force cache refresh for user')
         user_cache.add_argument('username', help='Username')
         
+        # user revoke-sessions-host
+        user_revoke_host = user_sub.add_parser('revoke-sessions-host', help='Revoke all sessions for user on specific host')
+        user_revoke_host.add_argument('username', help='Username')
+        user_revoke_host.add_argument('domain', help='Host domain')
+        user_revoke_host.add_argument('--reason', help='Revocation reason for audit trail')
+        
+        # user revoke-sessions-worker
+        user_revoke_worker = user_sub.add_parser('revoke-sessions-worker', help='Revoke all sessions for user on worker')
+        user_revoke_worker.add_argument('username', help='Username')
+        user_revoke_worker.add_argument('worker_name', help='Worker name')
+        user_revoke_worker.add_argument('--reason', help='Revocation reason for audit trail')
+        
         # Session commands
         session = subparsers.add_parser('session', help='Manage sessions')
         session_sub = session.add_subparsers(dest='action', help='Action')
@@ -117,6 +129,23 @@ class SunrayCommand(Command):
         session_revoke = session_sub.add_parser('revoke', help='Revoke session with audit trail')
         session_revoke.add_argument('session_id', help='Session ID')
         session_revoke.add_argument('--reason', help='Revocation reason for audit trail')
+        
+        # session revoke-user-host 
+        session_revoke_user_host = session_sub.add_parser('revoke-user-host', help='Revoke all sessions for user on specific host')
+        session_revoke_user_host.add_argument('username', help='Username')
+        session_revoke_user_host.add_argument('domain', help='Host domain')
+        session_revoke_user_host.add_argument('--reason', help='Revocation reason for audit trail')
+        
+        # session revoke-user-worker
+        session_revoke_user_worker = session_sub.add_parser('revoke-user-worker', help='Revoke all sessions for user on all hosts protected by worker')
+        session_revoke_user_worker.add_argument('username', help='Username')
+        session_revoke_user_worker.add_argument('worker_name', help='Worker name')
+        session_revoke_user_worker.add_argument('--reason', help='Revocation reason for audit trail')
+        
+        # session clear-host
+        session_clear_host = session_sub.add_parser('clear-host', help='Clear all sessions on specific host (all users)')
+        session_clear_host.add_argument('domain', help='Host domain')
+        session_clear_host.add_argument('--reason', help='Reason for clearing sessions')
         
         # session cleanup
         session_cleanup = session_sub.add_parser('cleanup', help='Remove expired sessions')
@@ -158,6 +187,11 @@ class SunrayCommand(Command):
         host_cache = host_sub.add_parser('force-cache-refresh', help='Force cache refresh for host')
         host_cache.add_argument('domain', help='Host domain')
         
+        # host clear-sessions
+        host_clear_sessions = host_sub.add_parser('clear-sessions', help='Clear all sessions on host (all users)')
+        host_clear_sessions.add_argument('domain', help='Host domain')
+        host_clear_sessions.add_argument('--reason', help='Reason for clearing sessions')
+        
         # host set-pending-worker
         host_set_pending = host_sub.add_parser('set-pending-worker', help='Set pending worker for migration')
         host_set_pending.add_argument('domain', help='Host domain')
@@ -192,6 +226,18 @@ class SunrayCommand(Command):
         worker_get.add_argument('name', help='Worker name')
         worker_get.add_argument('--output', '-o', choices=['table', 'json', 'yaml'],
                                default='table', help='Output format (default: table)')
+        
+        # worker force-config-refresh
+        worker_force_config = worker_sub.add_parser('force-config-refresh', help='Force config refresh for all hosts on worker')
+        worker_force_config.add_argument('name', help='Worker name')
+        worker_force_config.add_argument('--reason', help='Reason for config refresh')
+        
+        # worker clear-all-sessions (nuclear option)
+        worker_clear_sessions = worker_sub.add_parser('clear-all-sessions', help='NUCLEAR: Clear all sessions across all hosts on worker')
+        worker_clear_sessions.add_argument('name', help='Worker name')
+        worker_clear_sessions.add_argument('--confirm', action='store_true', required=True, 
+                                          help='Required confirmation for this dangerous operation')
+        worker_clear_sessions.add_argument('--reason', help='Reason for nuclear session clear')
         
         # Cron commands
         cron = subparsers.add_parser('cron', help='Manage cron jobs')
@@ -586,6 +632,48 @@ class SunrayCommand(Command):
                 print(f"Cache refresh triggered for user '{args.username}'")
             except Exception as e:
                 print(f"Error refreshing cache for user '{args.username}': {e}")
+        
+        elif args.action == 'revoke-sessions-host':
+            # Find user and host
+            Host = env['sunray.host']
+            user = User.search([('username', '=', args.username)], limit=1)
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not user:
+                print(f"User '{args.username}' not found")
+                return
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+                
+            try:
+                result = user.action_revoke_sessions_on_host(host.id)
+                print(f"Sessions revoked for user '{args.username}' on host '{args.domain}'")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error revoking sessions: {e}")
+                
+        elif args.action == 'revoke-sessions-worker':
+            # Find user and worker
+            Worker = env['sunray.worker']
+            user = User.search([('username', '=', args.username)], limit=1)
+            worker = Worker.search([('name', '=', args.worker_name)], limit=1)
+            
+            if not user:
+                print(f"User '{args.username}' not found")
+                return
+            if not worker:
+                print(f"Worker '{args.worker_name}' not found")
+                return
+                
+            try:
+                result = user.action_revoke_sessions_on_worker(worker.id)
+                print(f"Sessions revoked for user '{args.username}' on worker '{args.worker_name}'")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error revoking sessions: {e}")
     
     def _handle_session(self, env, args):
         """Handle session operations"""
@@ -676,6 +764,67 @@ class SunrayCommand(Command):
                 count = len(expired_sessions)
                 expired_sessions.write({'is_active': False})
                 print(f"Cleaned up {count} expired sessions")
+        
+        elif args.action == 'revoke-user-host':
+            # Find user and host
+            User = env['sunray.user']
+            Host = env['sunray.host']
+            user = User.search([('username', '=', args.username)], limit=1)
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not user:
+                print(f"User '{args.username}' not found")
+                return
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+                
+            try:
+                result = user.action_revoke_sessions_on_host(host.id)
+                print(f"Sessions revoked for user {args.username} on host {args.domain}")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error revoking sessions: {str(e)}")
+                
+        elif args.action == 'revoke-user-worker':
+            # Find user and worker
+            User = env['sunray.user']
+            Worker = env['sunray.worker']
+            user = User.search([('username', '=', args.username)], limit=1)
+            worker = Worker.search([('name', '=', args.worker_name)], limit=1)
+            
+            if not user:
+                print(f"User '{args.username}' not found")
+                return
+            if not worker:
+                print(f"Worker '{args.worker_name}' not found")
+                return
+                
+            try:
+                result = user.action_revoke_sessions_on_worker(worker.id)
+                print(f"Sessions revoked for user {args.username} on worker {args.worker_name}")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error revoking sessions: {str(e)}")
+                
+        elif args.action == 'clear-host':
+            # Find host
+            Host = env['sunray.host']
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+                
+            try:
+                result = host.action_clear_all_sessions()
+                print(f"All sessions cleared on host {args.domain}")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error clearing sessions: {str(e)}")
         
         elif args.action == 'stats':
             stats = self._calculate_session_stats(Session)
@@ -826,6 +975,21 @@ class SunrayCommand(Command):
                 print(f"Cache refresh triggered for host '{args.domain}'")
             except Exception as e:
                 print(f"Error refreshing cache for host '{args.domain}': {e}")
+        
+        elif args.action == 'clear-sessions':
+            host = Host.search([('domain', '=', args.domain)], limit=1)
+            
+            if not host:
+                print(f"Host '{args.domain}' not found")
+                return
+            
+            try:
+                result = host.action_clear_all_sessions()
+                print(f"All sessions cleared on host '{args.domain}'")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error clearing sessions on host '{args.domain}': {e}")
         
         elif args.action == 'set-pending-worker':
             host = Host.search([('domain', '=', args.domain)], limit=1)
@@ -1729,6 +1893,40 @@ class SunrayCommand(Command):
                 self._output_workers_json([worker])
             elif args.output == 'yaml':
                 self._output_workers_yaml([worker])
+        
+        elif args.action == 'force-config-refresh':
+            worker = Worker.search([('name', '=', args.name)], limit=1)
+            if not worker:
+                print(f"Worker '{args.name}' not found")
+                return
+            
+            try:
+                result = worker.action_force_config_refresh_all()
+                print(f"Configuration refresh triggered for worker '{args.name}'")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error triggering config refresh for worker '{args.name}': {e}")
+        
+        elif args.action == 'clear-all-sessions':
+            worker = Worker.search([('name', '=', args.name)], limit=1)
+            if not worker:
+                print(f"Worker '{args.name}' not found")
+                return
+            
+            if not args.confirm:
+                print("ERROR: --confirm flag is required for this dangerous operation")
+                print(f"This will clear ALL sessions across ALL hosts protected by worker '{args.name}'")
+                return
+            
+            try:
+                result = worker.action_clear_all_sessions_nuclear()
+                print(f"NUCLEAR CLEAR COMPLETE for worker '{args.name}'")
+                print("ALL sessions have been terminated across all protected hosts")
+                if args.reason:
+                    print(f"Reason: {args.reason}")
+            except Exception as e:
+                print(f"Error performing nuclear clear for worker '{args.name}': {e}")
     
     def _output_workers_table(self, workers):
         """Output workers in table format"""

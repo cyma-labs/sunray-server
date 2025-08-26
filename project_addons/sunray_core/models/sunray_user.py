@@ -71,6 +71,14 @@ class SunrayUser(models.Model):
         string='Active Sessions'
     )
     
+    # Workers that protect this user's hosts
+    worker_ids = fields.Many2many(
+        'sunray.worker',
+        compute='_compute_worker_ids',
+        string='Workers',
+        help='Workers that protect hosts this user has access to'
+    )
+    
     # Version tracking for cache invalidation
     config_version = fields.Datetime(
         string='Configuration Version',
@@ -98,6 +106,13 @@ class SunrayUser(models.Model):
     def _compute_active_session_count(self):
         for user in self:
             user.active_session_count = len(user.session_ids.filtered('is_active'))
+    
+    @api.depends('host_ids.sunray_worker_id')
+    def _compute_worker_ids(self):
+        for user in self:
+            # Get unique workers from all hosts this user has access to
+            workers = user.host_ids.mapped('sunray_worker_id').filtered('id')
+            user.worker_ids = workers
     
     def write(self, vals):
         """Override to update config_version on any change"""
@@ -157,10 +172,10 @@ class SunrayUser(models.Model):
                     continue
                 
                 try:
-                    # Call worker's cache invalidation endpoint for this host
-                    host_obj._call_worker_cache_invalidate(
-                        scope='user',
-                        target=record.username,
+                    # Call worker's cache clear endpoint for this host
+                    host_obj._call_worker_cache_clear(
+                        scope='user-protectedhost',
+                        target={'username': record.username, 'hostname': host_obj.domain},
                         reason=f'Manual user refresh by {self.env.user.name}'
                     )
                     success_count += 1
@@ -169,13 +184,19 @@ class SunrayUser(models.Model):
                     failed_hosts.append(f'{host_obj.domain}: {str(e)}')
             
             # Log the action
-            self.env['sunray.audit.log'].create_admin_event(
-                event_type='cache_invalidation',
+            self.env['sunray.audit.log'].create_audit_event(
+                event_type='cache.cleared',
                 severity='info',
-                details=f'Cache refresh triggered for user {record.username} on {success_count} host(s)',
+                details={
+                    'scope': 'user-protectedhost',
+                    'username': record.username,
+                    'hosts_count': success_count,
+                    'operation': 'manual_user_cache_refresh',
+                    'reason': f'Manual user cache refresh by {self.env.user.name}'
+                },
                 sunray_user_id=record.id,
-                username=record.username,
-                admin_user_id=self.env.user.id
+                sunray_admin_user_id=self.env.user.id,
+                username=record.username
             )
             
             # Handle errors and warnings
@@ -210,5 +231,112 @@ class SunrayUser(models.Model):
                 'sticky': bool(failed_hosts),  # Stick error messages
             }
         }
+    
+    def action_revoke_sessions_on_worker(self, worker_id):
+        """Revoke all sessions for this user on all hosts protected by a specific worker"""
+        self.ensure_one()
+        worker_obj = self.env['sunray.worker'].browse(worker_id)
+        
+        if not worker_obj.exists():
+            raise UserError(f"Worker with ID {worker_id} not found")
+        
+        # Get user's active sessions on hosts protected by this worker
+        affected_sessions = self.session_ids.filtered(
+            lambda s: s.is_active and s.host_id.sunray_worker_id.id == worker_id
+        )
+        
+        if not affected_sessions:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Active Sessions',
+                    'message': f'User {self.username} has no active sessions on hosts protected by worker {worker_obj.name}.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            # Use the first host to call the worker (all hosts share the same worker)
+            first_host = affected_sessions[0].host_id
+            first_host._call_worker_cache_clear(
+                scope='user-worker',
+                target={'username': self.username},
+                reason=f'User sessions revoked on worker {worker_obj.name} by {self.env.user.name}'
+            )
+            
+            # Mark local sessions as inactive
+            affected_sessions.write({
+                'is_active': False,
+                'revoked': True,
+                'revoked_at': fields.Datetime.now(),
+                'revoked_reason': f'Bulk revocation - all sessions on worker {worker_obj.name}'
+            })
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Sessions Revoked',
+                    'message': f'Revoked {len(affected_sessions)} session(s) for user {self.username} on worker {worker_obj.name}.',
+                    'type': 'success',
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Failed to revoke sessions for user {self.username} on worker {worker_obj.name}: {str(e)}")
+            raise UserError(f"Failed to revoke sessions on worker: {str(e)}")
+    
+    def action_revoke_sessions_on_host(self, host_id):
+        """Revoke all sessions for this user on a specific host"""
+        self.ensure_one()
+        host_obj = self.env['sunray.host'].browse(host_id)
+        
+        if not host_obj.exists():
+            raise UserError(f"Host with ID {host_id} not found")
+        
+        # Get user's active sessions on this specific host
+        affected_sessions = self.session_ids.filtered(
+            lambda s: s.is_active and s.host_id.id == host_id
+        )
+        
+        if not affected_sessions:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Active Sessions',
+                    'message': f'User {self.username} has no active sessions on host {host_obj.domain}.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            # Call worker to clear user sessions on this specific host
+            host_obj._call_worker_cache_clear(
+                scope='user-protectedhost',
+                target={'username': self.username, 'hostname': host_obj.domain},
+                reason=f'User sessions revoked on host {host_obj.domain} by {self.env.user.name}'
+            )
+            
+            # Mark local sessions as inactive
+            affected_sessions.write({
+                'is_active': False,
+                'revoked': True,
+                'revoked_at': fields.Datetime.now(),
+                'revoked_reason': f'Bulk revocation - all sessions on host {host_obj.domain}'
+            })
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Sessions Revoked',
+                    'message': f'Revoked {len(affected_sessions)} session(s) for user {self.username} on host {host_obj.domain}.',
+                    'type': 'success',
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Failed to revoke sessions for user {self.username} on host {host_obj.domain}: {str(e)}")
+            raise UserError(f"Failed to revoke sessions on host: {str(e)}")
     
     # Removed _call_worker_cache_invalidate method - now uses host's method

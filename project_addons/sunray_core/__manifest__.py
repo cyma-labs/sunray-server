@@ -43,6 +43,11 @@ Technical Components:
         'data/ir_config_parameter.xml',
         'data/sunray_data.xml',
         
+        # Wizards (must be loaded before views that reference them)
+        'wizards/setup_token_wizard_views.xml',
+        'wizards/session_revoke_wizard_views.xml',
+        'wizards/user_sessions_revoke_wizard_views.xml',
+        
         # Views (actions must be defined before menu)
         'views/sunray_user_views.xml',
         'views/sunray_host_views.xml',
@@ -51,9 +56,6 @@ Technical Components:
         'views/sunray_audit_log_views.xml',
         'views/sunray_api_key_views.xml',
         'views/sunray_worker_views.xml',
-        
-        # Wizards
-        'wizards/setup_token_wizard_views.xml',
         
         # Menu (must be last)
         'views/sunray_menu.xml',

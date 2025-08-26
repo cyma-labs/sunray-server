@@ -164,3 +164,125 @@ class TestSecurityAuditEvents(TransactionCase):
         self.assertTrue(audit_record)
         self.assertEqual(audit_record.event_type, 'security.cross_domain_session')
         self.assertEqual(audit_record.severity, 'critical')
+    
+    def test_cache_cleared_event(self):
+        """Test cache cleared audit event creation"""
+        event_details = {
+            'scope': 'user-session',
+            'target': {
+                'hostname': 'app1.example.com',
+                'username': 'testuser',
+                'sessionId': 'sess_123'
+            },
+            'reason': 'Session revoked by admin',
+            'worker_response': {
+                'success': True,
+                'cleared': ['user-session']
+            }
+        }
+        
+        audit_record = self.AuditLog.create_audit_event(
+            event_type='cache.cleared',
+            details=event_details,
+            severity='info',
+            sunray_user_id=self.sunray_user.id,
+            sunray_worker='worker-001',
+            ip_address='192.168.1.5'
+        )
+        
+        self.assertTrue(audit_record)
+        self.assertEqual(audit_record.event_type, 'cache.cleared')
+        self.assertEqual(audit_record.severity, 'info')
+        
+        parsed_details = audit_record.get_details_dict()
+        self.assertEqual(parsed_details['scope'], 'user-session')
+        self.assertEqual(parsed_details['target']['hostname'], 'app1.example.com')
+        self.assertEqual(parsed_details['reason'], 'Session revoked by admin')
+    
+    def test_cache_clear_failed_event(self):
+        """Test cache clear failed audit event creation"""
+        event_details = {
+            'scope': 'host',
+            'target': {
+                'hostname': 'app2.example.com'
+            },
+            'reason': 'Configuration refresh',
+            'error': 'Network timeout - worker unreachable',
+            'worker_endpoint': 'https://app2.example.com/sunray-wrkr/v1/cache/clear'
+        }
+        
+        audit_record = self.AuditLog.create_audit_event(
+            event_type='cache.clear_failed',
+            details=event_details,
+            severity='error',
+            sunray_worker='worker-002',
+            ip_address='10.0.1.100'
+        )
+        
+        self.assertTrue(audit_record)
+        self.assertEqual(audit_record.event_type, 'cache.clear_failed')
+        self.assertEqual(audit_record.severity, 'error')
+        
+        parsed_details = audit_record.get_details_dict()
+        self.assertEqual(parsed_details['scope'], 'host')
+        self.assertEqual(parsed_details['error'], 'Network timeout - worker unreachable')
+        self.assertEqual(parsed_details['worker_endpoint'], 'https://app2.example.com/sunray-wrkr/v1/cache/clear')
+    
+    def test_cache_nuclear_clear_event(self):
+        """Test nuclear cache clear audit event creation"""
+        event_details = {
+            'scope': 'allusers-worker',
+            'target': {},
+            'reason': 'NUCLEAR CLEAR - Emergency session termination',
+            'affected_sessions': 15,
+            'affected_hosts': 5,
+            'worker_id': 'worker-prod-001'
+        }
+        
+        audit_record = self.AuditLog.create_audit_event(
+            event_type='cache.nuclear_clear',
+            details=event_details,
+            severity='critical',
+            sunray_worker='worker-prod-001',
+            ip_address='172.16.0.10'
+        )
+        
+        self.assertTrue(audit_record)
+        self.assertEqual(audit_record.event_type, 'cache.nuclear_clear')
+        self.assertEqual(audit_record.severity, 'critical')
+        
+        parsed_details = audit_record.get_details_dict()
+        self.assertEqual(parsed_details['scope'], 'allusers-worker')
+        self.assertIn('NUCLEAR CLEAR', parsed_details['reason'])
+        self.assertEqual(parsed_details['affected_sessions'], 15)
+        self.assertEqual(parsed_details['affected_hosts'], 5)
+    
+    def test_session_bulk_revocation_event(self):
+        """Test bulk session revocation audit event creation"""
+        event_details = {
+            'operation': 'bulk_revoke',
+            'scope': 'user-worker',
+            'username': 'testuser',
+            'sessions_revoked': 3,
+            'hosts_affected': ['app1.example.com', 'app2.example.com', 'app3.example.com'],
+            'reason': 'User account suspended'
+        }
+        
+        audit_record = self.AuditLog.create_audit_event(
+            event_type='session.bulk_revocation',
+            details=event_details,
+            severity='warning',
+            sunray_user_id=self.sunray_user.id,
+            sunray_worker='worker-hub-001',
+            ip_address='192.168.10.50'
+        )
+        
+        self.assertTrue(audit_record)
+        self.assertEqual(audit_record.event_type, 'session.bulk_revocation')
+        self.assertEqual(audit_record.severity, 'warning')
+        
+        parsed_details = audit_record.get_details_dict()
+        self.assertEqual(parsed_details['operation'], 'bulk_revoke')
+        self.assertEqual(parsed_details['sessions_revoked'], 3)
+        self.assertEqual(len(parsed_details['hosts_affected']), 3)
+        self.assertEqual(parsed_details['reason'], 'User account suspended')

@@ -168,10 +168,16 @@ bin/sunray-srvr -u sunray_core               # Update sunray_core module
 bin/sunray-srvr -u all --stop-after-init     # Update all modules and exit
 bin/sunray-srvr -i sunray_core               # Install sunray_core module
 
-# Testing - IMPORTANT: Use Only Test Launcher Scripts
+# Testing - IMPORTANT: Use Only Test Launcher Scripts and Proper Syntax Validation
 # NEVER run bin/sunray-srvr --test-enable directly
+# NEVER run direct Python import tests or syntax validation commands
 # ALWAYS use the test launcher scripts at repository root:
 
+# STEP 1: MANDATORY Syntax and Import Validation
+# Before running any tests, ALWAYS validate module syntax and imports:
+bin/sunray-srvr -u sunray_core --stop-after-init    # Updates module and validates all syntax/imports
+
+# STEP 2: Run Comprehensive Tests (only after Step 1 passes)
 bin/test_server.sh                           # Run all server tests with comprehensive reporting
 bin/test_server.sh --test TestAccessRules    # Run specific Access Rules tests
 bin/test_server.sh --coverage --verbose      # Full test run with coverage
@@ -567,6 +573,17 @@ def test_webhook(self, mock_post):
     mock_post.return_value.status_code = 200
     # Test code here
 ```
+
+#### Important Test Notes
+
+**Expected Database Constraint Violations**: The test `TestWebhookTokenMultiProvider.test_token_validation_constraints` intentionally generates 2 database constraint violation ERRORs in the log as part of testing invalid token configurations. These are expected and do not indicate test failures.
+
+**Test Success Verification**: Always check the final test result lines, not intermediate database errors:
+```
+2025-08-26 16:07:00,241 INFO odoo.tests.stats: sunray_core: 49 tests 9.37s 767 queries 
+2025-08-26 16:07:00,242 INFO odoo.tests.result: 0 failed, 0 error(s) of 41 tests
+```
+The key indicator is `0 failed, 0 error(s)` in the final result line, not database constraint violations that appear during test execution.
 
 ### Test Launcher Scripts
 

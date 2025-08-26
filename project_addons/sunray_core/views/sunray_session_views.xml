@@ -48,6 +48,14 @@
         <field name="model">sunray.session</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_open_revoke_wizard" type="object" 
+                            string="Revoke Session" 
+                            class="btn-primary"
+                            invisible="not is_active"
+                            help="Immediately terminates this specific session. The user will need to authenticate again to access protected resources. This action only affects the current session - any other active sessions for the same user will remain valid."/>
+                    <field name="is_active" widget="statusbar" statusbar_visible="True,False"/>
+                </header>
                 <sheet>
                     <group>
                         <group>

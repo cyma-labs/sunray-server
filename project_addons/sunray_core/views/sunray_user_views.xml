@@ -104,7 +104,73 @@
                         </page>
                         
                         <page string="Authorized Hosts">
-                            <field name="host_ids" />
+                            <div class="mb16">
+                                <h3>Authorized Protected Hosts</h3>
+                                <p>Hosts this user is authorized to access. Use the "Revoke Sessions" button to terminate all sessions for this user on a specific host.</p>
+                            </div>
+                            <field name="host_ids">
+                                <list>
+                                    <field name="domain"/>
+                                    <field name="sunray_worker_id" string="Worker" optional="show"/>
+                                    <field name="is_active" widget="boolean_toggle" optional="show"/>
+                                    <button name="%(action_revoke_user_sessions_on_host)d" 
+                                            string="Revoke Sessions" 
+                                            type="action" 
+                                            class="btn-warning"
+                                            context="{'default_user_id': parent.id, 'default_host_id': id}"
+                                            help="Revokes all sessions for this user on this specific protected host only. The user will need to re-authenticate to access this host, but sessions on other hosts remain valid. Use when access to a specific application needs to be temporarily restricted."
+                                            icon="fa-user-times"/>
+                                </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <field name="domain" readonly="1"/>
+                                            <field name="sunray_worker_id" readonly="1"/>
+                                            <field name="is_active" readonly="1"/>
+                                        </group>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                        
+                        <page string="Workers">
+                            <div class="mb16">
+                                <h3>Workers Protecting User's Hosts</h3>
+                                <p>Workers that protect hosts this user has access to. Use the "Revoke Sessions" button to terminate all sessions for this user across all hosts protected by a specific worker.</p>
+                            </div>
+                            <field name="worker_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="worker_type" widget="badge"/>
+                                    <field name="host_count" string="Protected Hosts"/>
+                                    <field name="is_healthy" widget="boolean_toggle" readonly="1"/>
+                                    <field name="health_status" optional="show"/>
+                                    <field name="last_seen_ts" string="Last Seen" optional="show"/>
+                                    <button name="%(action_revoke_user_sessions_on_worker)d" 
+                                            string="Revoke Sessions" 
+                                            type="action" 
+                                            class="btn-warning"
+                                            context="{'default_user_id': parent.id, 'default_worker_id': id}"
+                                            help="Revokes all sessions for this user across all protected hosts managed by this specific worker. The user will need to re-authenticate on all hosts protected by this worker. Useful when a user reports suspicious activity on their account."
+                                            icon="fa-user-times"/>
+                                </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <group>
+                                                <field name="name" readonly="1"/>
+                                                <field name="worker_type" readonly="1"/>
+                                                <field name="is_healthy" readonly="1"/>
+                                            </group>
+                                            <group>
+                                                <field name="host_count" readonly="1"/>
+                                                <field name="health_status" readonly="1"/>
+                                                <field name="last_seen_ts" readonly="1"/>
+                                            </group>
+                                        </group>
+                                    </sheet>
+                                </form>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>

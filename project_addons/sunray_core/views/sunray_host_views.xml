@@ -51,9 +51,13 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="force_cache_refresh" string="Force Cache Refresh" icon="fa-refresh" type="object" class="btn-warning"
+                    <button name="force_cache_refresh" string="Force Config Refresh" icon="fa-refresh" type="object" class="btn-warning"
+                            help="Forces the worker to immediately refresh its cached configuration for this host. Use this after making changes to access rules, webhook tokens, or other host settings that need to take effect immediately. This does not affect user sessions - users remain logged in."
                             confirm="This will immediately invalidate cached configuration for this host. Continue?"/>
-                    <button name="action_clear_pending_migration" string="Clear Pending Migration" icon="fa-times" type="object" class="btn-danger"
+                    <button name="action_clear_all_sessions" string="Clear All Sessions" icon="fa-user-times" type="object" class="btn-danger"
+                            help="Removes all active user sessions for this protected host. All users will need to re-authenticate to access this host. This is useful when you need to force all users to re-login, such as after a security policy change. Note: This does not affect the configuration cache."
+                            confirm="This will immediately terminate all active user sessions for this host. All users will need to re-authenticate. Continue?"/>
+                    <button name="action_clear_pending_migration" string="Clear Pending Migration" icon="fa-times" type="object" class="btn-secondary"
                             invisible="not pending_worker_name"
                             confirm="This will cancel the pending worker migration. Continue?"/>
                 </header>
@@ -142,6 +146,48 @@
                                                 
                         <page string="Authorized Users">
                             <field name="user_ids" />
+                        </page>
+                        
+                        <page string="Active Sessions">
+                            <div class="mb16">
+                                <h3>Active User Sessions</h3>
+                                <p>Currently active user sessions on this host. Sessions shown here are properly filtered to display only active sessions.</p>
+                                <p><strong>Active Sessions: <field name="active_session_count" readonly="1" nolabel="1" style="display:inline;"/></strong></p>
+                            </div>
+                            <field name="active_session_ids" readonly="1">
+                                <list>
+                                    <field name="session_id"/>
+                                    <field name="user_id"/>
+                                    <field name="created_at"/>
+                                    <field name="last_activity"/>
+                                    <field name="expires_at"/>
+                                    <field name="created_ip" optional="show"/>
+                                    <field name="last_ip" optional="show"/>
+                                    <field name="is_active" widget="boolean_toggle" readonly="1"/>
+                                </list>
+                                <form>
+                                    <sheet>
+                                        <group>
+                                            <group>
+                                                <field name="session_id" readonly="1"/>
+                                                <field name="user_id" readonly="1"/>
+                                                <field name="is_active" readonly="1"/>
+                                            </group>
+                                            <group>
+                                                <field name="created_at" readonly="1"/>
+                                                <field name="last_activity" readonly="1"/>
+                                                <field name="expires_at" readonly="1"/>
+                                            </group>
+                                        </group>
+                                        <group string="Security Information">
+                                            <field name="created_ip" readonly="1"/>
+                                            <field name="last_ip" readonly="1"/>
+                                            <field name="user_agent" readonly="1"/>
+                                            <field name="device_fingerprint" readonly="1"/>
+                                        </group>
+                                    </sheet>
+                                </form>
+                            </field>
                         </page>
                         
                         <page string="API &amp; Webhook Tokens">

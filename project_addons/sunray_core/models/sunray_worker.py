@@ -273,6 +273,121 @@ class SunrayWorker(models.Model):
         """Get worker associated with an API key"""
         return self.search([('api_key_id', '=', api_key_obj.id)], limit=1)
     
+    def action_clear_all_sessions_nuclear(self):
+        """Nuclear option: Clear ALL user sessions across ALL hosts protected by this worker"""
+        self.ensure_one()
+        
+        if not self.host_ids:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Protected Hosts',
+                    'message': 'This worker does not protect any hosts.',
+                    'type': 'info',
+                }
+            }
+        
+        # Count total active sessions across all hosts
+        total_active_sessions = sum(len(host.active_session_ids) for host in self.host_ids)
+        
+        if total_active_sessions == 0:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Active Sessions',
+                    'message': 'No active sessions found across all hosts protected by this worker.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            # Use the first host to call the worker (all hosts share the same worker)
+            first_host = self.host_ids[0]
+            result = first_host._call_worker_cache_clear(
+                scope='allusers-worker',
+                target={},  # No target needed for allusers-worker scope
+                reason=f'NUCLEAR: All sessions cleared on worker {self.name} by {self.env.user.name}'
+            )
+            
+            # Mark all local sessions as inactive across all hosts
+            all_active_sessions = self.env['sunray.session'].search([
+                ('host_id', 'in', self.host_ids.ids),
+                ('is_active', '=', True)
+            ])
+            
+            all_active_sessions.write({
+                'is_active': False,
+                'revoked': True,
+                'revoked_at': fields.Datetime.now(),
+                'revoked_reason': f'NUCLEAR: All sessions cleared on worker {self.name}'
+            })
+            
+            # Create critical audit log entry
+            self.env['sunray.audit.log'].create_admin_event(
+                event_type='cache.nuclear_clear',
+                details={
+                    'worker': self.name,
+                    'worker_id': self.id,
+                    'hosts_affected': len(self.host_ids),
+                    'sessions_cleared': len(all_active_sessions),
+                    'host_domains': self.host_ids.mapped('domain')
+                },
+                severity='critical'
+            )
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'NUCLEAR CLEAR COMPLETE',
+                    'message': f'Cleared {len(all_active_sessions)} active session(s) across {len(self.host_ids)} host(s). All users will need to re-authenticate on all protected applications.',
+                    'type': 'warning',
+                    'sticky': True,
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Failed nuclear session clear for worker {self.name}: {str(e)}")
+            raise UserError(f"Failed to perform nuclear session clear: {str(e)}")
+    
+    def action_force_config_refresh_all(self):
+        """Force configuration refresh for ALL hosts protected by this worker"""
+        self.ensure_one()
+        
+        if not self.host_ids:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Protected Hosts',
+                    'message': 'This worker does not protect any hosts.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            # Use the first host to call the worker (all hosts share the same worker)
+            first_host = self.host_ids[0]
+            result = first_host._call_worker_cache_clear(
+                scope='config',
+                target={},  # No target needed for config scope
+                reason=f'Configuration refresh for all hosts on worker {self.name} by {self.env.user.name}'
+            )
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Configuration Refresh Triggered',
+                    'message': f'Configuration refresh triggered for all {len(self.host_ids)} host(s) protected by this worker. Changes will take effect within 60 seconds.',
+                    'type': 'success',
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Failed config refresh for worker {self.name}: {str(e)}")
+            raise UserError(f"Failed to refresh configuration: {str(e)}")
+    
     def get_migration_status(self):
         """Get migration status for this worker's hosts
         

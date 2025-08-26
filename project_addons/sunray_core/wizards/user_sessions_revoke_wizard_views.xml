@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Revoke User Sessions Wizard Form -->
+    <record id="view_user_sessions_revoke_wizard_form" model="ir.ui.view">
+        <field name="name">sunray.user.sessions.revoke.wizard.form</field>
+        <field name="model">sunray.user.sessions.revoke.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Revoke User Sessions">
+                <group>
+                    <group>
+                        <field name="user_name" readonly="1"/>
+                        <field name="scope" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="host_domain" readonly="1" invisible="scope != 'host'"/>
+                        <field name="worker_name" readonly="1" invisible="scope != 'worker'"/>
+                        <field name="user_id" invisible="1"/>
+                        <field name="host_id" invisible="1"/>
+                        <field name="worker_id" invisible="1"/>
+                    </group>
+                </group>
+                
+                <group string="Revocation Details">
+                    <field name="reason" required="1" 
+                           placeholder="e.g., Security incident, suspicious activity, administrative action..."
+                           widget="text"/>
+                </group>
+                
+                <separator string="Warning"/>
+                <div class="alert alert-warning" role="alert" invisible="scope != 'host'">
+                    <strong>This action will terminate all active sessions for this user on the specified host.</strong>
+                    <p>The user will need to re-authenticate to access this host. Sessions on other hosts will remain active.</p>
+                </div>
+                
+                <div class="alert alert-danger" role="alert" invisible="scope != 'worker'">
+                    <strong>This action will terminate all active sessions for this user on ALL hosts protected by this worker.</strong>
+                    <p>The user will need to re-authenticate on all affected hosts. This is a broader action that affects multiple applications.</p>
+                </div>
+                
+                <footer>
+                    <button string="Revoke Sessions" name="action_revoke_sessions" 
+                            type="object" class="btn-primary" 
+                            confirm="Are you sure you want to revoke these sessions?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Action for Host-specific revocation -->
+    <record id="action_revoke_user_sessions_on_host" model="ir.actions.act_window">
+        <field name="name">Revoke User Sessions on Host</field>
+        <field name="res_model">sunray.user.sessions.revoke.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_scope': 'host'}</field>
+    </record>
+    
+    <!-- Action for Worker-specific revocation -->
+    <record id="action_revoke_user_sessions_on_worker" model="ir.actions.act_window">
+        <field name="name">Revoke User Sessions on Worker</field>
+        <field name="res_model">sunray.user.sessions.revoke.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_scope': 'worker'}</field>
+    </record>
+</odoo>

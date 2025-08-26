@@ -101,6 +101,20 @@ class SunrayHost(models.Model):
         help='Timestamp of last configuration change, used for cache invalidation'
     )
     
+    # Active sessions
+    active_session_ids = fields.One2many(
+        'sunray.session',
+        'host_id',
+        string='Active Sessions',
+        domain=[('is_active', '=', True)],
+        help='Currently active user sessions on this host'
+    )
+    active_session_count = fields.Integer(
+        string='Active Sessions Count',
+        compute='_compute_active_session_count',
+        help='Number of currently active sessions on this host'
+    )
+    
     # cURL helper fields
     server_curl_helper = fields.Text(
         string='Server cURL Helper',
@@ -174,6 +188,11 @@ class SunrayHost(models.Model):
                 now = fields.Datetime.now()
                 delta = now - record.migration_requested_at
                 record.migration_pending_duration = self._format_time_delta(delta)
+    
+    def _compute_active_session_count(self):
+        """Compute the number of active sessions for this host"""
+        for record in self:
+            record.active_session_count = len(record.active_session_ids)
     
     def _format_time_delta(self, delta):
         """Format timedelta to human-readable string"""
@@ -415,19 +434,24 @@ class SunrayHost(models.Model):
                                "Worker binding happens automatically when the worker first calls the API.")
             
             try:
-                # Call worker's cache invalidation endpoint via protected host URL
-                record._call_worker_cache_invalidate(
+                # Call worker's cache clear endpoint via protected host URL
+                record._call_worker_cache_clear(
                     scope='host',
-                    target=record.domain,
+                    target={'hostname': record.domain},
                     reason=f'Manual refresh by {self.env.user.name}'
                 )
                 
                 # Log the action
-                self.env['sunray.audit.log'].create_admin_event(
-                    event_type='cache_invalidation',
+                self.env['sunray.audit.log'].create_audit_event(
+                    event_type='cache.cleared',
                     severity='info',
-                    details=f'Cache refresh triggered for host {record.domain}',
-                    admin_user_id=self.env.user.id
+                    details={
+                        'scope': 'host',
+                        'hostname': record.domain,
+                        'operation': 'manual_host_cache_refresh',
+                        'reason': f'Manual host cache refresh by {self.env.user.name}'
+                    },
+                    sunray_admin_user_id=self.env.user.id
                 )
             except Exception as e:
                 _logger.error(f"Failed to trigger cache refresh for host {record.domain}: {str(e)}")
@@ -443,8 +467,70 @@ class SunrayHost(models.Model):
             }
         }
     
-    def _call_worker_cache_invalidate(self, scope, target=None, reason=''):
-        """Call Worker API to trigger cache invalidation"""
+    def action_clear_all_sessions(self):
+        """Clear all active sessions for this host (scope: allusers-protectedhost)"""
+        self.ensure_one()
+        
+        if not self.sunray_worker_id:
+            raise UserError(f"Host {self.domain} is not bound to a worker. "
+                           "Worker binding happens automatically when the worker first calls the API.")
+        
+        active_sessions_count = len(self.active_session_ids)
+        if active_sessions_count == 0:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'No Active Sessions',
+                    'message': 'This host has no active sessions to clear.',
+                    'type': 'info',
+                }
+            }
+        
+        try:
+            # Call worker's cache clear endpoint for all users on this host
+            result = self._call_worker_cache_clear(
+                scope='allusers-protectedhost',
+                target={'hostname': self.domain},
+                reason=f'All sessions cleared by {self.env.user.name}'
+            )
+            
+            # Mark local sessions as inactive
+            self.active_session_ids.write({
+                'is_active': False,
+                'revoked': True,
+                'revoked_at': fields.Datetime.now(),
+                'revoked_reason': 'Bulk revocation - all sessions cleared on host'
+            })
+            
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'All Sessions Cleared',
+                    'message': f'Successfully cleared {active_sessions_count} active session(s) for this host. Users will need to re-authenticate.',
+                    'type': 'success',
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Failed to clear all sessions for host {self.domain}: {str(e)}")
+            raise UserError(f"Failed to clear sessions: {str(e)}")
+    
+    def _call_worker_cache_clear(self, scope, target=None, reason=''):
+        """Call Worker API to trigger cache clearing using new cache/clear endpoint
+        
+        Args:
+            scope: One of the 7 supported scopes:
+                - user-session: Delete specific user session (requires hostname, username, sessionId)
+                - user-protectedhost: Delete all sessions for user on host (requires username, hostname)  
+                - user-worker: Delete all sessions for user across worker (requires username)
+                - allusers-protectedhost: Delete all sessions on host (requires hostname)
+                - allusers-worker: Delete ALL sessions across worker (no target needed)
+                - host: Clear configuration for host (requires hostname)
+                - config: Clear all configuration caches (no target needed)
+            target: Target parameters dict based on scope
+            reason: Reason for the cache clear operation
+        """
         self.ensure_one()
         
         if not self.sunray_worker_id:
@@ -456,27 +542,64 @@ class SunrayHost(models.Model):
         if not api_key_obj or not api_key_obj.is_active:
             raise UserError(f'No active API key found for worker {self.sunray_worker_id.name}')
         
-        # Call the worker's invalidation endpoint using protected host URL
+        # Call the worker's cache clear endpoint using protected host URL
         # We use the protected host URL, not the worker.dev URL
-        url = f"https://{self.domain}/sunray-wrkr/v1/cache/invalidate"
+        url = f"https://{self.domain}/sunray-wrkr/v1/cache/clear"
         headers = {
             'Authorization': f'Bearer {api_key_obj.key}',
             'Content-Type': 'application/json'
         }
+        
+        # Construct payload according to new API format
         payload = {
             'scope': scope,
-            'target': target,
-            'reason': reason
+            'reason': reason or f'Server-initiated cache clear for {scope}'
         }
         
-        _logger.info(f"Calling Worker cache invalidation: {url} with scope={scope}, target={target}")
+        # Add target object if provided
+        if target is not None:
+            payload['target'] = target
+        
+        _logger.info(f"Calling Worker cache clear: {url} with scope={scope}, target={target}")
         
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
             response.raise_for_status()
             result = response.json()
-            _logger.info(f"Worker cache invalidation successful: {result}")
+            _logger.info(f"Worker cache clear successful: {result}")
+            
+            # Log successful cache clear operation
+            self.env['sunray.audit.log'].create_api_event(
+                event_type='cache.cleared',
+                api_key_id=api_key_obj.id,
+                details={
+                    'scope': scope,
+                    'target': target,
+                    'reason': reason,
+                    'host': self.domain,
+                    'worker': self.sunray_worker_id.name,
+                    'cleared_items': result.get('cleared', [])
+                },
+                severity='info'
+            )
+            
             return result
         except requests.exceptions.RequestException as e:
-            _logger.error(f"Worker cache invalidation failed: {str(e)}")
-            raise UserError(f"Failed to trigger cache refresh: {str(e)}")
+            _logger.error(f"Worker cache clear failed: {str(e)}")
+            
+            # Log failed cache clear attempt
+            self.env['sunray.audit.log'].create_api_event(
+                event_type='cache.clear_failed',
+                api_key_id=api_key_obj.id,
+                details={
+                    'scope': scope,
+                    'target': target,
+                    'reason': reason,
+                    'host': self.domain,
+                    'worker': self.sunray_worker_id.name,
+                    'error': str(e)
+                },
+                severity='error'
+            )
+            
+            raise UserError(f"Failed to clear worker cache: {str(e)}")

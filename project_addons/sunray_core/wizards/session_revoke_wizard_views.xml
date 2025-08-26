@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Revoke Session Wizard Form -->
+    <record id="view_session_revoke_wizard_form" model="ir.ui.view">
+        <field name="name">sunray.session.revoke.wizard.form</field>
+        <field name="model">sunray.session.revoke.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Revoke Session">
+                <group>
+                    <group>
+                        <field name="user_name" readonly="1"/>
+                        <field name="host_domain" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="session_display" readonly="1"/>
+                        <field name="session_id" invisible="1"/>
+                    </group>
+                </group>
+                
+                <group string="Revocation Details">
+                    <field name="reason" required="1" 
+                           placeholder="e.g., Security incident, user request, administrative action..."
+                           widget="text"/>
+                </group>
+                
+                <separator string="Warning"/>
+                <div class="alert alert-warning" role="alert">
+                    <strong>This action will immediately terminate the user's session.</strong>
+                    <p>The user will need to authenticate again to access protected resources. 
+                       This action affects only this specific session.</p>
+                </div>
+                
+                <footer>
+                    <button string="Revoke Session" name="action_revoke" 
+                            type="object" class="btn-primary" 
+                            confirm="Are you sure you want to revoke this session?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

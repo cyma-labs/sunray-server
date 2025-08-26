@@ -42,3 +42,11 @@ access_sunray_audit_log_admin,sunray.audit.log admin,model_sunray_audit_log,grou
 access_sunray_setup_token_wizard_user,sunray.setup.token.wizard user,model_sunray_setup_token_wizard,group_sunray_user,1,1,1,1
 access_sunray_setup_token_wizard_manager,sunray.setup.token.wizard manager,model_sunray_setup_token_wizard,group_sunray_manager,1,1,1,1
 access_sunray_setup_token_wizard_admin,sunray.setup.token.wizard admin,model_sunray_setup_token_wizard,group_sunray_admin,1,1,1,1
+
+access_sunray_session_revoke_wizard_user,sunray.session.revoke.wizard user,model_sunray_session_revoke_wizard,group_sunray_user,1,1,1,1
+access_sunray_session_revoke_wizard_manager,sunray.session.revoke.wizard manager,model_sunray_session_revoke_wizard,group_sunray_manager,1,1,1,1
+access_sunray_session_revoke_wizard_admin,sunray.session.revoke.wizard admin,model_sunray_session_revoke_wizard,group_sunray_admin,1,1,1,1
+
+access_sunray_user_sessions_revoke_wizard_user,sunray.user.sessions.revoke.wizard user,model_sunray_user_sessions_revoke_wizard,group_sunray_user,1,1,1,1
+access_sunray_user_sessions_revoke_wizard_manager,sunray.user.sessions.revoke.wizard manager,model_sunray_user_sessions_revoke_wizard,group_sunray_manager,1,1,1,1
+access_sunray_user_sessions_revoke_wizard_admin,sunray.user.sessions.revoke.wizard admin,model_sunray_user_sessions_revoke_wizard,group_sunray_admin,1,1,1,1

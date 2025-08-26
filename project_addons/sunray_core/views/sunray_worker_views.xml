@@ -53,12 +53,22 @@
         <field name="arch" type="xml">
             <form create="false" edit="false">
                 <header>
-                    <button name="force_cache_refresh" 
+                    <button name="action_force_config_refresh_all" 
                             type="object" 
-                            string="Refresh Worker Cache" 
+                            string="Force Config Refresh (All Hosts)" 
                             class="btn-warning"
+                            icon="fa-refresh"
                             invisible="not id or host_count == 0"
-                            confirm="This will refresh cache on all hosts protected by this worker. Continue?"/>
+                            help="Forces the worker to refresh cached configurations for ALL protected hosts it manages. Use after bulk configuration changes or when troubleshooting configuration synchronization issues. This operation does not affect user sessions."
+                            confirm="This will refresh configuration cache for all hosts protected by this worker. Continue?"/>
+                    <button name="action_clear_all_sessions_nuclear" 
+                            type="object" 
+                            string="Clear All Sessions (Nuclear)" 
+                            class="btn-danger"
+                            icon="fa-nuclear"
+                            invisible="not id or host_count == 0"
+                            help="DANGER: Removes ALL user sessions across ALL protected hosts managed by this worker. Every user will be forced to re-authenticate. This is the 'nuclear option' - only use in emergencies such as suspected security breaches. Consider using host-specific session clearing for less disruptive maintenance."
+                            confirm="NUCLEAR OPTION: This will immediately terminate ALL user sessions across ALL hosts protected by this worker. ALL users will need to re-authenticate. This cannot be undone. Are you absolutely sure?"/>
                     <field name="health_status" widget="badge" decoration-success="is_healthy == True" decoration-danger="is_healthy == False"/>
                 </header>
                 <sheet>

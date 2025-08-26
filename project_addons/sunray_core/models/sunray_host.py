@@ -114,6 +114,11 @@ class SunrayHost(models.Model):
         compute='_compute_active_session_count',
         help='Number of currently active sessions on this host'
     )
+    active_user_count = fields.Integer(
+        string='Active Users Count',
+        compute='_compute_active_user_count',
+        help='Number of active users authorized for this host'
+    )
     
     # cURL helper fields
     server_curl_helper = fields.Text(
@@ -193,6 +198,12 @@ class SunrayHost(models.Model):
         """Compute the number of active sessions for this host"""
         for record in self:
             record.active_session_count = len(record.active_session_ids)
+    
+    def _compute_active_user_count(self):
+        """Compute the number of active users authorized for this host"""
+        for record in self:
+            active_users = record.user_ids.filtered('is_active')
+            record.active_user_count = len(active_users)
     
     def _format_time_delta(self, delta):
         """Format timedelta to human-readable string"""
@@ -603,3 +614,22 @@ class SunrayHost(models.Model):
             )
             
             raise UserError(f"Failed to clear worker cache: {str(e)}")
+    
+    def btn_refresh(self):
+        pass
+    
+    def action_view_active_users(self):
+        """Open list of active users authorized for this host"""
+        self.ensure_one()
+        
+        action = self.env.ref('sunray_core.action_sunray_users').read()[0]
+        action.update({
+            'display_name': f'Active Users for {self.domain}',
+            'domain': [('host_ids', 'in', [self.id])],
+            'context': {
+                'default_host_ids': [(4, self.id)],
+                'default_is_active': True,
+                'search_default_active': 1,  # Activate the 'Active' filter by default
+            }
+        })
+        return action

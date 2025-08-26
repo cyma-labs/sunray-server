@@ -240,3 +240,6 @@ class SunrayApiKey(models.Model):
         
         # Perform the deletion
         return super().unlink()
+    
+    def btn_refresh(self):
+        pass

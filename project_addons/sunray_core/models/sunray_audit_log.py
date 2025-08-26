@@ -373,3 +373,6 @@ class SunrayAuditLog(models.Model):
             except (json.JSONDecodeError, TypeError):
                 return {'raw': self.details}
         return {}
+    
+    def btn_refresh(self):
+        pass

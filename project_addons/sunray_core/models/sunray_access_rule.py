@@ -96,6 +96,9 @@ class SunrayAccessRule(models.Model):
             if not patterns:
                 raise ValidationError("At least one valid URL pattern is required!")
     
+    def btn_refresh(self):
+        pass
+
     def _parse_line_separated_field(self, field_value):
         """Parse line-separated field with comment support
         
@@ -211,3 +214,6 @@ class SunrayAccessRule(models.Model):
             name = f"[{rule.priority}] {rule.description} ({rule.access_type})"
             result.append((rule.id, name))
         return result
+    
+    def btn_refresh(self):
+        pass

@@ -464,3 +464,6 @@ class SunrayWorker(models.Model):
             )
         
         return super().unlink()
+    
+    def btn_refresh(self):
+        pass

@@ -216,3 +216,6 @@ class SunraySession(models.Model):
             vals['last_ip'] = new_ip
         self.write(vals)
         return True
+    
+    def btn_refresh(self):
+        pass

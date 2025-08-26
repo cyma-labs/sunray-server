@@ -50,6 +50,13 @@
                             confirm="This will immediately invalidate all cached data for this user across all workers. Continue?"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button"
+                                type="object"
+                                string="Refresh"
+                                icon="fa-refresh"
+                                name="btn_refresh" />
+                    </div>
                     <group>
                         <group>
                             <field name="username"/>

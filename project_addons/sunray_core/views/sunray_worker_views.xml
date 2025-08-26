@@ -69,13 +69,14 @@
                             invisible="not id or host_count == 0"
                             help="DANGER: Removes ALL user sessions across ALL protected hosts managed by this worker. Every user will be forced to re-authenticate. This is the 'nuclear option' - only use in emergencies such as suspected security breaches. Consider using host-specific session clearing for less disruptive maintenance."
                             confirm="NUCLEAR OPTION: This will immediately terminate ALL user sessions across ALL hosts protected by this worker. ALL users will need to re-authenticate. This cannot be undone. Are you absolutely sure?"/>
-                    <field name="health_status" widget="badge" decoration-success="is_healthy == True" decoration-danger="is_healthy == False"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_view_hosts" type="object" class="oe_stat_button" icon="fa-server" invisible="host_count == 0">
                             <field name="host_count" widget="statinfo" string="Protected Hosts"/>
                         </button>
+                        <button name="btn_refresh" string="Refresh" type="object" class="oe_stat_button" icon="fa-refresh"/>
+
                     </div>
                     
                     <div class="oe_title">
@@ -92,6 +93,7 @@
                             <field name="is_active" widget="boolean_toggle"/>
                         </group>
                         <group name="timestamps" string="Activity">
+                            <field name="health_status" widget="badge" decoration-success="is_healthy == True" decoration-danger="is_healthy == False"/>
                             <field name="first_seen_ts" readonly="1"/>
                             <field name="last_seen_ts" readonly="1"/>
                             <field name="last_ip" readonly="1"/>

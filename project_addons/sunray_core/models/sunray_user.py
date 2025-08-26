@@ -345,4 +345,7 @@ class SunrayUser(models.Model):
             _logger.error(f"Failed to revoke sessions for user {self.username} on host {host_obj.domain}: {str(e)}")
             raise UserError(f"Failed to revoke sessions on host: {str(e)}")
     
+    def btn_refresh(self):
+        pass
+    
     # Removed _call_worker_cache_invalidate method - now uses host's method

@@ -157,81 +157,130 @@ class SunrayUser(models.Model):
             }
         }
     
-    def force_cache_refresh(self):
-        """Trigger immediate cache refresh for this user on all allowed hosts"""
-        for record in self:
-            # Get all hosts this user has access to
-            host_objs = record.host_ids
+    def action_revoke_sessions_on_all_hosts(self):
+        """Revoke all active sessions for this user across all assigned hosts
+        
+        This method performs a bulk session revocation operation by calling
+        action_revoke_sessions_on_host() for each host the user is assigned to.
+        
+        The operation will:
+        - Clear cached authentication data from all workers
+        - Mark all active sessions as revoked in the database  
+        - Force immediate re-authentication on next access attempt
+        - Generate comprehensive audit logs for the operation
+        
+        Use cases:
+        - Immediate security response (suspected account compromise)
+        - Force policy updates to take effect immediately
+        - Clear stale authentication after permission changes
+        - Troubleshoot authentication issues across multiple hosts
+        
+        Returns:
+            dict: Odoo client action showing consolidated results from all hosts
             
-            if not host_objs:
-                raise UserError(f"User {record.username} has no assigned hosts. "
-                               "Assign the user to hosts first.")
-            
-            success_count = 0
-            failed_hosts = []
-            unbound_hosts = []
-            
-            for host_obj in host_objs:
-                # Check if host is bound to a worker
-                if not host_obj.sunray_worker_id:
-                    unbound_hosts.append(host_obj.domain)
-                    continue
+        Raises:
+            UserError: If user has no assigned hosts or all operations fail
+        """
+        self.ensure_one()
+        
+        # Get all hosts this user has access to
+        host_objs = self.host_ids
+        
+        if not host_objs:
+            raise UserError(f"User {self.username} has no assigned hosts. "
+                           "Assign the user to hosts first.")
+        
+        # Track results from each host operation
+        success_hosts = []
+        failed_hosts = []
+        unbound_hosts = []
+        no_session_hosts = []
+        total_sessions_revoked = 0
+        
+        for host_obj in host_objs:
+            # Check if host is bound to a worker
+            if not host_obj.sunray_worker_id:
+                unbound_hosts.append(host_obj.domain)
+                continue
                 
-                try:
-                    # Call worker's cache clear endpoint for this host
-                    host_obj._call_worker_cache_clear(
-                        scope='user-protectedhost',
-                        target={'username': record.username, 'hostname': host_obj.domain},
-                        reason=f'Manual user refresh by {self.env.user.name}'
-                    )
-                    success_count += 1
-                except Exception as e:
-                    _logger.error(f"Failed to refresh cache for user {record.username} on host {host_obj.domain}: {str(e)}")
-                    failed_hosts.append(f'{host_obj.domain}: {str(e)}')
-            
-            # Log the action
-            self.env['sunray.audit.log'].create_audit_event(
-                event_type='cache.cleared',
-                severity='info',
-                details={
-                    'scope': 'user-protectedhost',
-                    'username': record.username,
-                    'hosts_count': success_count,
-                    'operation': 'manual_user_cache_refresh',
-                    'reason': f'Manual user cache refresh by {self.env.user.name}'
-                },
-                sunray_user_id=record.id,
-                sunray_admin_user_id=self.env.user.id,
-                username=record.username
-            )
-            
-            # Handle errors and warnings
-            if unbound_hosts and not success_count:
-                raise UserError(f"Cannot refresh cache for user {record.username}. "
-                               f"All hosts ({', '.join(unbound_hosts)}) are not yet bound to workers. "
-                               "Worker binding happens automatically when workers first call the API.")
-            elif failed_hosts and not success_count:
-                raise UserError(f"Failed to refresh cache for user {record.username} on all hosts: "
-                               f"{', '.join(failed_hosts)}")
+            try:
+                # Reuse existing method to handle each host
+                result = self.action_revoke_sessions_on_host(host_obj.id)
+                
+                # Parse the result to track success/failure
+                if result['params']['type'] == 'success':
+                    success_hosts.append(host_obj.domain)
+                    # Extract session count from message
+                    message = result['params']['message']
+                    if 'Revoked' in message:
+                        # Extract number from "Revoked X session(s)"
+                        import re
+                        match = re.search(r'Revoked (\d+) session', message)
+                        if match:
+                            total_sessions_revoked += int(match.group(1))
+                elif result['params']['type'] == 'info':
+                    # No active sessions on this host
+                    no_session_hosts.append(host_obj.domain)
+                    
+            except Exception as e:
+                _logger.error(f"Failed to revoke sessions for user {self.username} on host {host_obj.domain}: {str(e)}")
+                failed_hosts.append(f'{host_obj.domain}: {str(e)}')
         
-        # Build result message
+        # Create consolidated audit log entry
+        self.env['sunray.audit.log'].create_audit_event(
+            event_type='sessions.bulk_revoked',
+            severity='info',
+            details={
+                'operation': 'revoke_sessions_all_hosts',
+                'username': self.username,
+                'total_hosts': len(host_objs),
+                'success_hosts': success_hosts,
+                'failed_hosts': [h.split(':')[0] for h in failed_hosts],
+                'unbound_hosts': unbound_hosts,
+                'no_session_hosts': no_session_hosts,
+                'total_sessions_revoked': total_sessions_revoked,
+                'reason': f'Bulk session revocation by {self.env.user.name}'
+            },
+            sunray_user_id=self.id,
+            sunray_admin_user_id=self.env.user.id,
+            username=self.username
+        )
+        
+        # Handle complete failure cases
+        if unbound_hosts and not success_hosts and not no_session_hosts:
+            raise UserError(f"Cannot revoke sessions for user {self.username}. "
+                           f"All hosts ({', '.join(unbound_hosts)}) are not yet bound to workers. "
+                           "Worker binding happens automatically when workers first call the API.")
+        elif failed_hosts and not success_hosts and not no_session_hosts:
+            raise UserError(f"Failed to revoke sessions for user {self.username} on all hosts: "
+                           f"{', '.join(failed_hosts)}")
+        
+        # Build consolidated result message
         message_parts = []
-        if success_count:
-            message_parts.append(f'Successfully refreshed {success_count} host(s)')
+        if success_hosts:
+            message_parts.append(f'Successfully revoked sessions on {len(success_hosts)} host(s): {", ".join(success_hosts)}')
+        if no_session_hosts:
+            message_parts.append(f'{len(no_session_hosts)} host(s) had no active sessions: {", ".join(no_session_hosts)}')
         if unbound_hosts:
-            message_parts.append(f'{len(unbound_hosts)} host(s) not bound to workers: {', '.join(unbound_hosts)}')
+            message_parts.append(f'{len(unbound_hosts)} host(s) not bound to workers: {", ".join(unbound_hosts)}')
         if failed_hosts:
-            message_parts.append(f'{len(failed_hosts)} host(s) failed: {', '.join(failed_hosts)}')
+            message_parts.append(f'{len(failed_hosts)} host(s) failed: {", ".join(failed_hosts)}')
+            
+        if total_sessions_revoked > 0:
+            message_parts.insert(0, f'Total sessions revoked: {total_sessions_revoked}')
         
+        # Determine notification type
         notification_type = 'success'
-        if failed_hosts or unbound_hosts:
+        if failed_hosts:
             notification_type = 'warning'
+        elif not success_hosts and no_session_hosts:
+            notification_type = 'info'
         
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': 'Cache Refresh Results',
+                'title': 'Bulk Session Revocation Results',
                 'message': '. '.join(message_parts),
                 'type': notification_type,
                 'sticky': bool(failed_hosts),  # Stick error messages

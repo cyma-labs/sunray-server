@@ -46,8 +46,9 @@
             <form>
                 <header>
                     <button name="generate_setup_token" string="Generate Setup Token" type="object" icon="fa-plus-circle" class="btn-warning"/>
-                    <button name="force_cache_refresh" string="Force Cache Refresh" icon="fa-refresh" type="object" class="btn-warning" 
-                            confirm="This will immediately invalidate all cached data for this user across all workers. Continue?"/>
+                    <button name="action_revoke_sessions_on_all_hosts" string="Revoke All Sessions" icon="fa-ban" type="object" class="btn-danger"
+                            help="Immediately revokes ALL active sessions for this user across ALL Protected Hosts, forcing re-authentication everywhere. Use for security incidents or when permission changes need to take effect immediately." 
+                            confirm="This will immediately revoke ALL active sessions for this user across ALL assigned hosts, forcing re-authentication everywhere. Continue?"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">

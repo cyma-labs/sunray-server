@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
+
 from odoo import http, fields
 from odoo.http import request, Response
-import json
 import hashlib
+import json
+import logging
+
 from datetime import datetime, timedelta
+
+_logger = logging.getLogger(__name__)
 
 
 class SunrayRESTController(http.Controller):

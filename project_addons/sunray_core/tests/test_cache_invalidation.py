@@ -180,39 +180,41 @@ class TestCacheInvalidation(TransactionCase):
         self.assertEqual(result['type'], 'ir.actions.client')
         self.assertEqual(result['tag'], 'display_notification')
     
-    @patch('requests.post')
-    def test_force_cache_refresh_user(self, mock_post):
-        """Test force_cache_refresh method on user model"""
-        # Configure mock response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'success': True,
-            'message': 'Cache invalidation triggered'
+    @patch('odoo.addons.sunray_core.models.sunray_user.SunrayUser.action_revoke_sessions_on_host')
+    @patch('odoo.addons.sunray_core.models.sunray_audit_log.SunrayAuditLog.create_audit_event')
+    def test_action_revoke_sessions_on_all_hosts_user(self, mock_audit_log, mock_revoke_host):
+        """Test action_revoke_sessions_on_all_hosts method on user model"""
+        # Configure mock response from action_revoke_sessions_on_host
+        mock_revoke_host.return_value = {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Sessions Revoked',
+                'message': 'Revoked 2 session(s) for user testuser on host test.example.com.',
+                'type': 'success',
+            }
         }
-        mock_post.return_value = mock_response
         
-        # Worker URL is now taken from the host's worker relationship
+        # Call action_revoke_sessions_on_all_hosts
+        result = self.user.action_revoke_sessions_on_all_hosts()
         
-        # Call force_cache_refresh
-        result = self.user.force_cache_refresh()
+        # Verify the underlying method was called once (for one host)
+        mock_revoke_host.assert_called_once_with(self.host.id)
         
-        # Verify API call was made
-        mock_post.assert_called_once()
-        call_args = mock_post.call_args
+        # Check the consolidated result
+        self.assertEqual(result['type'], 'ir.actions.client')
+        self.assertEqual(result['tag'], 'display_notification')
+        self.assertEqual(result['params']['title'], 'Bulk Session Revocation Results')
+        self.assertIn('Total sessions revoked: 2', result['params']['message'])
+        self.assertIn('Successfully revoked sessions on 1 host(s)', result['params']['message'])
         
-        # Check payload - new API format with target object
-        payload = call_args[1]['json']
-        self.assertEqual(payload['scope'], 'user-protectedhost')
-        self.assertEqual(payload['target'], {'username': 'testuser', 'hostname': 'test.example.com'})
-        self.assertIn('Manual user refresh', payload['reason'])
-        
-        # Check audit log was created with new event type
-        audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'cache.cleared'),
-            ('sunray_user_id', '=', self.user.id)
-        ], limit=1)
-        self.assertTrue(audit_log)
+        # Verify audit log creation was called
+        mock_audit_log.assert_called_once()
+        audit_call = mock_audit_log.call_args
+        self.assertEqual(audit_call[1]['event_type'], 'sessions.bulk_revoked')
+        self.assertEqual(audit_call[1]['severity'], 'info')
+        self.assertEqual(audit_call[1]['details']['operation'], 'revoke_sessions_all_hosts')
+        self.assertEqual(audit_call[1]['sunray_user_id'], self.user.id)
     
     @patch('requests.post')
     def test_force_cache_refresh_error_handling(self, mock_post):

@@ -39,6 +39,7 @@ class SunrayAuditLog(models.Model):
         ('session.created', 'Session Created'),
         ('session.revoked', 'Session Revoked'),
         ('session.expired', 'Session Expired'),
+        ('session.bulk_revocation', 'Bulk Session Revocation'),
         # Webhook Events
         ('webhook.used', 'Webhook Token Used'),
         ('webhook.regenerated', 'Webhook Token Regenerated'),
@@ -52,8 +53,6 @@ class SunrayAuditLog(models.Model):
         ('cache.clear_failed', 'Cache Clear Failed'),
         ('cache.nuclear_clear', 'Nuclear Cache Clear'),
         # Session Events  
-        ('session.revoked', 'Session Revoked'),
-        ('session.bulk_revocation', 'Bulk Session Revocation'),
         # WAF Bypass Events
         ('waf_bypass.created', 'WAF Bypass Cookie Created'),
         ('waf_bypass.validated', 'WAF Bypass Validated'),
@@ -65,7 +64,6 @@ class SunrayAuditLog(models.Model):
         ('waf_bypass.tamper.ip_change', 'WAF Bypass Tamper: IP Changed'),
         ('waf_bypass.tamper.ua_change', 'WAF Bypass Tamper: User-Agent Changed'),
         ('waf_bypass.error', 'WAF Bypass Error'),
-        ('waf_bypass.unknown', 'WAF Bypass Unknown'),
         # Worker Migration Events
         ('worker.registered', 'Worker Registered'),
         ('worker.re_registered', 'Worker Re-registered'),
@@ -83,6 +81,7 @@ class SunrayAuditLog(models.Model):
         ('security.cross_domain_session', 'Cross-Domain Session Attempt'),
         ('security.host_id_mismatch', 'Host ID Mismatch'),
         ('security.unmanaged_host_access', 'Unmanaged Host Access'),
+        ('security.worker_direct_access', 'Worker Direct Access'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
         ('SESSION_IP_CHANGED', 'Session IP Changed'),
         ('SESSION_COUNTRY_CHANGED', 'Session Country Changed'),

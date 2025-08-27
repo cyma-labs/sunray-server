@@ -126,8 +126,6 @@ class SunrayPasskey(models.Model):
     public_key = fields.Text(string='Public Key', required=True)
     name = fields.Char(string='Device Name', required=True)
     last_used = fields.Datetime()
-    backup_eligible = fields.Boolean(string='Backup Eligible')
-    backup_state = fields.Boolean(string='Backup State')
     
     # Audit fields
     created_ip = fields.Char(string='Registration IP')
@@ -528,9 +526,7 @@ def get_config(self, **kwargs):
                 'credential_id': passkey.credential_id,
                 'public_key': passkey.public_key,
                 'name': passkey.name,
-                'created_at': passkey.created_date.isoformat(),
-                'backup_eligible': passkey.backup_eligible,
-                'backup_state': passkey.backup_state
+                'created_at': passkey.created_date.isoformat()
             })
     
     # Add hosts
@@ -773,8 +769,6 @@ def register_passkey(self, username, credential_id, public_key, name, client_ip,
         'name': name,
         'created_ip': client_ip,
         'created_user_agent': user_agent,
-        'backup_eligible': kwargs.get('backup_eligible', False),
-        'backup_state': kwargs.get('backup_state', False)
     })
     
     # Log event
@@ -899,7 +893,6 @@ def register_passkey(self, username, credential_id, public_key, name, client_ip,
                                 <field name="name"/>
                                 <field name="create_date"/>
                                 <field name="last_used"/>
-                                <field name="backup_state"/>
                                 <button name="revoke" string="Revoke" type="object" icon="fa-trash"/>
                             </tree>
                         </field>

@@ -18,6 +18,12 @@
               action="action_sunray_users"
               sequence="10"/>
               
+    <menuitem id="menu_sunray_passkeys" 
+              name="WebAuthn Passkeys" 
+              parent="menu_sunray_config" 
+              action="action_sunray_passkeys"
+              sequence="15"/>
+              
     <menuitem id="menu_sunray_hosts" 
               name="Protected Hosts" 
               parent="menu_sunray_config" 

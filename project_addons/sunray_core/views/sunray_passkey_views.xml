@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_sunray_passkey_list" model="ir.ui.view">
+        <field name="name">sunray.passkey.list</field>
+        <field name="model">sunray.passkey</field>
+        <field name="arch" type="xml">
+            <list string="WebAuthn Passkeys" default_order="create_date desc">
+                <field name="user_id"/>
+                <field name="name"/>
+                <field name="host_domain" required="1"/>
+                <field name="credential_id" optional="show"/>
+                <field name="last_used"/>
+                <field name="created_ip" optional="hide"/>
+                <field name="create_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_sunray_passkey_form" model="ir.ui.view">
+        <field name="name">sunray.passkey.form</field>
+        <field name="model">sunray.passkey</field>
+        <field name="arch" type="xml">
+            <form string="WebAuthn Passkey">
+                <sheet>
+                    <group>
+                        <group string="Passkey Information">
+                            <field name="user_id" readonly="context.get('from_user_form', False)"/>
+                            <field name="name"/>
+                            <field name="host_domain" 
+                                   readonly="1" 
+                                   required="1"
+                                   help="WebAuthn Relying Party ID (rpId) - The domain this passkey is cryptographically bound to per WebAuthn specification. Each passkey can only be used on the domain it was registered for, preventing phishing attacks. Empty value indicates a legacy passkey that requires re-registration for security compliance."/>
+                            <field name="credential_id" readonly="1"/>
+                        </group>
+                        <group string="Security Details">
+                            <field name="last_used" readonly="1"/>
+                            <field name="created_ip" readonly="1"/>
+                            <field name="created_user_agent" readonly="1" invisible="not created_user_agent"/>
+                            <field name="create_date" string="Registered" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Technical Details" groups="base.group_no_one">
+                        <field name="public_key" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_sunray_passkey_search" model="ir.ui.view">
+        <field name="name">sunray.passkey.search</field>
+        <field name="model">sunray.passkey</field>
+        <field name="arch" type="xml">
+            <search string="Search Passkeys">
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="host_domain"/>
+                <field name="credential_id"/>
+                <separator/>
+                <filter name="no_domain" string="No Domain" domain="[('host_domain', '=', False)]"/>
+                <filter name="has_domain" string="Has Domain" domain="[('host_domain', '!=', False)]"/>
+                <separator/>
+                <filter name="used_recently" string="Used Recently" domain="[('last_used', '>', datetime.datetime.now() - datetime.timedelta(days=7))]"/>
+                <filter name="never_used" string="Never Used" domain="[('last_used', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_host" string="Host Domain" context="{'group_by': 'host_domain'}"/>
+                    <filter name="group_create_month" string="Registration Month" context="{'group_by': 'create_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_sunray_passkeys" model="ir.actions.act_window">
+        <field name="name">WebAuthn Passkeys</field>
+        <field name="res_model">sunray.passkey</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No passkeys registered yet
+            </p>
+            <p>
+                WebAuthn passkeys are cryptographically bound to specific host domains (rpId).
+                Users must register separate passkeys for each protected host they access.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -119,17 +119,11 @@ class TestCacheInvalidation(TransactionCase):
             # Check response structure
             self.assertIn('config_version', data)
             self.assertIn('host_versions', data)
-            self.assertIn('user_versions', data)
             
             # Check host version is included
             self.assertIn(self.host.domain, data['host_versions'])
             host_version = datetime.fromisoformat(data['host_versions'][self.host.domain])
             self.assertEqual(host_version, self.host.config_version)
-            
-            # Check user version is included
-            self.assertIn(self.user.username, data['user_versions'])
-            user_version = datetime.fromisoformat(data['user_versions'][self.user.username])
-            self.assertEqual(user_version, self.user.config_version)
     
     @patch('requests.post')
     def test_force_cache_refresh_host(self, mock_post):
@@ -378,7 +372,7 @@ class TestCacheInvalidation(TransactionCase):
                 parsed = datetime.fromisoformat(version_str)
                 self.assertIsInstance(parsed, datetime)
             
-            # User versions should be parseable
-            for username, version_str in data['user_versions'].items():
+            # Host versions should be parseable
+            for domain, version_str in data['host_versions'].items():
                 parsed = datetime.fromisoformat(version_str)
                 self.assertIsInstance(parsed, datetime)

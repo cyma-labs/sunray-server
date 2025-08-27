@@ -34,13 +34,13 @@ class SunrayPasskey(models.Model):
         string='Last Used',
         help='Last authentication timestamp'
     )
-    backup_eligible = fields.Boolean(
-        string='Backup Eligible',
-        help='Whether this passkey is backed up in cloud'
-    )
-    backup_state = fields.Boolean(
-        string='Backup State',
-        help='Current backup status'
+    
+    # WebAuthn rpId binding - CRITICAL for security
+    host_domain = fields.Char(
+        string='Registered Host Domain',
+        required=False,  # Allow blank for existing records to force re-registration
+        index=True,
+        help='The host domain (rpId) this passkey is bound to per WebAuthn spec. Empty value means passkey needs re-registration to comply with WebAuthn security requirements.'
     )
     
     # Audit fields

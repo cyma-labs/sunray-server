@@ -182,39 +182,8 @@ class SunrayRESTController(http.Controller):
             'generated_at': fields.Datetime.now().isoformat(),
             'config_version': fields.Datetime.now().isoformat(),  # Global config version
             'host_versions': {},  # Per-host versions
-            'user_versions': {},  # Recently modified user versions
-            'users': {},
             'hosts': []
         }
-        
-        # Add users and track recently modified versions
-        user_objs = request.env['sunray.user'].sudo().search([('is_active', '=', True)])
-        
-        # Include users modified in the last 5 minutes
-        five_minutes_ago = fields.Datetime.now() - timedelta(minutes=5)
-        
-        for user_obj in user_objs:
-            config['users'][user_obj.username] = {
-                'email': user_obj.email,
-                'display_name': user_obj.display_name or user_obj.username,
-                'created_at': user_obj.create_date.isoformat(),
-                'passkeys': []
-            }
-            
-            # Track version for recently modified users
-            if user_obj.config_version and user_obj.config_version > five_minutes_ago:
-                config['user_versions'][user_obj.username] = user_obj.config_version.isoformat()
-            
-            # Add passkeys
-            for passkey in user_obj.passkey_ids:
-                config['users'][user_obj.username]['passkeys'].append({
-                    'credential_id': passkey.credential_id,
-                    'public_key': passkey.public_key,
-                    'name': passkey.name,
-                    'created_at': passkey.create_date.isoformat(),
-                    'backup_eligible': passkey.backup_eligible,
-                    'backup_state': passkey.backup_state
-                })
         
         # Add hosts with version tracking
         host_objs = request.env['sunray.host'].sudo().search([('is_active', '=', True)])
@@ -226,7 +195,7 @@ class SunrayRESTController(http.Controller):
             host_config = {
                 'domain': host_obj.domain,
                 'backend': host_obj.backend_url,
-                'authorized_users': host_obj.user_ids.mapped('username'),
+                'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
                 
                 # NEW: Access Rules - unified exceptions tree
@@ -449,35 +418,14 @@ class SunrayRESTController(http.Controller):
             'host': {
                 'domain': host_obj.domain,
                 'backend': host_obj.backend_url,
-                'authorized_users': host_obj.user_ids.mapped('username'),
+                'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
                 'config_version': host_obj.config_version.isoformat() if host_obj.config_version else None
-            },
-            'users': {}
-        }
-        
-        # Add user data for authorized users only
-        for user_obj in host_obj.user_ids.filtered(lambda u: u.is_active):
-            config['users'][user_obj.username] = {
-                'email': user_obj.email,
-                'display_name': user_obj.display_name or user_obj.username,
-                'created_at': user_obj.create_date.isoformat(),
-                'passkeys': []
             }
-            
-            # Add passkeys
-            for passkey in user_obj.passkey_ids:
-                config['users'][user_obj.username]['passkeys'].append({
-                    'credential_id': passkey.credential_id,
-                    'public_key': passkey.public_key,
-                    'name': passkey.name,
-                    'created_at': passkey.create_date.isoformat(),
-                    'backup_eligible': passkey.backup_eligible,
-                    'backup_state': passkey.backup_state
-                })
+        }
         
         # Audit log successful registration
         request.env['sunray.audit.log'].sudo().create_api_event(
@@ -487,8 +435,7 @@ class SunrayRESTController(http.Controller):
                 'worker_id': worker_obj.id,
                 'worker_name': worker_name,
                 'host_id': host_obj.id,
-                'hostname': hostname,
-                'user_count': len(config['users'])
+                'hostname': hostname
             },
             ip_address=request.httprequest.environ.get('REMOTE_ADDR')
         )
@@ -551,35 +498,14 @@ class SunrayRESTController(http.Controller):
             'host': {
                 'domain': host_obj.domain,
                 'backend': host_obj.backend_url,
-                'authorized_users': host_obj.user_ids.mapped('username'),
+                'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
                 'config_version': host_obj.config_version.isoformat() if host_obj.config_version else None
-            },
-            'users': {}
-        }
-        
-        # Add user data for authorized users only
-        for user_obj in host_obj.user_ids.filtered(lambda u: u.is_active):
-            config['users'][user_obj.username] = {
-                'email': user_obj.email,
-                'display_name': user_obj.display_name or user_obj.username,
-                'created_at': user_obj.create_date.isoformat(),
-                'passkeys': []
             }
-            
-            # Add passkeys
-            for passkey in user_obj.passkey_ids:
-                config['users'][user_obj.username]['passkeys'].append({
-                    'credential_id': passkey.credential_id,
-                    'public_key': passkey.public_key,
-                    'name': passkey.name,
-                    'created_at': passkey.create_date.isoformat(),
-                    'backup_eligible': passkey.backup_eligible,
-                    'backup_state': passkey.backup_state
-                })
+        }
         
         # Setup request context and log config fetch
         context_data = self._setup_request_context(request)
@@ -587,8 +513,7 @@ class SunrayRESTController(http.Controller):
             event_type='config.host_fetched',
             details={
                 'worker_id': context_data['worker_id'],
-                'hostname': hostname,
-                'user_count': len(config['users'])
+                'hostname': hostname
             },
             sunray_worker=context_data['worker_id'],
             ip_address=request.httprequest.environ.get('REMOTE_ADDR')
@@ -736,16 +661,32 @@ class SunrayRESTController(http.Controller):
         if not user_obj:
             return self._error_response('User not found', 404)
         
-        # Create passkey
+        # Validate host_domain is provided and exists
+        host_domain = data.get('host_domain')
+        if not host_domain:
+            return self._error_response('host_domain is required for passkey registration', 400)
+
+        host_obj = request.env['sunray.host'].sudo().search([
+            ('domain', '=', host_domain),
+            ('is_active', '=', True)
+        ])
+
+        if not host_obj:
+            return self._error_response(f'Unknown host domain: {host_domain}', 400)
+
+        # Check if user is authorized for this host
+        if user_obj not in host_obj.user_ids:
+            return self._error_response(f'User not authorized for host: {host_domain}', 403)
+
+        # Create passkey with domain binding
         passkey_obj = request.env['sunray.passkey'].sudo().create({
             'user_id': user_obj.id,
             'credential_id': data.get('credential_id'),
             'public_key': data.get('public_key'),
             'name': data.get('name'),
+            'host_domain': host_domain,  # Bind to specific domain
             'created_ip': data.get('client_ip'),
-            'created_user_agent': data.get('user_agent'),
-            'backup_eligible': data.get('backup_eligible', False),
-            'backup_state': data.get('backup_state', False)
+            'created_user_agent': data.get('user_agent')
         })
         
         # Setup request context and log event
@@ -802,13 +743,43 @@ class SunrayRESTController(http.Controller):
         # In production, this should verify the signature using the public key
         credential_id = credential.get('id')
         
-        # Find matching passkey
+        # Validate host_domain is provided
+        if not host_domain:
+            return self._error_response('host_domain is required for authentication', 400)
+
+        # Find matching passkey that is bound to the requesting host
         passkey_obj = request.env['sunray.passkey'].sudo().search([
             ('user_id', '=', user_obj.id),
-            ('credential_id', '=', credential_id)
+            ('credential_id', '=', credential_id),
+            ('host_domain', '=', host_domain)  # CRITICAL: Verify domain binding
         ])
         
         if not passkey_obj:
+            # Check if passkey exists but for wrong domain or no domain
+            wrong_domain_passkey = request.env['sunray.passkey'].sudo().search([
+                ('user_id', '=', user_obj.id),
+                ('credential_id', '=', credential_id)
+            ])
+            
+            if wrong_domain_passkey:
+                # Log security event for domain mismatch (including empty domain)
+                request.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='security.passkey_domain_mismatch',
+                    details={
+                        'username': username,
+                        'credential_id': credential_id,
+                        'requested_domain': host_domain,
+                        'registered_domain': wrong_domain_passkey.host_domain or 'empty',
+                        'user_agent': request.httprequest.headers.get('User-Agent')
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    ip_address=data.get('client_ip'),
+                    username=username
+                )
+                # Return generic error - don't reveal if it's legacy or wrong domain
+                return self._error_response('Invalid credential', 404)
+            
             return self._error_response('Invalid credential', 404)
         
         # Update last used timestamp

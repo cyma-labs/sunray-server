@@ -177,31 +177,11 @@ The `/config/register` endpoint handles all migration logic:
   "host_versions": {
     "example.com": "2024-01-01T11:55:00Z"
   },
-  "user_versions": {
-    "user@example.com": "2024-01-01T11:58:00Z"
-  },
-  "users": {
-    "user@example.com": {
-      "email": "user@example.com",
-      "display_name": "User Name",
-      "created_at": "2023-01-01T00:00:00Z",
-      "passkeys": [
-        {
-          "credential_id": "credential_id_base64",
-          "public_key": "public_key_base64",
-          "name": "MacBook Pro",
-          "created_at": "2023-01-01T00:00:00Z",
-          "backup_eligible": true,
-          "backup_state": true
-        }
-      ]
-    }
-  },
   "hosts": [
     {
       "domain": "example.com",
       "backend": "https://backend.example.com",
-      "authorized_users": ["user@example.com"],
+      "nb_authorized_users": 1,
       "session_duration_s": 3600,
       "exceptions_tree": {
         "public_patterns": ["/health", "/status"],
@@ -240,8 +220,6 @@ The `/config/register` endpoint handles all migration logic:
 - `generated_at`: Timestamp when config was generated
 - `config_version`: Global configuration version timestamp
 - `host_versions`: Map of domain to last modification timestamp
-- `user_versions`: Map of recently modified users (last 5 minutes) to modification timestamp
-- `users`: Map of username to user details including passkeys
 - `hosts`: Array of host configurations
 
 **Host Configuration Fields**:
@@ -256,9 +234,8 @@ The `/config/register` endpoint handles all migration logic:
 - `worker_name`: Name of the worker protecting this host (null if not yet bound)
 
 **Version Tracking**:
-- `host_versions` and `user_versions` allow workers to detect configuration changes
+- `host_versions` allows workers to detect configuration changes
 - Workers can use these for cache invalidation strategies
-- Only recently modified users (last 5 minutes) appear in `user_versions`
 
 ### GET /sunray-srvr/v1/config/{hostname}
 
@@ -322,9 +299,7 @@ The `/config/register` endpoint handles all migration logic:
           "credential_id": "credential_id_base64",
           "public_key": "public_key_base64",
           "name": "MacBook Pro",
-          "created_at": "2023-01-01T00:00:00Z",
-          "backup_eligible": true,
-          "backup_state": true
+          "created_at": "2023-01-01T00:00:00Z"
         }
       ]
     }
@@ -424,9 +399,7 @@ The `/config/register` endpoint handles all migration logic:
           "credential_id": "credential_id_base64",
           "public_key": "public_key_base64",
           "name": "MacBook Pro",
-          "created_at": "2023-01-01T00:00:00Z",
-          "backup_eligible": true,
-          "backup_state": true
+          "created_at": "2023-01-01T00:00:00Z"
         }
       ]
     }
@@ -693,7 +666,7 @@ curl -X POST https://sunray-server.example.com/sunray-srvr/v1/setup-tokens/valid
 
 ### POST /sunray-srvr/v1/auth/verify
 
-**Purpose**: Verifies WebAuthn access control response (does NOT create session).
+**Purpose**: Verify passkey authentication. Verifies WebAuthn access control response (does NOT create session).
 
 **Request Body**:
 ```json

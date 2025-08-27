@@ -81,7 +81,6 @@
                                     <field name="credential_id" readonly="1"/>
                                     <field name="create_date" readonly="1"/>
                                     <field name="last_used" readonly="1"/>
-                                    <field name="backup_state"/>
                                 </list>
                             </field>
                         </page>

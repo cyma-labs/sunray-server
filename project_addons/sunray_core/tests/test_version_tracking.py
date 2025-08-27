@@ -116,12 +116,10 @@ class TestVersionTracking(TransactionCase):
         
         # Simulate what the controller does
         config = {
-            'version': 3,
+            'version': 4,
             'generated_at': fields.Datetime.now().isoformat(),
             'config_version': fields.Datetime.now().isoformat(),
             'host_versions': {},
-            'user_versions': {},
-            'users': {},
             'hosts': []
         }
         
@@ -129,19 +127,11 @@ class TestVersionTracking(TransactionCase):
         if self.test_host.config_version:
             config['host_versions'][self.test_host.domain] = self.test_host.config_version.isoformat()
         
-        # Add user version if recently modified
-        five_minutes_ago = fields.Datetime.now() - timedelta(minutes=5)
-        if self.test_user.config_version and self.test_user.config_version > five_minutes_ago:
-            config['user_versions'][self.test_user.username] = self.test_user.config_version.isoformat()
-        
         # Verify structure
         self.assertIn('config_version', config, "Config should have global version")
         self.assertIn('host_versions', config, "Config should have host versions")
-        self.assertIn('user_versions', config, "Config should have user versions")
         self.assertIn(self.test_host.domain, config['host_versions'], 
                      "Test host should be in host versions")
-        self.assertIn(self.test_user.username, config['user_versions'],
-                     "Recently modified user should be in user versions")
     
     def test_host_authorized_users_change_updates_version(self):
         """Test that changing authorized users updates host version"""

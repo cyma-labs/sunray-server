@@ -585,6 +585,18 @@ class SunrayRESTController(http.Controller):
                 'name': host.domain
             })
         
+        # Get passkeys data
+        passkeys = []
+        for passkey in user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
         # Build response data
         user_data = {
             'username': user_obj.username,
@@ -595,6 +607,7 @@ class SunrayRESTController(http.Controller):
             'active_session_count': user_obj.active_session_count,
             'last_login': user_obj.last_login.isoformat() if user_obj.last_login else None,
             'authorized_hosts': authorized_hosts,
+            'passkeys': passkeys,
             'config_version': user_obj.config_version.isoformat() if user_obj.config_version else None
         }
         

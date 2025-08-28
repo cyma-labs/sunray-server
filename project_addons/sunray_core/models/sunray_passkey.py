@@ -40,6 +40,11 @@ class SunrayPasskey(models.Model):
         string='Last Used',
         help='Last authentication timestamp'
     )
+    counter = fields.Integer(
+        string='Authentication Counter',
+        default=0,
+        help='WebAuthn authentication counter for replay attack prevention. Must increment on each successful authentication.'
+    )
     
     # WebAuthn rpId binding - CRITICAL for security
     host_domain = fields.Char(

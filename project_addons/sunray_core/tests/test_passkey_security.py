@@ -714,3 +714,233 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         self.assertIn('security.passkey.token_expired', event_types)
         self.assertIn('passkey.registered', event_types)
         self.assertIn('security.passkey.token_already_consumed', event_types)
+
+
+@tagged('sunray', 'model', 'users', 'passkeys')
+class TestUserPasskeyData(TransactionCase):
+    """Test that user models correctly return passkey data"""
+    
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
+        
+        # Create test host
+        cls.host_obj = cls.env['sunray.host'].create({
+            'domain': 'test.example.com',
+            'backend_url': 'https://backend.example.com',
+            'is_active': True
+        })
+        
+        # Create test user with host access
+        cls.user_obj = cls.env['sunray.user'].create({
+            'username': 'testuser@example.com',
+            'email': 'testuser@example.com',
+            'is_active': True,
+            'host_ids': [(6, 0, [cls.host_obj.id])]
+        })
+        
+        # Create user without passkeys for testing
+        cls.user_no_passkeys = cls.env['sunray.user'].create({
+            'username': 'nopasskeys@example.com',
+            'email': 'nopasskeys@example.com',
+            'is_active': True
+        })
+        
+    def test_user_with_no_passkeys(self):
+        """Test user that has no passkeys returns correct data structure"""
+        # Verify passkey_ids is empty
+        self.assertEqual(len(self.user_no_passkeys.passkey_ids), 0)
+        self.assertEqual(self.user_no_passkeys.passkey_count, 0)
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_no_passkeys.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        self.assertEqual(passkeys, [])  # Empty array for no passkeys
+        
+    def test_user_with_single_passkey(self):
+        """Test user that has one passkey returns correct structure"""
+        # Create a passkey for the test user
+        passkey_obj = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'test_credential_123',
+            'public_key': 'test_public_key_456',
+            'name': 'Test Device',
+            'counter': 5,
+            'host_domain': 'test.example.com'
+        })
+        
+        self.assertEqual(self.user_obj.passkey_count, 1)
+        self.assertEqual(len(self.user_obj.passkey_ids), 1)
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        self.assertEqual(len(passkeys), 1)
+        passkey_data = passkeys[0]
+        self.assertEqual(passkey_data['credential_id'], 'test_credential_123')
+        self.assertEqual(passkey_data['public_key'], 'test_public_key_456')
+        self.assertEqual(passkey_data['name'], 'Test Device')
+        self.assertEqual(passkey_data['counter'], 5)
+        self.assertIsNotNone(passkey_data['created_at'])
+        self.assertIsNone(passkey_data['last_used_at'])  # Never used
+        
+    def test_user_with_multiple_passkeys(self):
+        """Test user that has multiple passkeys returns all correctly"""
+        from datetime import datetime
+        
+        # Create multiple passkeys
+        passkey1 = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'cred_1',
+            'public_key': 'key_1',
+            'name': 'Device 1',
+            'counter': 10
+        })
+        
+        passkey2 = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'cred_2',
+            'public_key': 'key_2',
+            'name': 'Device 2',
+            'counter': 25,
+            'last_used': datetime.now()
+        })
+        
+        self.assertEqual(self.user_obj.passkey_count, 2)
+        self.assertEqual(len(self.user_obj.passkey_ids), 2)
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        self.assertEqual(len(passkeys), 2)
+        
+        # Check both passkeys are present
+        credential_ids = {pk['credential_id'] for pk in passkeys}
+        self.assertEqual(credential_ids, {'cred_1', 'cred_2'})
+        
+        # Find the passkey with last_used and verify format
+        used_passkey = next(pk for pk in passkeys if pk['last_used_at'] is not None)
+        self.assertEqual(used_passkey['credential_id'], 'cred_2')
+        self.assertEqual(used_passkey['counter'], 25)
+        
+    def test_counter_field_defaults_to_zero(self):
+        """Test that counter field defaults to 0 when not explicitly set"""
+        # Create passkey without explicit counter value
+        passkey_obj = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'no_counter_cred',
+            'public_key': 'no_counter_key',
+            'name': 'No Counter Device'
+            # counter field not set, should default to 0
+        })
+        
+        # Verify default value
+        self.assertEqual(passkey_obj.counter, 0)
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        passkey_data = passkeys[0]
+        self.assertEqual(passkey_data['counter'], 0)  # Should default to 0
+        
+    def test_passkey_all_required_fields_present(self):
+        """Test that all required passkey fields are present"""
+        from datetime import datetime
+        now = datetime.now()
+        
+        passkey_obj = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'full_cred',
+            'public_key': 'full_key',
+            'name': 'Full Device',
+            'counter': 42,
+            'last_used': now
+        })
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        passkey = passkeys[0]
+        required_fields = ['credential_id', 'public_key', 'name', 'counter', 'created_at', 'last_used_at']
+        
+        for field in required_fields:
+            self.assertIn(field, passkey, f"Missing required field: {field}")
+            
+        # Verify field values
+        self.assertEqual(passkey['credential_id'], 'full_cred')
+        self.assertEqual(passkey['public_key'], 'full_key')
+        self.assertEqual(passkey['name'], 'Full Device')
+        self.assertEqual(passkey['counter'], 42)
+        self.assertIsNotNone(passkey['created_at'])
+        self.assertIsNotNone(passkey['last_used_at'])
+        
+    def test_passkey_public_key_included_for_auth(self):
+        """Test that public_key is included (needed for worker authentication)"""
+        passkey_obj = self.env['sunray.passkey'].create({
+            'user_id': self.user_obj.id,
+            'credential_id': 'auth_cred',
+            'public_key': 'secret_public_key_for_auth',
+            'name': 'Auth Device'
+        })
+        
+        # Build passkeys list like the controller does
+        passkeys = []
+        for passkey in self.user_obj.passkey_ids:
+            passkeys.append({
+                'credential_id': passkey.credential_id,
+                'public_key': passkey.public_key,
+                'name': passkey.name,
+                'counter': passkey.counter or 0,
+                'created_at': passkey.create_date.isoformat(),
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+            })
+        
+        passkey = passkeys[0]
+        self.assertEqual(passkey['public_key'], 'secret_public_key_for_auth')
+        self.assertIsNotNone(passkey['public_key'])  # Must be present for signature verification

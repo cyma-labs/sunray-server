@@ -107,16 +107,6 @@ def get_usage_stats(self):
 
 ## Infrastructure Improvements
 
-### Multi-Host Token Support
-**Priority:** Low
-**Estimated effort:** 1 week
-
-Allow tokens to work across multiple hosts for users with multi-host access:
-
-- Token not bound to specific host
-- Host validation during registration
-- Enhanced security with host-specific credentials
-
 ### Token Analytics and Monitoring
 **Priority:** Low  
 **Estimated effort:** 2-3 days
@@ -168,46 +158,58 @@ Additional token security mechanisms:
 - Geographic restrictions
 - Time-based access windows
 
-### Worker-Server Communication Security
+### Worker-Server Communication Security (Hawk Protocol)
 **Priority:** Medium
 **Estimated effort:** 2-3 days
 
-Enhance security of network communications between workers and server:
+Enhance security of network communications between workers and server using the Hawk authentication protocol:
 
 **Current State:**
-- Workers authenticate to server using API keys only
+- Workers authenticate to server using Bearer API keys only
 - API key compromise allows full authentication bypass
 - No request integrity verification between worker and server
+- No replay attack protection
 
-**Proposed Enhancement:**
-- Add HMAC signatures to worker-server API calls
-- Include timestamp and request hash in signature to prevent replay attacks
-- Implement request/response integrity verification
-- Add optional mutual TLS support for high-security deployments
+**Proposed Enhancement: Implement Hawk Protocol**
+- Replace Bearer tokens with Hawk request signing
+- Built-in timestamp validation and nonce tracking for replay protection
+- Request payload integrity verification using MAC (Message Authentication Code)
+- Standardized protocol with proven library implementations
 
 **Security Benefits:**
-- **Defense-in-depth**: Even if API key is compromised, HMAC prevents abuse
-- **Request integrity**: Ensures messages aren't tampered with in transit
-- **Replay protection**: Timestamp-based signatures prevent replay attacks
-- **Audit trail**: Failed signature verification creates security alerts
+- **Per-request authentication**: Each API call individually authenticated and signed
+- **Defense-in-depth**: Even if credentials leak, individual requests can't be replayed
+- **Request integrity**: MAC ensures messages aren't tampered with in transit
+- **Replay protection**: Timestamp + nonce validation prevents replay attacks
+- **Standardized protocol**: Battle-tested, well-documented authentication scheme
+- **No credential transmission**: Only MAC signatures sent over wire, never the secret
 
 **Implementation approach:**
 ```
-Worker side:
-- Generate HMAC signature for each API request
-- Include timestamp and request body hash
-- Send signature in X-Request-Signature header
+Worker side (JavaScript):
+- Generate Hawk Authorization header for each API request
+- Include timestamp, nonce, and optional payload hash
+- Use hawk-js library or minimal custom implementation
 
-Server side:
-- Verify HMAC signature using shared secret
-- Check timestamp freshness (configurable window)
+Server side (Python):
+- Verify Hawk signature using mohawk library
+- Validate timestamp freshness (configurable window)
+- Track nonces to prevent replay attacks
 - Log failed signature attempts as security events
 ```
 
 **Configuration:**
-- `WORKER_HMAC_SECRET`: Shared secret for HMAC generation
-- `HMAC_SIGNATURE_WINDOW_S`: Acceptable timestamp drift (default: 300s)
-- `HMAC_REQUIRED`: Whether to enforce HMAC validation (default: false for compatibility)
+- `WORKER_HAWK_KEY_ID`: Worker identifier for Hawk credentials
+- `WORKER_HAWK_SECRET`: Shared secret for Hawk signature generation  
+- `HAWK_TIMESTAMP_SKEW_S`: Acceptable timestamp drift (default: 60s)
+- `HAWK_NONCE_TTL_S`: Nonce cache duration (default: 120s)
+- `HAWK_REQUIRED`: Whether to enforce Hawk validation (default: false for compatibility)
+
+**Migration Strategy:**
+1. Phase 1: Add Hawk support alongside Bearer tokens
+2. Phase 2: Deploy workers with Hawk authentication
+3. Phase 3: Gradually migrate existing workers
+4. Phase 4: Disable Bearer token support after full migration
 
 ## Testing and Quality Assurance
 

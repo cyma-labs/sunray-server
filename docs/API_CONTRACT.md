@@ -475,9 +475,27 @@ The `/config/register` endpoint handles all migration logic:
       "name": "Application Server"
     }
   ],
+  "passkeys": [
+    {
+      "credential_id": "AbC123dEF456...",
+      "public_key": "pQECAyYgASFYIH0B...",
+      "name": "Chrome - Dec 28, 2024",
+      "counter": 42,
+      "created_at": "2024-12-28T10:00:00Z",
+      "last_used_at": "2024-12-28T15:30:00Z"
+    }
+  ],
   "config_version": "2024-01-15T09:00:00Z"
 }
 ```
+
+**Passkey Fields**:
+- `credential_id`: Base64URL encoded credential ID to match against credential.id in authentication assertion
+- `public_key`: Base64 encoded COSE public key for signature verification
+- `name`: User-friendly device/passkey name for identification and debugging
+- `counter`: WebAuthn authentication counter for replay attack prevention (must be greater than last used value)
+- `created_at`: When the passkey was registered (ISO 8601 format)
+- `last_used_at`: When the passkey was last used for authentication (null if never used)
 
 **Error Responses**:
 - `401 Unauthorized`: Invalid or missing API key
@@ -488,6 +506,7 @@ The `/config/register` endpoint handles all migration logic:
 - Check user existence (404 = doesn't exist, 200 = exists)
 - Retrieve user details for administrative purposes
 - Get user configuration version for cache invalidation
+- Access passkey information for authentication and security monitoring
 
 ### POST /sunray-srvr/v1/users/{username}/passkeys
 

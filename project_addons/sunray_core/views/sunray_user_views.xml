@@ -77,10 +77,13 @@
                         <page string="Passkeys">
                             <field name="passkey_ids">
                                 <list editable="bottom">
+                                    <field name="id" optional="hide"/>
+                                    <field name="credential_id" readonly="1" optional="hide"/>
+                                    <field name="host_domain" optional="show"/>
                                     <field name="name"/>
-                                    <field name="credential_id" readonly="1"/>
-                                    <field name="create_date" readonly="1"/>
-                                    <field name="last_used" readonly="1"/>
+                                    <field name="create_date" readonly="1" optional="show"/>
+                                    <field name="counter" string="Used" readonly="1" optional="show"/>
+                                    <field name="last_used" readonly="1" optional="show"/>
                                 </list>
                             </field>
                         </page>

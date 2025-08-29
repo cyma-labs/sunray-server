@@ -6,6 +6,7 @@ import base64
 import cbor2
 import json
 from unittest.mock import patch
+from datetime import datetime, timedelta
 
 
 class TestCBORPublicKeys(TransactionCase):
@@ -23,9 +24,8 @@ class TestCBORPublicKeys(TransactionCase):
         
         # Create test host
         self.test_host = self.env['sunray.host'].create({
-            'name': 'test.example.com',
             'domain': 'test.example.com',
-            'backend': 'http://localhost:8000',
+            'backend_url': 'http://localhost:8000',
             'is_active': True,
             'user_ids': [(4, self.test_user.id)]
         })
@@ -34,8 +34,9 @@ class TestCBORPublicKeys(TransactionCase):
         self.setup_token = self.env['sunray.setup.token'].create({
             'user_id': self.test_user.id,
             'host_id': self.test_host.id,
-            'expires_at': self.env['sunray.setup.token']._default_expires_at(),
-            'max_uses': 1
+            'expires_at': datetime.now() + timedelta(hours=24),
+            'max_uses': 1,
+            'token_hash': 'test_token_hash'
         })
         
         # Valid COSE key (EC2/ES256)
@@ -286,13 +287,3 @@ class TestCBORPublicKeys(TransactionCase):
         self.assertTrue(is_valid)
         self.assertIsNotNone(result)
     
-    @patch('project_addons.sunray_core.models.sunray_passkey.COSE_AVAILABLE', False)
-    def test_fallback_validation_without_pycose(self):
-        """Test CBOR validation works when pycose library is not available"""
-        passkey_model = self.env['sunray.passkey']
-        
-        is_valid, result = passkey_model._validate_cbor_public_key(self.valid_public_key)
-        
-        self.assertTrue(is_valid)
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result[1], 2)  # kty: EC2

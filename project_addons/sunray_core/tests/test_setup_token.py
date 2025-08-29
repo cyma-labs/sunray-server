@@ -4,6 +4,7 @@ from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 from odoo import fields
 import hashlib
+import json
 
 
 class TestSetupToken(TransactionCase):
@@ -13,8 +14,8 @@ class TestSetupToken(TransactionCase):
         super().setUp()
         # Create test host
         self.host_obj = self.env['sunray.host'].create({
-            'name': 'test.example.com',
-            'domain': 'test.example.com'
+            'domain': 'test.example.com',
+            'backend_url': 'http://localhost:8000'
         })
         
         # Create test user
@@ -258,3 +259,404 @@ class TestSetupToken(TransactionCase):
         # Multiple records should fail
         with self.assertRaises(ValueError):
             (token_obj1 | token_obj2).consume()
+
+
+class TestSetupTokenValidation(TransactionCase):
+    """Test suite for sunray.setup.token validation method"""
+    
+    def setUp(self):
+        super().setUp()
+        # Create test host
+        self.host_obj = self.env['sunray.host'].create({
+            'domain': 'validation-test.example.com',
+            'backend_url': 'http://localhost:8000',
+            'is_active': True
+        })
+        
+        # Create test user
+        self.user_obj = self.env['sunray.user'].create({
+            'username': 'validationuser',
+            'email': 'validation@example.com',
+            'is_active': True
+        })
+        
+        # Create inactive user for testing
+        self.inactive_user_obj = self.env['sunray.user'].create({
+            'username': 'inactiveuser',
+            'email': 'inactive@example.com',
+            'is_active': False
+        })
+        
+        # Create inactive host for testing
+        self.inactive_host_obj = self.env['sunray.host'].create({
+            'domain': 'inactive-test.example.com',
+            'backend_url': 'http://localhost:8001',
+            'is_active': False
+        })
+        
+        # Create valid token for testing
+        self.valid_token, self.plain_token = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='Valid Test Device',
+            validity_hours=24,
+            max_uses=1
+        )
+    
+    def test_01_successful_validation(self):
+        """Test successful token validation"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            user_agent='Test Browser',
+            worker_id='test-worker'
+        )
+        
+        self.assertTrue(result['valid'])
+        self.assertEqual(result['token_obj'], self.valid_token)
+        self.assertEqual(result['user_obj'], self.user_obj)
+        self.assertEqual(result['host_obj'], self.host_obj)
+        self.assertIsNone(result['error_code'])
+        self.assertIsNone(result['error_message'])
+        
+        # Verify audit log entry was created
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.success'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_02_user_not_found(self):
+        """Test validation with non-existent user"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='nonexistentuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '404')
+        self.assertEqual(result['error_message'], 'User not found')
+        self.assertIsNone(result['token_obj'])
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.user_not_found'),
+            ('username', '=', 'nonexistentuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_03_inactive_user(self):
+        """Test validation with inactive user"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='inactiveuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '403')
+        self.assertEqual(result['error_message'], 'User is inactive')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.user_inactive'),
+            ('username', '=', 'inactiveuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_04_invalid_token_hash(self):
+        """Test validation with invalid token hash"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash='sha512:invalid_hash_value',
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '401')
+        self.assertEqual(result['error_message'], 'Invalid setup token hash')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.token_not_found'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_05_expired_token(self):
+        """Test validation with expired token"""
+        # Create expired token
+        expired_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='Expired Device',
+            validity_hours=1
+        )
+        # Force expiry
+        expired_token.expires_at = fields.Datetime.now() - timedelta(hours=1)
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=expired_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '401')
+        self.assertEqual(result['error_message'], 'Setup token expired')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.expired'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_06_consumed_token(self):
+        """Test validation with consumed token"""
+        # Consume the token
+        self.valid_token.consumed = True
+        self.valid_token.consumed_date = fields.Datetime.now()
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '403')
+        self.assertEqual(result['error_message'], 'Token already consumed')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.consumed'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_07_usage_limit_exceeded(self):
+        """Test validation with token at usage limit"""
+        # Set token at usage limit
+        self.valid_token.current_uses = 1
+        self.valid_token.max_uses = 1
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '403')
+        self.assertEqual(result['error_message'], 'Token usage limit exceeded')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.usage_exceeded'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_08_unknown_host_domain(self):
+        """Test validation with unknown host domain"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='unknown.example.com',
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '404')
+        self.assertEqual(result['error_message'], 'Unknown host domain')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.unknown_host'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_09_host_mismatch(self):
+        """Test validation with token for different host"""
+        # Create token for different host
+        different_host = self.env['sunray.host'].create({
+            'domain': 'different.example.com',
+            'backend_url': 'http://localhost:8002',
+            'is_active': True
+        })
+        
+        different_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=different_host.id,
+            device_name='Different Host Device'
+        )
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=different_token.token_hash,
+            host_domain='validation-test.example.com',  # Different host
+            client_ip='192.168.1.100',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '403')
+        self.assertEqual(result['error_message'], 'Token not valid for this host domain')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.host_mismatch'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_10_ip_restrictions_allowed(self):
+        """Test validation with IP restrictions - allowed IP"""
+        # Create token with CIDR restrictions
+        restricted_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='Restricted Device',
+            allowed_cidrs='192.168.1.0/24'
+        )
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=restricted_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',  # Within allowed CIDR
+            worker_id='test-worker'
+        )
+        
+        self.assertTrue(result['valid'])
+        
+    def test_11_ip_restrictions_blocked(self):
+        """Test validation with IP restrictions - blocked IP"""
+        # Create token with CIDR restrictions
+        restricted_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='Restricted Device',
+            allowed_cidrs='192.168.1.0/24'
+        )
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=restricted_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='10.0.0.100',  # Outside allowed CIDR
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '403')
+        self.assertEqual(result['error_message'], 'IP address not allowed for this token')
+        
+        # Verify audit log entry
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.ip_restricted'),
+            ('username', '=', 'validationuser')
+        ])
+        self.assertTrue(audit_logs)
+        
+    def test_12_invalid_ip_address(self):
+        """Test validation with invalid IP address"""
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='invalid.ip.address',
+            worker_id='test-worker'
+        )
+        
+        # Should still succeed if no CIDR restrictions
+        self.assertTrue(result['valid'])
+        
+        # Test with CIDR restrictions and invalid IP
+        restricted_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='Invalid IP Test',
+            allowed_cidrs='192.168.1.0/24'
+        )
+        
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=restricted_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='invalid.ip.address',
+            worker_id='test-worker'
+        )
+        
+        self.assertFalse(result['valid'])
+        self.assertEqual(result['error_code'], '400')
+        self.assertEqual(result['error_message'], 'Invalid client IP address')
+        
+    def test_13_no_client_ip_with_restrictions(self):
+        """Test validation without client IP when token has CIDR restrictions"""
+        # Create token with CIDR restrictions
+        restricted_token, _ = self.env['sunray.setup.token'].create_setup_token(
+            user_id=self.user_obj.id,
+            host_id=self.host_obj.id,
+            device_name='No IP Test',
+            allowed_cidrs='192.168.1.0/24'
+        )
+        
+        # Should pass when no client_ip provided (CIDR check skipped)
+        result = self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=restricted_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip=None,
+            worker_id='test-worker'
+        )
+        
+        self.assertTrue(result['valid'])
+        
+    def test_14_comprehensive_audit_logging(self):
+        """Test that all validation attempts create proper audit logs"""
+        # Clear existing audit logs for clean test
+        self.env['sunray.audit.log'].search([]).unlink()
+        
+        # Test successful validation
+        self.env['sunray.setup.token'].validate_setup_token(
+            username='validationuser',
+            token_hash=self.valid_token.token_hash,
+            host_domain='validation-test.example.com',
+            client_ip='192.168.1.100',
+            user_agent='Test Browser',
+            worker_id='test-worker'
+        )
+        
+        # Verify audit log details
+        audit_log = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'token.validation.success')
+        ])
+        self.assertEqual(len(audit_log), 1)
+        
+        details = json.loads(audit_log.details) if isinstance(audit_log.details, str) else audit_log.details
+        self.assertEqual(details['username'], 'validationuser')
+        self.assertEqual(details['token_id'], self.valid_token.id)
+        self.assertEqual(details['host_domain'], 'validation-test.example.com')
+        self.assertEqual(details['client_ip'], '192.168.1.100')
+        self.assertEqual(details['worker_id'], 'test-worker')
+        self.assertEqual(details['device_name'], 'Valid Test Device')
+        self.assertIn('uses_remaining', details)

@@ -19,9 +19,9 @@ class TestCLICacheCommands(TransactionCase):
         self.ApiKey = self.env['sunray.api.key']
         self.Worker = self.env['sunray.worker']
         
-        # Create CLI handler
-        from odoo.addons.sunray_core.cli.sunray_cli import SunrayCLIHandler
-        self.cli_handler = SunrayCLIHandler()
+        # Create CLI command instance
+        from odoo.addons.sunray_core.cli.sunray_cli import SunrayCommand
+        self.cli_command = SunrayCommand()
         
         # Create test infrastructure
         self.api_key = self.ApiKey.create({
@@ -64,7 +64,15 @@ class TestCLICacheCommands(TransactionCase):
     def _create_mock_args(self, **kwargs):
         """Helper to create mock argument objects"""
         from argparse import Namespace
-        return Namespace(**kwargs)
+        # Set default values for optional arguments that might be accessed
+        defaults = {
+            'reason': None,
+            'confirm': False,
+            'sr_all': False,
+            'output': 'table'
+        }
+        defaults.update(kwargs)
+        return Namespace(**defaults)
 
     def _capture_output(self, func, *args, **kwargs):
         """Helper to capture print output from CLI commands"""
@@ -96,7 +104,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_session,
+            self.cli_command._handle_session,
             self.env,
             args
         )
@@ -127,7 +135,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_session,
+            self.cli_command._handle_session,
             self.env,
             args
         )
@@ -154,7 +162,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_session,
+            self.cli_command._handle_session,
             self.env,
             args
         )
@@ -181,7 +189,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_host,
+            self.cli_command._handle_host,
             self.env,
             args
         )
@@ -209,7 +217,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_user,
+            self.cli_command._handle_user,
             self.env,
             args
         )
@@ -237,7 +245,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_user,
+            self.cli_command._handle_user,
             self.env,
             args
         )
@@ -264,7 +272,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_worker,
+            self.cli_command._handle_worker,
             self.env,
             args
         )
@@ -292,7 +300,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_worker,
+            self.cli_command._handle_worker,
             self.env,
             args
         )
@@ -313,7 +321,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_worker,
+            self.cli_command._handle_worker,
             self.env,
             args
         )
@@ -334,7 +342,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_session,
+            self.cli_command._handle_session,
             self.env,
             args
         )
@@ -354,7 +362,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_session,
+            self.cli_command._handle_session,
             self.env,
             args
         )
@@ -373,7 +381,7 @@ class TestCLICacheCommands(TransactionCase):
         
         # Capture output
         output = self._capture_output(
-            self.cli_handler._handle_worker,
+            self.cli_command._handle_worker,
             self.env,
             args
         )
@@ -393,10 +401,10 @@ class TestCLICacheCommands(TransactionCase):
         )
         
         # Mock the user action to raise an exception
-        with patch.object(self.user, 'action_revoke_sessions_on_host', side_effect=Exception('Test error')):
+        with patch('odoo.addons.sunray_core.models.sunray_user.SunrayUser.action_revoke_sessions_on_host', side_effect=Exception('Test error')):
             # Capture output
             output = self._capture_output(
-                self.cli_handler._handle_session,
+                self.cli_command._handle_session,
                 self.env,
                 args
             )
@@ -423,7 +431,7 @@ class TestCLICacheCommands(TransactionCase):
             
             # Capture output
             output = self._capture_output(
-                self.cli_handler._handle_session,
+                self.cli_command._handle_session,
                 self.env,
                 args
             )
@@ -450,7 +458,7 @@ class TestCLICacheCommands(TransactionCase):
             
             # Capture output
             output = self._capture_output(
-                self.cli_handler._handle_session,
+                self.cli_command._handle_session,
                 self.env,
                 args
             )
@@ -498,7 +506,7 @@ class TestCLICacheCommands(TransactionCase):
                     
                     # Should not raise any exceptions
                     try:
-                        self.cli_handler._handle_session(self.env, args)
+                        self.cli_command._handle_session(self.env, args)
                     except Exception as e:
                         self.fail(f"CLI command {command} raised exception: {e}")
 
@@ -535,7 +543,7 @@ class TestCLICacheCommands(TransactionCase):
                     
                     # Should not raise any exceptions
                     try:
-                        self.cli_handler._handle_user(self.env, args)
+                        self.cli_command._handle_user(self.env, args)
                     except Exception as e:
                         self.fail(f"CLI command {command} raised exception: {e}")
 
@@ -571,7 +579,7 @@ class TestCLICacheCommands(TransactionCase):
                     
                     # Should not raise any exceptions
                     try:
-                        self.cli_handler._handle_worker(self.env, args)
+                        self.cli_command._handle_worker(self.env, args)
                     except Exception as e:
                         self.fail(f"CLI command {command} raised exception: {e}")
 
@@ -591,7 +599,7 @@ class TestCLICacheCommands(TransactionCase):
             
             # Should not raise any exceptions
             try:
-                self.cli_handler._handle_host(self.env, args)
+                self.cli_command._handle_host(self.env, args)
             except Exception as e:
                 self.fail(f"CLI command host clear-sessions raised exception: {e}")
 
@@ -600,7 +608,7 @@ class TestCLICacheCommands(TransactionCase):
         # CLI and UI should call the same underlying methods
         # This ensures consistency between interfaces
         
-        with patch.object(self.user, 'action_revoke_sessions_on_host') as mock_method:
+        with patch('odoo.addons.sunray_core.models.sunray_user.SunrayUser.action_revoke_sessions_on_host') as mock_method:
             mock_method.return_value = {
                 'type': 'ir.actions.client',
                 'params': {'message': 'Test'}
@@ -614,7 +622,7 @@ class TestCLICacheCommands(TransactionCase):
             )
             
             # Call CLI handler
-            self.cli_handler._handle_session(self.env, args)
+            self.cli_command._handle_session(self.env, args)
             
             # Should have called the same method as UI
             mock_method.assert_called_once_with(self.host.id)

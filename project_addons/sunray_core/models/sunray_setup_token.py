@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import ipaddress
+import json
+import logging
+
 from odoo import models, fields, api
 from datetime import datetime, timedelta
-import json
 
 
 class SunraySetupToken(models.Model):
@@ -230,3 +233,390 @@ class SunraySetupToken(models.Model):
             'current_uses': new_uses,
             'max_uses': self.max_uses
         }
+    
+    @api.model
+    def validate_setup_token(self, username, token_hash, host_domain, client_ip=None, user_agent=None, worker_id=None):
+        """
+        Validate a setup token with comprehensive security checks.
+        
+        This is the centralized validation method that performs all setup token validation
+        logic. It's used by both the REST API endpoint and passkey registration.
+        
+        Args:
+            username: Username associated with the token
+            token_hash: SHA-512 hash of the setup token (prefixed with "sha512:")
+            host_domain: Domain the token is being used for
+            client_ip: Client IP address for CIDR validation (optional)
+            user_agent: Client user agent string (optional)
+            worker_id: Worker identifier making the request (optional)
+            
+        Returns:
+            dict: Validation result containing:
+                - valid: boolean indicating if token is valid
+                - token_obj: token object if valid (None if invalid)
+                - user_obj: user object if valid (None if invalid)  
+                - host_obj: host object if valid (None if invalid)
+                - error_code: HTTP-style error code if invalid
+                - error_message: human-readable error message if invalid
+        """
+        _logger = logging.getLogger(__name__)
+        
+        _logger.debug(f"Validating setup token for username: {username}, host: {host_domain}")
+        now = fields.Datetime.now()
+        
+        # Initialize result structure
+        result = {
+            'valid': False,
+            'token_obj': None,
+            'user_obj': None,
+            'host_obj': None,
+            'error_code': None,
+            'error_message': None
+        }
+        
+        try:
+            # Phase 1: User Validation
+            _logger.debug("Validating user existence and status")
+            user_obj = self.env['sunray.user'].sudo().search([('username', '=', username)], limit=1)
+            if not user_obj:
+                _logger.warning(f"User not found: {username}")
+                # AUDIT: Log user not found
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.user_not_found',
+                    details={
+                        'username': username,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='warning',
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '404',
+                    'error_message': 'User not found'
+                })
+                return result
+            
+            if not user_obj.is_active:
+                _logger.warning(f"Inactive user attempted token validation: {username}")
+                # AUDIT: Log inactive user attempt
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.user_inactive',
+                    details={
+                        'username': username,
+                        'user_id': user_obj.id,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='warning',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '403',
+                    'error_message': 'User is inactive'
+                })
+                return result
+            
+            # Phase 2: Setup Token Hash Validation
+            _logger.debug(f"Validating setup token hash for user {username}")
+            
+            token_obj = self.env['sunray.setup.token'].sudo().search([
+                ('token_hash', '=', token_hash),
+                ('user_id', '=', user_obj.id)
+            ], limit=1)
+            
+            if not token_obj:
+                _logger.warning(f"Invalid setup token hash for user {username}")
+                # AUDIT: Log invalid token hash
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.token_not_found',
+                    details={
+                        'username': username,
+                        'user_id': user_obj.id,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '401',
+                    'error_message': 'Invalid setup token hash'
+                })
+                return result
+            
+            # Check token expiry
+            if token_obj.expires_at < now:
+                hours_ago = (now - token_obj.expires_at).total_seconds() / 3600
+                _logger.warning(f"Expired token used for {username}, expired {hours_ago:.1f} hours ago")
+                # AUDIT: Log expired token
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.expired',
+                    details={
+                        'username': username,
+                        'token_id': token_obj.id,
+                        'expired_hours_ago': round(hours_ago, 1),
+                        'expired_at': token_obj.expires_at.isoformat(),
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='warning',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '401',
+                    'error_message': 'Setup token expired'
+                })
+                return result
+            
+            # Check if token is already consumed
+            if token_obj.consumed:
+                _logger.warning(f"Consumed token reuse attempted for {username}")
+                # AUDIT: Log consumed token reuse
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.consumed',
+                    details={
+                        'username': username,
+                        'token_id': token_obj.id,
+                        'consumed_date': token_obj.consumed_date.isoformat() if token_obj.consumed_date else None,
+                        'current_uses': token_obj.current_uses,
+                        'max_uses': token_obj.max_uses,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '403',
+                    'error_message': 'Token already consumed'
+                })
+                return result
+            
+            # Check token usage limit
+            if token_obj.current_uses >= token_obj.max_uses:
+                _logger.warning(f"Token usage limit exceeded for {username}: {token_obj.current_uses}/{token_obj.max_uses}")
+                # AUDIT: Log token usage limit exceeded
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.usage_exceeded',
+                    details={
+                        'username': username,
+                        'token_id': token_obj.id,
+                        'current_uses': token_obj.current_uses,
+                        'max_uses': token_obj.max_uses,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '403',
+                    'error_message': 'Token usage limit exceeded'
+                })
+                return result
+            
+            # Phase 3: Host Domain Validation
+            _logger.debug(f"Validating host domain: {host_domain}")
+            host_obj = self.env['sunray.host'].sudo().search([('domain', '=', host_domain)], limit=1)
+            
+            if not host_obj:
+                _logger.warning(f"Unknown host domain: {host_domain}")
+                # AUDIT: Log unknown host
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.unknown_host',
+                    details={
+                        'username': username,
+                        'token_id': token_obj.id,
+                        'host_domain': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '404',
+                    'error_message': 'Unknown host domain'
+                })
+                return result
+            
+            # Verify token is for the correct host
+            if token_obj.host_id.id != host_obj.id:
+                _logger.warning(f"Token host mismatch: token for {token_obj.host_id.domain}, requested for {host_domain}")
+                # AUDIT: Log host mismatch
+                self.env['sunray.audit.log'].sudo().create_audit_event(
+                    event_type='token.validation.host_mismatch',
+                    details={
+                        'username': username,
+                        'token_id': token_obj.id,
+                        'token_host': token_obj.host_id.domain,
+                        'requested_host': host_domain,
+                        'worker_id': worker_id
+                    },
+                    severity='critical',
+                    sunray_user_id=user_obj.id,
+                    sunray_worker=worker_id,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    username=username
+                )
+                result.update({
+                    'error_code': '403',
+                    'error_message': 'Token not valid for this host domain'
+                })
+                return result
+            
+            # Phase 4: CIDR IP Address Validation (if configured and client_ip provided)
+            if client_ip and token_obj.allowed_cidrs:
+                allowed_cidrs = token_obj.get_allowed_cidrs()
+                if allowed_cidrs:
+                    ip_allowed = False
+                    try:
+                        client_ip_obj = ipaddress.ip_address(client_ip)
+                        for cidr in allowed_cidrs:
+                            try:
+                                if '/' in cidr:
+                                    # CIDR notation
+                                    network = ipaddress.ip_network(cidr, strict=False)
+                                    if client_ip_obj in network:
+                                        ip_allowed = True
+                                        break
+                                else:
+                                    # Single IP
+                                    if client_ip_obj == ipaddress.ip_address(cidr):
+                                        ip_allowed = True
+                                        break
+                            except ValueError:
+                                _logger.warning(f"Invalid CIDR in token {token_obj.id}: {cidr}")
+                                continue
+                    except ValueError:
+                        _logger.warning(f"Invalid client IP address: {client_ip}")
+                        # AUDIT: Log invalid IP
+                        self.env['sunray.audit.log'].sudo().create_audit_event(
+                            event_type='token.validation.invalid_ip',
+                            details={
+                                'username': username,
+                                'token_id': token_obj.id,
+                                'client_ip': client_ip,
+                                'host_domain': host_domain,
+                                'worker_id': worker_id
+                            },
+                            severity='warning',
+                            sunray_user_id=user_obj.id,
+                            sunray_worker=worker_id,
+                            ip_address=client_ip,
+                            user_agent=user_agent,
+                            username=username
+                        )
+                        result.update({
+                            'error_code': '400',
+                            'error_message': 'Invalid client IP address'
+                        })
+                        return result
+                    
+                    if not ip_allowed:
+                        _logger.warning(f"IP address {client_ip} not allowed for token {token_obj.id}")
+                        # AUDIT: Log IP restriction
+                        self.env['sunray.audit.log'].sudo().create_audit_event(
+                            event_type='token.validation.ip_restricted',
+                            details={
+                                'username': username,
+                                'token_id': token_obj.id,
+                                'client_ip': client_ip,
+                                'allowed_cidrs': allowed_cidrs,
+                                'host_domain': host_domain,
+                                'worker_id': worker_id
+                            },
+                            severity='critical',
+                            sunray_user_id=user_obj.id,
+                            sunray_worker=worker_id,
+                            ip_address=client_ip,
+                            user_agent=user_agent,
+                            username=username
+                        )
+                        result.update({
+                            'error_code': '403',
+                            'error_message': 'IP address not allowed for this token'
+                        })
+                        return result
+            
+            # All validation checks passed
+            _logger.info(f"Setup token validation successful for {username} on {host_domain}")
+            
+            # AUDIT: Log successful validation
+            self.env['sunray.audit.log'].sudo().create_audit_event(
+                event_type='token.validation.success',
+                details={
+                    'username': username,
+                    'token_id': token_obj.id,
+                    'host_domain': host_domain,
+                    'client_ip': client_ip,
+                    'worker_id': worker_id,
+                    'device_name': token_obj.device_name,
+                    'uses_remaining': token_obj.max_uses - token_obj.current_uses
+                },
+                severity='info',
+                sunray_user_id=user_obj.id,
+                sunray_worker=worker_id,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                username=username
+            )
+            
+            result.update({
+                'valid': True,
+                'token_obj': token_obj,
+                'user_obj': user_obj,
+                'host_obj': host_obj
+            })
+            return result
+            
+        except Exception as e:
+            _logger.error(f"Unexpected error during token validation: {str(e)}")
+            # AUDIT: Log validation error
+            self.env['sunray.audit.log'].sudo().create_audit_event(
+                event_type='token.validation.error',
+                details={
+                    'username': username,
+                    'host_domain': host_domain,
+                    'error': str(e),
+                    'worker_id': worker_id
+                },
+                severity='error',
+                sunray_worker=worker_id,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                username=username
+            )
+            result.update({
+                'error_code': '500',
+                'error_message': 'Internal validation error'
+            })
+            return result

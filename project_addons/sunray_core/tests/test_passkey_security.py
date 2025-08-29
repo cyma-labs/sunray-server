@@ -284,7 +284,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         
         # Verify audit
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.setup_token_not_found')
+            ('event_type', '=', 'token.validation.token_not_found')
         ], limit=1, order='create_date desc')
         self.assertTrue(audit_log)
         self.assertEqual(audit_log.severity, 'critical')
@@ -310,7 +310,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         
         # Verify audit
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.token_expired')
+            ('event_type', '=', 'token.validation.expired')
         ], limit=1, order='create_date desc')
         self.assertTrue(audit_log)
         if isinstance(audit_log.details, str):
@@ -360,7 +360,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         
         # Verify audit for replay attempt
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.token_already_consumed')
+            ('event_type', '=', 'token.validation.consumed')
         ], limit=1, order='create_date desc')
         self.assertTrue(audit_log)
         self.assertEqual(audit_log.severity, 'critical')
@@ -392,7 +392,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         
         # Verify audit
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.token_wrong_host')
+            ('event_type', '=', 'token.validation.host_mismatch')
         ], limit=1, order='create_date desc')
         self.assertTrue(audit_log)
         if isinstance(audit_log.details, str):
@@ -439,7 +439,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         
         # Verify audit
         audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.ip_not_allowed')
+            ('event_type', '=', 'token.validation.ip_restricted')
         ], limit=1, order='create_date desc')
         self.assertTrue(audit_log)
         if isinstance(audit_log.details, str):
@@ -745,15 +745,15 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         # Get all passkey-related events 
         security_events = []
         for log in audit_logs:
-            if 'passkey' in log.event_type:
+            if 'passkey' in log.event_type or 'token.validation' in log.event_type:
                 security_events.append(log)
         
         # Verify we have the expected events (order may vary)
         event_types = [log.event_type for log in security_events]
-        self.assertIn('security.passkey.setup_token_not_found', event_types)
-        self.assertIn('security.passkey.token_expired', event_types)
+        self.assertIn('token.validation.token_not_found', event_types)
+        self.assertIn('token.validation.expired', event_types)
         self.assertIn('passkey.registered', event_types)
-        self.assertIn('security.passkey.token_already_consumed', event_types)
+        self.assertIn('token.validation.consumed', event_types)
 
 
 @tagged('sunray', 'model', 'users', 'passkeys')

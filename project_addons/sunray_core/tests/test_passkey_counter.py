@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from odoo.tests.common import TransactionCase
-from odoo.exceptions import UserError
 from datetime import datetime, timedelta
 import json
+from unittest.mock import Mock, patch
+from odoo.addons.sunray_core.controllers.rest_api import SunrayRESTController
 
 
 class TestPasskeyCounter(TransactionCase):
-    """Test WebAuthn passkey counter functionality and security"""
+    """Test passkey counter storage functionality - server acts as storage layer only"""
     
     def setUp(self):
         super().setUp()
@@ -20,8 +21,8 @@ class TestPasskeyCounter(TransactionCase):
         
         # Create test host
         self.host_obj = self.env['sunray.host'].create({
-            'name': 'Counter Test Host',
             'domain': 'counter.test.com',
+            'backend_url': 'http://backend.counter.test.com',
             'is_active': True,
             'session_duration_s': 3600
         })
@@ -46,114 +47,17 @@ class TestPasskeyCounter(TransactionCase):
             'is_active': True
         })
     
-    def test_01_counter_increment_success(self):
-        """Test successful counter increment updates both counter and last_used"""
-        original_counter = self.passkey_obj.counter
-        original_last_used = self.passkey_obj.last_used
-        
-        # Update counter with valid increment
-        result = self.passkey_obj.update_authentication_counter(original_counter + 5)
-        
-        # Verify success response
-        self.assertTrue(result['success'])
-        self.assertEqual(result['counter'], original_counter + 5)
-        self.assertIsNotNone(result['last_used'])
-        
-        # Verify database updates
-        self.passkey_obj.invalidate_recordset()  # Ensure fresh read
-        self.assertEqual(self.passkey_obj.counter, original_counter + 5)
-        self.assertNotEqual(self.passkey_obj.last_used, original_last_used)
-        self.assertIsNotNone(self.passkey_obj.last_used)
-        
-        # Verify audit log entry
-        audit_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'passkey.authenticated'),
-            ('sunray_user_id', '=', self.user_obj.id)
-        ])
-        self.assertTrue(audit_logs)
-        self.assertEqual(audit_logs[-1].severity, 'info')
-        
-        # Verify audit details
-        details = json.loads(audit_logs[-1].details)
-        self.assertEqual(details['passkey_id'], self.passkey_obj.id)
-        self.assertEqual(details['new_counter'], original_counter + 5)
-        self.assertEqual(details['counter_increment'], 5)
-    
-    def test_02_counter_same_value_rejection(self):
-        """Test rejection when counter doesn't increase (same value)"""
-        current_counter = self.passkey_obj.counter
-        
-        # Attempt to use same counter value
-        with self.assertRaises(UserError) as context:
-            self.passkey_obj.update_authentication_counter(current_counter)
-        
-        # Verify error message format
-        error_msg = str(context.exception)
-        self.assertIn('403|Authentication counter violation', error_msg)
-        self.assertIn(f'current: {current_counter}', error_msg)
-        self.assertIn(f'attempted: {current_counter}', error_msg)
-        
-        # Verify counter wasn't updated
-        self.passkey_obj.invalidate_recordset()
-        self.assertEqual(self.passkey_obj.counter, current_counter)
-        
-        # Verify critical security audit log
-        security_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.counter_violation'),
-            ('sunray_user_id', '=', self.user_obj.id)
-        ])
-        self.assertTrue(security_logs)
-        self.assertEqual(security_logs[-1].severity, 'critical')
-        
-        # Verify security log details
-        details = json.loads(security_logs[-1].details)
-        self.assertEqual(details['current_counter'], current_counter)
-        self.assertEqual(details['attempted_counter'], current_counter)
-        self.assertEqual(details['violation_type'], 'counter_not_increased')
-    
-    def test_03_counter_backward_rejection(self):
-        """Test rejection when counter goes backward (potential replay attack)"""
-        current_counter = self.passkey_obj.counter
-        attempted_counter = current_counter - 1
-        
-        # Attempt to use smaller counter value
-        with self.assertRaises(UserError) as context:
-            self.passkey_obj.update_authentication_counter(attempted_counter)
-        
-        # Verify error message
-        error_msg = str(context.exception)
-        self.assertIn('403|Authentication counter violation', error_msg)
-        self.assertIn(f'current: {current_counter}', error_msg)
-        self.assertIn(f'attempted: {attempted_counter}', error_msg)
-        
-        # Verify counter wasn't updated
-        self.passkey_obj.invalidate_recordset()
-        self.assertEqual(self.passkey_obj.counter, current_counter)
-        
-        # Verify critical security audit log
-        security_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.counter_violation'),
-            ('sunray_user_id', '=', self.user_obj.id)
-        ])
-        self.assertTrue(security_logs)
-        self.assertEqual(security_logs[-1].severity, 'critical')
-        
-        # Verify detailed security logging
-        details = json.loads(security_logs[-1].details)
-        self.assertEqual(details['current_counter'], current_counter)
-        self.assertEqual(details['attempted_counter'], attempted_counter)
-        self.assertEqual(details['security_risk'], 'replay_attack_or_cloned_credential')
-    
-    def test_04_session_creation_with_counter_success(self):
-        """Test successful session creation with counter update"""
+    def test_01_session_creation_with_counter_success(self):
+        """Test successful session creation with counter storage"""
         original_counter = self.passkey_obj.counter
         new_counter = original_counter + 3
         
-        # Create session with counter update
+        # Create session with counter storage
         session_data = {
             'session_id': 'test_session_counter_success',
             'username': self.user_obj.username,
             'host_domain': self.host_obj.domain,
+            'expires_at': '2024-01-01T20:00:00Z',
             'credential_id': self.passkey_obj.credential_id,
             'counter': new_counter,
             'created_ip': '192.168.1.100',
@@ -170,7 +74,7 @@ class TestPasskeyCounter(TransactionCase):
         mock_request.env = self.env
         
         # Create controller instance and call method
-        controller = self.env['sunray.rest.api']
+        controller = SunrayRESTController()
         
         # Mock authentication 
         original_auth = controller._authenticate_api
@@ -183,11 +87,12 @@ class TestPasskeyCounter(TransactionCase):
             # Call session creation
             with self.env.registry.cursor() as cr:
                 env = self.env(cr=cr)
-                controller_env = env['sunray.rest.api']
+                controller_env = SunrayRESTController()
                 controller_env._authenticate_api = lambda r: self.api_key_obj
                 controller_env._setup_request_context = lambda r: {'worker_id': 'test_worker'}
                 
-                response = controller_env.with_context(request=mock_request).create_session()
+                with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+                    response = controller_env.create_session()
                 
                 # Verify response structure
                 if hasattr(response, 'data'):
@@ -195,7 +100,7 @@ class TestPasskeyCounter(TransactionCase):
                     self.assertTrue(response_data['success'])
                     self.assertEqual(response_data['session_id'], session_data['session_id'])
                 
-                # Verify passkey counter was updated
+                # Verify passkey counter was stored
                 self.passkey_obj.invalidate_recordset()
                 self.assertEqual(self.passkey_obj.counter, new_counter)
                 
@@ -211,20 +116,21 @@ class TestPasskeyCounter(TransactionCase):
             # Restore original authentication method
             controller._authenticate_api = original_auth
     
-    def test_05_session_creation_counter_violation(self):
-        """Test session creation rejection due to counter violation"""
+    def test_02_session_creation_stores_any_counter(self):
+        """Test session creation stores any counter value (worker manages validation)"""
         current_counter = self.passkey_obj.counter
-        invalid_counter = current_counter - 1  # Backward counter
+        any_counter = current_counter - 1  # Any counter value should be stored
         
-        # Attempt session creation with invalid counter
+        # Session creation with any counter should succeed (worker manages validation)
         session_data = {
-            'session_id': 'test_session_counter_violation',
+            'session_id': 'test_session_any_counter',
             'username': self.user_obj.username,
             'host_domain': self.host_obj.domain,
+            'expires_at': '2024-01-01T20:00:00Z',
             'credential_id': self.passkey_obj.credential_id,
-            'counter': invalid_counter,
+            'counter': any_counter,
             'created_ip': '192.168.1.101',
-            'user_agent': 'Test Browser Violation'
+            'user_agent': 'Test Browser Any Counter'
         }
         
         from odoo.http import request
@@ -234,44 +140,47 @@ class TestPasskeyCounter(TransactionCase):
         mock_request.httprequest.data = json.dumps(session_data).encode()
         mock_request.env = self.env
         
-        controller = self.env['sunray.rest.api']
+        controller = SunrayRESTController()
         controller._authenticate_api = lambda r: self.api_key_obj
         controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
         
-        # Call session creation - should fail
-        response = controller.with_context(request=mock_request).create_session()
+        # Call session creation - should succeed (server only stores)
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
         
-        # Verify error response (method should return error, not raise exception)
-        if hasattr(response, 'status_code'):
-            self.assertEqual(response.status_code, 403)
+        # Verify success response (server stores any counter value)
+        response_data = json.loads(response.data.decode())
+        self.assertTrue(response_data.get('success'))
         
-        # Verify session was NOT created
+        # Verify session was created
         session_obj = self.env['sunray.session'].search([
             ('session_id', '=', session_data['session_id'])
         ])
-        self.assertFalse(session_obj)
+        self.assertTrue(session_obj)
         
-        # Verify counter was NOT updated
+        # Verify counter was stored (any value accepted)
         self.passkey_obj.invalidate_recordset()
-        self.assertEqual(self.passkey_obj.counter, current_counter)
+        self.assertEqual(self.passkey_obj.counter, any_counter)
         
-        # Verify security audit log
-        security_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'security.passkey.counter_violation'),
+        # Verify audit log shows storage (not validation failure)
+        audit_logs = self.env['sunray.audit.log'].search([
+            ('event_type', '=', 'session.created'),
             ('sunray_user_id', '=', self.user_obj.id)
         ])
-        self.assertTrue(security_logs)
-        self.assertEqual(security_logs[-1].severity, 'critical')
+        self.assertTrue(audit_logs)
+        details = json.loads(audit_logs[-1].details)
+        self.assertEqual(details['counter_stored'], any_counter)
     
-    def test_06_session_creation_without_counter(self):
-        """Test session creation without counter (should succeed without counter update)"""
+    def test_03_session_creation_requires_counter(self):
+        """Test session creation requires counter (for debugging and audit purposes)"""
         original_counter = self.passkey_obj.counter
         
-        # Create session without counter field
+        # Create session without counter field - should fail
         session_data = {
             'session_id': 'test_session_no_counter',
             'username': self.user_obj.username,
             'host_domain': self.host_obj.domain,
+            'expires_at': '2024-01-01T20:00:00Z',
             'credential_id': self.passkey_obj.credential_id,
             'created_ip': '192.168.1.102',
             'user_agent': 'Test Browser No Counter'
@@ -284,31 +193,33 @@ class TestPasskeyCounter(TransactionCase):
         mock_request.httprequest.data = json.dumps(session_data).encode()
         mock_request.env = self.env
         
-        controller = self.env['sunray.rest.api']
+        controller = SunrayRESTController()
         controller._authenticate_api = lambda r: self.api_key_obj
         controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
         
-        # Call session creation
-        response = controller.with_context(request=mock_request).create_session()
+        # Call session creation - should fail
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
         
-        # Should succeed
-        if hasattr(response, 'data'):
+        # Should fail due to missing counter
+        if hasattr(response, 'status_code'):
+            self.assertEqual(response.status_code, 400)
+        elif hasattr(response, 'data'):
             response_data = json.loads(response.data.decode())
-            self.assertTrue(response_data['success'])
+            self.assertFalse(response_data.get('success', True))
         
-        # Verify counter was NOT updated (no counter provided)
+        # Verify counter was NOT updated
         self.passkey_obj.invalidate_recordset()
         self.assertEqual(self.passkey_obj.counter, original_counter)
         
-        # Verify session was created but without counter update
+        # Verify session was NOT created
         session_obj = self.env['sunray.session'].search([
             ('session_id', '=', session_data['session_id'])
         ])
-        self.assertTrue(session_obj)
-        self.assertEqual(session_obj.credential_id, self.passkey_obj.credential_id)
+        self.assertFalse(session_obj)
     
-    def test_07_session_creation_no_credential_id(self):
-        """Test session creation without credential_id (should succeed, no counter validation)"""
+    def test_04_session_creation_no_credential_id(self):
+        """Test session creation without credential_id (should succeed, counter not stored)"""
         original_counter = self.passkey_obj.counter
         
         # Create session without credential_id
@@ -316,6 +227,7 @@ class TestPasskeyCounter(TransactionCase):
             'session_id': 'test_session_no_credential',
             'username': self.user_obj.username,
             'host_domain': self.host_obj.domain,
+            'expires_at': '2024-01-01T20:00:00Z',
             'counter': 999,  # Counter provided but no credential_id
             'created_ip': '192.168.1.103'
         }
@@ -327,12 +239,13 @@ class TestPasskeyCounter(TransactionCase):
         mock_request.httprequest.data = json.dumps(session_data).encode()
         mock_request.env = self.env
         
-        controller = self.env['sunray.rest.api']
+        controller = SunrayRESTController()
         controller._authenticate_api = lambda r: self.api_key_obj
         controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
         
         # Call session creation
-        response = controller.with_context(request=mock_request).create_session()
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
         
         # Should succeed (counter ignored without credential_id)
         if hasattr(response, 'data'):
@@ -343,85 +256,107 @@ class TestPasskeyCounter(TransactionCase):
         self.passkey_obj.invalidate_recordset()
         self.assertEqual(self.passkey_obj.counter, original_counter)
     
-    def test_08_multiple_counter_increments(self):
-        """Test multiple sequential counter increments"""
-        base_counter = self.passkey_obj.counter
+    def test_05_session_creation_requires_expires_at(self):
+        """Test session creation requires expires_at field (worker provides expiration)"""
         
-        # Perform multiple counter updates
-        for i in range(1, 6):
-            expected_counter = base_counter + i
-            result = self.passkey_obj.update_authentication_counter(expected_counter)
-            
-            self.assertTrue(result['success'])
-            self.assertEqual(result['counter'], expected_counter)
-            
-            # Verify database update
-            self.passkey_obj.invalidate_recordset()
-            self.assertEqual(self.passkey_obj.counter, expected_counter)
+        # Create session without expires_at field - should fail
+        session_data = {
+            'session_id': 'test_session_no_expires',
+            'username': self.user_obj.username,
+            'host_domain': self.host_obj.domain,
+            'credential_id': self.passkey_obj.credential_id,
+            'counter': 50,
+            'created_ip': '192.168.1.104',
+            'user_agent': 'Test Browser No Expires'
+        }
         
-        # Verify final counter value
-        self.assertEqual(self.passkey_obj.counter, base_counter + 5)
+        from odoo.http import request
+        from unittest.mock import Mock
         
-        # Verify we have multiple authentication audit logs
-        auth_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'passkey.authenticated'),
-            ('sunray_user_id', '=', self.user_obj.id)
+        mock_request = Mock()
+        mock_request.httprequest.data = json.dumps(session_data).encode()
+        mock_request.env = self.env
+        
+        controller = SunrayRESTController()
+        controller._authenticate_api = lambda r: self.api_key_obj
+        controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
+        
+        # Call session creation - should fail
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
+        
+        # Should fail due to missing expires_at
+        if hasattr(response, 'status_code'):
+            self.assertEqual(response.status_code, 400)
+        elif hasattr(response, 'data'):
+            response_data = json.loads(response.data.decode())
+            self.assertFalse(response_data.get('success', True))
+        
+        # Verify session was NOT created
+        session_obj = self.env['sunray.session'].search([
+            ('session_id', '=', session_data['session_id'])
         ])
-        self.assertEqual(len(auth_logs), 5)  # Should have 5 authentication events
+        self.assertFalse(session_obj)
     
-    def test_09_concurrent_counter_updates_simulation(self):
-        """Test atomic counter updates to prevent race conditions"""
+    def test_06_session_creation_invalid_expires_at_format(self):
+        """Test session creation with invalid expires_at format"""
+        
+        # Create session with invalid expires_at format - should fail
+        session_data = {
+            'session_id': 'test_session_invalid_expires',
+            'username': self.user_obj.username,
+            'host_domain': self.host_obj.domain,
+            'expires_at': 'invalid-datetime-format',
+            'credential_id': self.passkey_obj.credential_id,
+            'counter': 50,
+            'created_ip': '192.168.1.105',
+            'user_agent': 'Test Browser Invalid Expires'
+        }
+        
+        from odoo.http import request
+        from unittest.mock import Mock
+        
+        mock_request = Mock()
+        mock_request.httprequest.data = json.dumps(session_data).encode()
+        mock_request.env = self.env
+        
+        controller = SunrayRESTController()
+        controller._authenticate_api = lambda r: self.api_key_obj
+        controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
+        
+        # Call session creation - should fail
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
+        
+        # Should fail due to invalid expires_at format
+        if hasattr(response, 'status_code'):
+            self.assertEqual(response.status_code, 400)
+        elif hasattr(response, 'data'):
+            response_data = json.loads(response.data.decode())
+            self.assertFalse(response_data.get('success', True))
+        
+        # Verify session was NOT created
+        session_obj = self.env['sunray.session'].search([
+            ('session_id', '=', session_data['session_id'])
+        ])
+        self.assertFalse(session_obj)
+
+    def test_07_counter_direct_assignment(self):
+        """Test that counter can be directly assigned any value (storage-only)"""
         original_counter = self.passkey_obj.counter
-        new_counter = original_counter + 1
         
-        # Simulate concurrent update attempt
-        # First update succeeds
-        result1 = self.passkey_obj.update_authentication_counter(new_counter)
-        self.assertTrue(result1['success'])
+        # Test various counter values
+        test_counters = [0, 5, 100, 999, original_counter - 10, original_counter + 50]
         
-        # Second update with same counter should fail
-        with self.assertRaises(UserError):
-            self.passkey_obj.update_authentication_counter(new_counter)
-        
-        # Third update with higher counter should succeed
-        result3 = self.passkey_obj.update_authentication_counter(new_counter + 1)
-        self.assertTrue(result3['success'])
-        self.assertEqual(result3['counter'], new_counter + 1)
-    
-    def test_10_audit_log_details_validation(self):
-        """Test that all required audit log details are properly recorded"""
-        original_counter = self.passkey_obj.counter
-        new_counter = original_counter + 7
-        
-        # Perform authentication
-        self.passkey_obj.update_authentication_counter(new_counter)
-        
-        # Get the audit log
-        audit_log = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'passkey.authenticated'),
-            ('sunray_user_id', '=', self.user_obj.id)
-        ], order='create_date desc', limit=1)
-        
-        self.assertTrue(audit_log)
-        
-        # Verify audit log fields
-        self.assertEqual(audit_log.event_type, 'passkey.authenticated')
-        self.assertEqual(audit_log.severity, 'info')
-        self.assertEqual(audit_log.sunray_user_id.id, self.user_obj.id)
-        self.assertEqual(audit_log.username, self.user_obj.username)
-        
-        # Verify audit details
-        details = json.loads(audit_log.details)
-        required_fields = [
-            'username', 'credential_id', 'passkey_id', 'passkey_name',
-            'host_domain', 'previous_counter', 'new_counter', 'counter_increment',
-            'authentication_time'
-        ]
-        
-        for field in required_fields:
-            self.assertIn(field, details, f'Missing audit detail field: {field}')
-        
-        self.assertEqual(details['passkey_id'], self.passkey_obj.id)
-        self.assertEqual(details['new_counter'], new_counter)
-        self.assertEqual(details['counter_increment'], 7)
-        self.assertEqual(details['credential_id'], self.passkey_obj.credential_id)
+        for test_counter in test_counters:
+            # Direct assignment should always work (no validation)
+            self.passkey_obj.counter = test_counter
+            self.passkey_obj.invalidate_recordset()
+            self.assertEqual(self.passkey_obj.counter, test_counter)
+            
+            # Test last_used can also be updated directly
+            from odoo import fields
+            now = fields.Datetime.now()
+            self.passkey_obj.last_used = now
+            self.passkey_obj.invalidate_recordset()
+            self.assertEqual(self.passkey_obj.last_used, now)

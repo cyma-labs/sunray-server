@@ -90,6 +90,7 @@ class SunrayWebhookToken(models.Model):
             elif record.token_source == 'both' and not record.header_name and not record.param_name:
                 raise ValidationError('At least one of header name or parameter name is required when token source is "both"')
     
+    @api.model_create_multi
     def create(self, vals_list):
         """Override create to auto-generate token if not provided"""
         for vals in vals_list:

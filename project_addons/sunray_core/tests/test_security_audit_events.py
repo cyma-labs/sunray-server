@@ -113,6 +113,18 @@ class TestSecurityAuditEvents(TransactionCase):
     
     def test_security_events_searchable(self):
         """Test that security events can be searched and filtered"""
+        # Count existing security events before test
+        initial_security_count = self.AuditLog.search_count([
+            ('event_type', 'like', 'security.')
+        ])
+        initial_critical_count = self.AuditLog.search_count([
+            ('event_type', 'like', 'security.'),
+            ('severity', '=', 'critical')
+        ])
+        initial_cross_domain_count = self.AuditLog.search_count([
+            ('event_type', '=', 'security.cross_domain_session')
+        ])
+        
         # Create multiple security events
         self.AuditLog.create_audit_event(
             event_type='security.cross_domain_session',
@@ -132,24 +144,24 @@ class TestSecurityAuditEvents(TransactionCase):
             severity='warning'
         )
         
-        # Test searching for security events
+        # Test searching for security events - check increment
         security_events = self.AuditLog.search([
             ('event_type', 'like', 'security.')
         ])
-        self.assertEqual(len(security_events), 3)
+        self.assertEqual(len(security_events), initial_security_count + 3)
         
-        # Test filtering by severity
+        # Test filtering by severity - check increment
         critical_events = self.AuditLog.search([
             ('event_type', 'like', 'security.'),
             ('severity', '=', 'critical')
         ])
-        self.assertEqual(len(critical_events), 2)
+        self.assertEqual(len(critical_events), initial_critical_count + 2)
         
-        # Test filtering by specific event type
+        # Test filtering by specific event type - check increment
         cross_domain_events = self.AuditLog.search([
             ('event_type', '=', 'security.cross_domain_session')
         ])
-        self.assertEqual(len(cross_domain_events), 1)
+        self.assertEqual(len(cross_domain_events), initial_cross_domain_count + 1)
     
     def test_backward_compatibility(self):
         """Test that existing create_security_event method still works"""

@@ -241,7 +241,7 @@ class TestWorkerRegistrationAPI(TransactionCase):
             'is_active': True
         })
     
-    @patch('odoo.http.request')
+    @patch('odoo.addons.sunray_core.controllers.main.request')
     def test_registration_same_worker_idempotent(self, mock_request):
         """Test that same worker re-registering is idempotent"""
         # Mock the request environment

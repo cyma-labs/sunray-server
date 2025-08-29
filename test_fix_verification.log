@@ -1,0 +1,219 @@
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher Loading EnvFile: /etc/muppy.env 
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--database=cmorisse_sunray18_d4_001' command line parameter added from environment variable 'PGDATABASE'.
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--db_user=cmorisse_sunray18_d4' command line parameter added from environment variable 'PGUSER'.
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--db_password=a9e4337436f44344' command line parameter added from environment variable 'PGPASSWORD'.
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--db_host=100.65.185.8' command line parameter added from environment variable 'PGHOST'.
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--db_port=5432' command line parameter added from environment variable 'PGPORT'.
+2025-08-29 07:03:53,891 111042 INFO ikb-odoo-launcher '--db-filter=^cmorisse_sunray18_d4.*$|^sunray18_seed.*$' command line parameter added from environment variable 'PGFILTER'.
+2025-08-29 05:03:54,151 111042 INFO ? odoo: Odoo version 18.0 
+2025-08-29 05:03:54,151 111042 INFO ? odoo: Using configuration file at /opt/muppy/appserver-sunray18/etc/odoo.buildit.cfg 
+2025-08-29 05:03:54,151 111042 INFO ? odoo: addons paths: ['/opt/muppy/appserver-sunray18/parts/odoo18/odoo/addons', '/home/muppy/.local/share/Odoo/addons/18.0', '/opt/muppy/appserver-sunray18/parts/odoo18/addons', '/opt/muppy/appserver-sunray18/project_addons', '/opt/muppy/appserver-sunray18/parts/inouk_addons'] 
+2025-08-29 05:03:54,151 111042 INFO ? odoo: database: cmorisse_sunray18_d4@100.65.185.8:5432 
+2025-08-29 05:03:54,205 111042 INFO ? odoo.addons.base.models.ir_actions_report: Will use the Wkhtmltopdf binary at /usr/local/bin/wkhtmltopdf 
+2025-08-29 05:03:54,210 111042 INFO ? odoo.addons.base.models.ir_actions_report: Will use the Wkhtmltoimage binary at /usr/local/bin/wkhtmltoimage 
+2025-08-29 05:03:54,292 111042 INFO ? odoo.service.server: HTTP service (werkzeug) running on sunray18-6d07454430d7402c.lxd:8069 
+2025-08-29 05:03:54,302 111042 INFO cmorisse_sunray18_d4_001 odoo.tests.common: Importing test framework 
+2025-08-29 05:03:54,316 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading 1 modules... 
+2025-08-29 05:03:54,318 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: 1 modules loaded in 0.00s, 0 queries (+0 extra) 
+2025-08-29 05:03:54,328 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: updating modules list 
+2025-08-29 05:03:54,329 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on [] to user __system__ #1 via n/a 
+2025-08-29 05:03:54,694 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_module: ALLOW access to module.button_upgrade on ['Sunray Core'] to user __system__ #1 via n/a 
+2025-08-29 05:03:54,694 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on ['Sunray Core'] to user __system__ #1 via n/a 
+2025-08-29 05:03:54,951 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_module: ALLOW access to module.button_install on [] to user __system__ #1 via n/a 
+2025-08-29 05:03:54,963 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading 28 modules... 
+2025-08-29 05:03:55,126 111042 INFO cmorisse_sunray18_d4_001 ir_cron_patcher: Added 'seconds' to ir_cron.py::_intervalTypes 
+2025-08-29 05:03:55,126 111042 INFO cmorisse_sunray18_d4_001 ir_cron_patcher: server.py::SLEEP_INTERVAL=10 
+2025-08-29 05:03:55,142 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: Loading module sunray_core (28/28) 
+2025-08-29 05:03:55,201 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.registry: module sunray_core: creating or updating database tables 
+2025-08-29 05:03:55,219 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_model: Two fields (active_session_count, active_session_ids) of sunray.user() have the same label: Active Sessions. [Modules: sunray_core and sunray_core] 
+2025-08-29 05:03:55,256 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/data/move_attachments_to_db.xml 
+2025-08-29 05:03:55,256 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/security/sunray_security.xml 
+2025-08-29 05:03:55,322 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/security/ir.model.access.csv 
+2025-08-29 05:03:55,346 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/data/ir_config_parameter.xml 
+2025-08-29 05:03:55,347 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/data/sunray_data.xml 
+2025-08-29 05:03:55,350 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/wizards/setup_token_wizard_views.xml 
+2025-08-29 05:03:55,355 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/wizards/session_revoke_wizard_views.xml 
+2025-08-29 05:03:55,359 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/wizards/user_sessions_revoke_wizard_views.xml 
+2025-08-29 05:03:55,367 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_user_views.xml 
+2025-08-29 05:03:55,382 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_host_views.xml 
+2025-08-29 05:03:55,393 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_passkey_views.xml 
+2025-08-29 05:03:55,400 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_access_rule_views.xml 
+2025-08-29 05:03:55,408 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_session_views.xml 
+2025-08-29 05:03:55,415 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_audit_log_views.xml 
+2025-08-29 05:03:55,423 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_api_key_views.xml 
+2025-08-29 05:03:55,430 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_worker_views.xml 
+2025-08-29 05:03:55,438 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: loading sunray_core/views/sunray_menu.xml 
+2025-08-29 05:03:55,488 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_01_successful_registration_complete_flow ... 
+2025-08-29 05:03:55,497 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,497 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,498 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,498 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,499 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 649 
+2025-08-29 05:03:55,499 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1095, current uses: 0 
+2025-08-29 05:03:55,499 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=1/1, consumed=True 
+2025-08-29 05:03:55,499 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,502 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_02_unauthorized_api_no_business_data ... 
+2025-08-29 05:03:55,505 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: skipped TestPasskeyRegistrationSecurity.test_02_unauthorized_api_no_business_data : Test requires HTTP controller context (API key validation) 
+2025-08-29 05:03:55,505 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_03_missing_setup_token_hash ... 
+2025-08-29 05:03:55,508 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,508 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '400|Missing required fields: setup_token_hash', Parts: ['400', 'Missing required fields: setup_token_hash'] 
+2025-08-29 05:03:55,508 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_04_invalid_token_hash ... 
+2025-08-29 05:03:55,512 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,512 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Invalid setup token hash for user test@example.com 
+2025-08-29 05:03:55,512 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '401|Invalid setup token hash', Parts: ['401', 'Invalid setup token hash'] 
+2025-08-29 05:03:55,513 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,513 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_04_invalid_token_hash
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 289, in test_04_invalid_token_hash
+    self.assertTrue(audit_log)
+AssertionError: sunray.audit.log() is not true
+ 
+2025-08-29 05:03:55,513 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_05_expired_token ... 
+2025-08-29 05:03:55,516 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,517 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Expired token used for test@example.com, expired 1.0 hours ago 
+2025-08-29 05:03:55,517 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '401|Setup token expired', Parts: ['401', 'Setup token expired'] 
+2025-08-29 05:03:55,517 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,517 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_05_expired_token
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 315, in test_05_expired_token
+    self.assertTrue(audit_log)
+AssertionError: sunray.audit.log() is not true
+ 
+2025-08-29 05:03:55,517 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_06_consumed_token_replay_attack ... 
+2025-08-29 05:03:55,520 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,521 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,521 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 650 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1098, current uses: 0 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=1/1, consumed=True 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,522 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,523 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consumed token reuse attempted for test@example.com 
+2025-08-29 05:03:55,523 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '403|Token already consumed', Parts: ['403', 'Token already consumed'] 
+2025-08-29 05:03:55,524 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,524 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_06_consumed_token_replay_attack
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 365, in test_06_consumed_token_replay_attack
+    self.assertTrue(audit_log)
+AssertionError: sunray.audit.log() is not true
+ 
+2025-08-29 05:03:55,524 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_07_wrong_host_binding ... 
+2025-08-29 05:03:55,527 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,527 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token host mismatch: token for other.example.com, requested for test.example.com 
+2025-08-29 05:03:55,528 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '403|Token not valid for this host domain', Parts: ['403', 'Token not valid for this host domain'] 
+2025-08-29 05:03:55,528 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,528 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_07_wrong_host_binding
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 391, in test_07_wrong_host_binding
+    self.assertEqual(response['data']['error'], 'Token not valid for this host')
+AssertionError: 'Token not valid for this host domain' != 'Token not valid for this host'
+- Token not valid for this host domain
+?                              -------
++ Token not valid for this host
+
+ 
+2025-08-29 05:03:55,528 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_08_ip_restriction_cidr ... 
+2025-08-29 05:03:55,531 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,531 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,532 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,532 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,533 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 651 
+2025-08-29 05:03:55,533 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1100, current uses: 0 
+2025-08-29 05:03:55,533 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=1/1, consumed=True 
+2025-08-29 05:03:55,533 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,533 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,533 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: IP address 172.16.0.1 not allowed for token 1100 
+2025-08-29 05:03:55,534 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '403|IP address not allowed for this token', Parts: ['403', 'IP address not allowed for this token'] 
+2025-08-29 05:03:55,534 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,534 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_08_ip_restriction_cidr
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 438, in test_08_ip_restriction_cidr
+    self.assertEqual(response2['data']['error'], 'IP not allowed')
+AssertionError: 'IP address not allowed for this token' != 'IP not allowed'
+- IP address not allowed for this token
++ IP not allowed
+
+ 
+2025-08-29 05:03:55,534 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_09_duplicate_credential ... 
+2025-08-29 05:03:55,537 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,538 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,538 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,538 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Duplicate credential found: 652 
+2025-08-29 05:03:55,539 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '409|Credential already registered', Parts: ['409', 'Credential already registered'] 
+2025-08-29 05:03:55,539 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_10_multi_use_token_management ... 
+2025-08-29 05:03:55,542 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,543 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,543 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 653 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1102, current uses: 0 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=1/3, consumed=False 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,544 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,545 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,545 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 654 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1102, current uses: 1 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=2/3, consumed=False 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,546 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,547 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,547 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,547 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,548 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 655 
+2025-08-29 05:03:55,548 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1102, current uses: 2 
+2025-08-29 05:03:55,548 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=3/3, consumed=True 
+2025-08-29 05:03:55,548 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,548 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,548 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consumed token reuse attempted for test@example.com 
+2025-08-29 05:03:55,549 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '403|Token already consumed', Parts: ['403', 'Token already consumed'] 
+2025-08-29 05:03:55,549 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_11_missing_public_key ... 
+2025-08-29 05:03:55,552 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,552 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '400|Public key is required for passkey registration', Parts: ['400', 'Public key is required for passkey registration'] 
+2025-08-29 05:03:55,553 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_12_empty_public_key ... 
+2025-08-29 05:03:55,556 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,556 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '400|Public key is required for passkey registration', Parts: ['400', 'Public key is required for passkey registration'] 
+2025-08-29 05:03:55,557 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_13_whitespace_only_public_key ... 
+2025-08-29 05:03:55,560 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,560 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '400|Public key is required for passkey registration', Parts: ['400', 'Public key is required for passkey registration'] 
+2025-08-29 05:03:55,560 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: Starting TestPasskeyRegistrationSecurity.test_14_complete_audit_trail ... 
+2025-08-29 05:03:55,563 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,563 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Invalid setup token hash for user test@example.com 
+2025-08-29 05:03:55,564 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '401|Invalid setup token hash', Parts: ['401', 'Invalid setup token hash'] 
+2025-08-29 05:03:55,564 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,564 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Expired token used for test@example.com, expired 1.0 hours ago 
+2025-08-29 05:03:55,565 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '401|Setup token expired', Parts: ['401', 'Setup token expired'] 
+2025-08-29 05:03:55,565 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,565 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Setup token validation successful for test@example.com on test.example.com 
+2025-08-29 05:03:55,566 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: CBOR validation successful for user test@example.com 
+2025-08-29 05:03:55,566 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Creating passkey for user test@example.com on host test.example.com 
+2025-08-29 05:03:55,567 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Passkey created successfully with ID: 656 
+2025-08-29 05:03:55,567 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consuming token 1107, current uses: 0 
+2025-08-29 05:03:55,567 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Token updated: uses=1/1, consumed=True 
+2025-08-29 05:03:55,567 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Recording success audit event 
+2025-08-29 05:03:55,567 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_passkey: Starting passkey registration for username: test@example.com 
+2025-08-29 05:03:55,567 111042 WARNING cmorisse_sunray18_d4_001 odoo.addons.sunray_core.models.sunray_setup_token: Consumed token reuse attempted for test@example.com 
+2025-08-29 05:03:55,568 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: TEST_DEBUG: Exception - Type: UserError, Message: '403|Token already consumed', Parts: ['403', 'Token already consumed'] 
+2025-08-29 05:03:55,568 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: ====================================================================== 
+2025-08-29 05:03:55,568 111042 ERROR cmorisse_sunray18_d4_001 odoo.addons.sunray_core.tests.test_passkey_security: FAIL: TestPasskeyRegistrationSecurity.test_14_complete_audit_trail
+Traceback (most recent call last):
+  File "/opt/muppy/appserver-sunray18/project_addons/sunray_core/tests/test_passkey_security.py", line 753, in test_14_complete_audit_trail
+    self.assertIn('security.passkey.setup_token_not_found', event_types)
+AssertionError: 'security.passkey.setup_token_not_found' not found in ['passkey.cbor_validation_success', 'passkey.registered']
+ 
+2025-08-29 05:03:55,588 111042 INFO cmorisse_sunray18_d4_001 odoo.addons.base.models.ir_attachment: filestore gc 0 checked, 0 removed 
+2025-08-29 05:03:55,595 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: Module sunray_core loaded in 0.45s (incl. 0.11s test), 683 queries (+354 test, +683 other) 
+2025-08-29 05:03:55,595 111042 ERROR cmorisse_sunray18_d4_001 odoo.modules.loading: Module sunray_core: 6 failures, 0 errors of 14 tests 
+2025-08-29 05:03:55,595 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.loading: 28 modules loaded in 0.63s, 683 queries (+1037 extra) 
+2025-08-29 05:03:55,798 111042 ERROR cmorisse_sunray18_d4_001 odoo.modules.loading: At least one test failed when loading the modules. 
+2025-08-29 05:03:55,800 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.registry: Registry changed, signaling through the database 
+2025-08-29 05:03:55,801 111042 INFO cmorisse_sunray18_d4_001 odoo.modules.registry: Registry loaded in 1.509s 
+2025-08-29 05:03:55,801 111042 INFO cmorisse_sunray18_d4_001 odoo.service.server: Starting post tests 
+2025-08-29 05:03:55,819 111042 INFO cmorisse_sunray18_d4_001 odoo.service.server: 0 post-tests in 0.02s, 0 queries 
+2025-08-29 05:03:55,819 111042 INFO cmorisse_sunray18_d4_001 odoo.tests.stats: sunray_core: 16 tests 0.11s 354 queries 
+2025-08-29 05:03:55,819 111042 ERROR cmorisse_sunray18_d4_001 odoo.tests.result: 6 failed, 0 error(s) of 14 tests when loading database 'cmorisse_sunray18_d4_001' 
+2025-08-29 05:03:55,819 111042 INFO cmorisse_sunray18_d4_001 odoo.service.server: Initiating shutdown 
+2025-08-29 05:03:55,819 111042 INFO cmorisse_sunray18_d4_001 odoo.service.server: Hit CTRL-C again or send a second signal to force the shutdown. 
+2025-08-29 05:03:56,295 111042 INFO cmorisse_sunray18_d4_001 odoo.sql_db: ConnectionPool(read/write;used=0/count=0/max=256): Closed 2 connections  

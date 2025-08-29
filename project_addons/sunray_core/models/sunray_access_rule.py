@@ -69,14 +69,9 @@ class SunrayAccessRule(models.Model):
         help='Deactivate to temporarily disable this access rule'
     )
     
-    _sql_constraints = [
-        ('cidr_type_check', 
-         "CHECK(access_type != 'cidr' OR allowed_cidrs IS NOT NULL)",
-         'CIDR access type requires CIDR blocks to be specified!'),
-        ('priority_positive', 
-         'CHECK(priority > 0)', 
-         'Priority must be positive!')
-    ]
+    # SQL constraints removed to allow Python constraints to provide better error handling
+    # Python constraints in _check_access_configuration() and _check_url_patterns() 
+    # provide the same validation with better user-friendly error messages
     
     @api.constrains('access_type', 'allowed_cidrs', 'token_ids')
     def _check_access_configuration(self):
@@ -95,6 +90,13 @@ class SunrayAccessRule(models.Model):
             patterns = rule.get_url_patterns()
             if not patterns:
                 raise ValidationError("At least one valid URL pattern is required!")
+    
+    @api.constrains('priority')
+    def _check_priority(self):
+        """Validate priority is positive"""
+        for rule in self:
+            if rule.priority <= 0:
+                raise ValidationError("Priority must be positive!")
     
     def btn_refresh(self):
         pass

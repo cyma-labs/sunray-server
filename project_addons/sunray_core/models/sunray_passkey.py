@@ -52,7 +52,7 @@ class SunrayPasskey(models.Model):
     counter = fields.Integer(
         string='Authentication Counter',
         default=0,
-        help='WebAuthn authentication counter for replay attack prevention. Must increment on each successful authentication.'
+        help='Counter value managed by worker (stored for debugging and audit purposes)'
     )
     
     # WebAuthn rpId binding - CRITICAL for security
@@ -159,78 +159,6 @@ class SunrayPasskey(models.Model):
         'missing_required_fields': 'COSE key missing required fields'
     }
     
-    def update_authentication_counter(self, new_counter):
-        """
-        Update the authentication counter and last_used timestamp for successful authentication.
-        
-        This method implements WebAuthn counter validation to prevent replay attacks.
-        The counter must always increase with each authentication.
-        
-        Args:
-            new_counter (int): The new counter value from WebAuthn authentication
-            
-        Returns:
-            dict: Success result with updated values
-            
-        Raises:
-            UserError: If counter validation fails (potential replay attack)
-        """
-        self.ensure_one()
-        
-        # Validate counter increment (WebAuthn spec requirement)
-        if new_counter <= self.counter:
-            # CRITICAL: Potential replay attack or counter rollback
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.counter_violation',
-                details={
-                    'username': self.user_id.username,
-                    'credential_id': self.credential_id,
-                    'passkey_id': self.id,
-                    'current_counter': self.counter,
-                    'attempted_counter': new_counter,
-                    'passkey_name': self.name,
-                    'host_domain': self.host_domain,
-                    'violation_type': 'counter_not_increased',
-                    'security_risk': 'replay_attack_or_cloned_credential'
-                },
-                severity='critical',
-                sunray_user_id=self.user_id.id,
-                username=self.user_id.username
-            )
-            raise UserError(f'403|Authentication counter violation: counter must increase (current: {self.counter}, attempted: {new_counter})')
-        
-        # Update counter and last_used atomically
-        now = fields.Datetime.now()
-        self.write({
-            'counter': new_counter,
-            'last_used': now
-        })
-        
-        # Log successful authentication
-        self.env['sunray.audit.log'].sudo().create_audit_event(
-            event_type='passkey.authenticated',
-            details={
-                'username': self.user_id.username,
-                'credential_id': self.credential_id,
-                'passkey_id': self.id,
-                'passkey_name': self.name,
-                'host_domain': self.host_domain,
-                'previous_counter': self.counter,  # Store current counter before update
-                'new_counter': new_counter,
-                'counter_increment': new_counter - self.counter,
-                'authentication_time': now.isoformat()
-            },
-            severity='info',
-            sunray_user_id=self.user_id.id,
-            username=self.user_id.username
-        )
-        
-        return {
-            'success': True,
-            'counter': self.counter,
-            'last_used': self.last_used,
-            'message': 'Authentication counter updated successfully'
-        }
     
     def revoke(self):
         """Revoke this passkey"""
@@ -317,199 +245,29 @@ class SunrayPasskey(models.Model):
             )
             raise UserError('400|Public key is required for passkey registration')
         
-        # Phase 1: User Validation
-        _logger.debug("Validating user existence and status")
-        user_obj = self.env['sunray.user'].sudo().search([('username', '=', username)], limit=1)
-        if not user_obj:
-            _logger.warning(f"User not found: {username}")
-            # AUDIT: Log user not found
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.user_not_found',
-                details={
-                    'username': username,
-                    'worker_id': worker_id
-                },
-                severity='warning',
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('404|User not found')
+        # Phase 1-4: Centralized Setup Token Validation
+        _logger.debug("Performing centralized setup token validation")
+        validation_result = self.env['sunray.setup.token'].validate_setup_token(
+            username=username,
+            token_hash=setup_token_hash,
+            host_domain=host_domain,
+            client_ip=client_ip,
+            user_agent=user_agent,
+            worker_id=worker_id
+        )
         
-        if not user_obj.is_active:
-            _logger.warning(f"Inactive user attempted registration: {username}")
-            # AUDIT: Log inactive user attempt
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.user_inactive',
-                details={
-                    'username': username,
-                    'user_id': user_obj.id,
-                    'worker_id': worker_id
-                },
-                severity='warning',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('404|User is inactive')
+        if not validation_result['valid']:
+            # Convert validation error to UserError for consistency
+            error_code = validation_result['error_code']
+            error_message = validation_result['error_message']
+            raise UserError(f'{error_code}|{error_message}')
         
-        # Setup Token Hash Validation
-        _logger.debug(f"Validating setup token hash for user {username}")
+        # Extract validated objects from result
+        token_obj = validation_result['token_obj']
+        user_obj = validation_result['user_obj']
+        host_obj = validation_result['host_obj']
         
-        token_obj = self.env['sunray.setup.token'].sudo().search([
-            ('token_hash', '=', setup_token_hash),
-            ('user_id', '=', user_obj.id)
-        ], limit=1)
-        
-        if not token_obj:
-            _logger.warning(f"Invalid setup token hash for user {username}")
-            # AUDIT: Log invalid token hash
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.setup_token_not_found',
-                details={
-                    'username': username,
-                    'user_id': user_obj.id,
-                    'worker_id': worker_id
-                },
-                severity='critical',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('401|Invalid setup token hash')
-        
-        # Check token expiry
-        if token_obj.expires_at < now:
-            hours_ago = (now - token_obj.expires_at).total_seconds() / 3600
-            _logger.warning(f"Expired token used for {username}, expired {hours_ago:.1f} hours ago")
-            # AUDIT: Log expired token
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.token_expired',
-                details={
-                    'username': username,
-                    'token_id': token_obj.id,
-                    'expired_hours_ago': round(hours_ago, 1),
-                    'expired_at': token_obj.expires_at.isoformat(),
-                    'worker_id': worker_id
-                },
-                severity='warning',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('401|Setup token expired')
-        
-        # Check if token is already consumed
-        if token_obj.consumed:
-            _logger.warning(f"Consumed token reuse attempted for {username}")
-            # AUDIT: Log consumed token reuse
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.token_already_consumed',
-                details={
-                    'username': username,
-                    'token_id': token_obj.id,
-                    'consumed_date': token_obj.consumed_date.isoformat() if token_obj.consumed_date else None,
-                    'current_uses': token_obj.current_uses,
-                    'max_uses': token_obj.max_uses,
-                    'worker_id': worker_id
-                },
-                severity='critical',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('403|Token already consumed')
-        
-        # Check token usage limit
-        if token_obj.current_uses >= token_obj.max_uses:
-            _logger.warning(f"Token usage limit exceeded for {username}: {token_obj.current_uses}/{token_obj.max_uses}")
-            # AUDIT: Log token usage limit exceeded
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.token_usage_exceeded',
-                details={
-                    'username': username,
-                    'token_id': token_obj.id,
-                    'current_uses': token_obj.current_uses,
-                    'max_uses': token_obj.max_uses,
-                    'worker_id': worker_id
-                },
-                severity='critical',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('403|Token usage limit exceeded')
-        
-        # Phase 3: Host Domain Validation
-        _logger.debug(f"Validating host domain: {host_domain}")
-        host_obj = self.env['sunray.host'].sudo().search([('domain', '=', host_domain)], limit=1)
-        
-        if not host_obj:
-            _logger.warning(f"Unknown host domain: {host_domain}")
-            # AUDIT: Log unknown host
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.unknown_host',
-                details={
-                    'username': username,
-                    'requested_host': host_domain,
-                    'token_id': token_obj.id,
-                    'worker_id': worker_id
-                },
-                severity='warning',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('400|Unknown host domain')
-        
-        if not host_obj.is_active:
-            _logger.warning(f"Inactive host domain: {host_domain}")
-            # AUDIT: Log inactive host
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.host_inactive',
-                details={
-                    'username': username,
-                    'requested_host': host_domain,
-                    'host_id': host_obj.id,
-                    'token_id': token_obj.id,
-                    'worker_id': worker_id
-                },
-                severity='warning',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('400|Host is inactive')
-        
-        # Validate token is for the correct host
-        if token_obj.host_id and token_obj.host_id.id != host_obj.id:
-            _logger.warning(f"Token host mismatch: token for {token_obj.host_id.domain}, requested {host_domain}")
-            # AUDIT: Log host mismatch
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.token_wrong_host',
-                details={
-                    'username': username,
-                    'token_host': token_obj.host_id.domain,
-                    'requested_host': host_domain,
-                    'token_id': token_obj.id,
-                    'worker_id': worker_id
-                },
-                severity='critical',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            raise UserError('403|Token not valid for this host')
-        
-        # User Authorization Check
+        # Additional passkey-specific authorization check
         if user_obj not in host_obj.user_ids:
             _logger.warning(f"User {username} not authorized for host {host_domain}")
             # AUDIT: Log unauthorized user for host
@@ -530,37 +288,26 @@ class SunrayPasskey(models.Model):
             )
             raise UserError(f'403|User not authorized for host: {host_domain}')
         
-        # Phase 4: IP CIDR Restriction Check
-        if token_obj.allowed_cidrs and client_ip:
-            _logger.debug(f"Checking IP {client_ip} against CIDR restrictions")
-            from odoo.addons.sunray_core.utils.cidr import check_cidr_match
-            allowed_cidrs = token_obj.get_allowed_cidrs()
-            
-            ip_allowed = False
-            for cidr in allowed_cidrs:
-                if check_cidr_match(client_ip, cidr):
-                    ip_allowed = True
-                    break
-            
-            if not ip_allowed:
-                # AUDIT: Log IP restriction violation
-                self.env['sunray.audit.log'].sudo().create_audit_event(
-                    event_type='security.passkey.ip_not_allowed',
-                    details={
-                        'username': username,
-                        'host_domain': host_domain,
-                        'client_ip': client_ip,
-                        'allowed_cidrs': allowed_cidrs,
-                        'token_id': token_obj.id,
-                        'worker_id': worker_id
-                    },
-                    severity='critical',
-                    sunray_user_id=user_obj.id,
-                    sunray_worker=worker_id,
-                    ip_address=client_ip,
-                    username=username
-                )
-                raise UserError('403|IP not allowed')
+        # Host active status check (not covered by token validation)
+        if not host_obj.is_active:
+            _logger.warning(f"Inactive host domain: {host_domain}")
+            # AUDIT: Log inactive host
+            self.env['sunray.audit.log'].sudo().create_audit_event(
+                event_type='security.passkey.host_inactive',
+                details={
+                    'username': username,
+                    'requested_host': host_domain,
+                    'host_id': host_obj.id,
+                    'token_id': token_obj.id,
+                    'worker_id': worker_id
+                },
+                severity='warning',
+                sunray_user_id=user_obj.id,
+                sunray_worker=worker_id,
+                ip_address=client_ip,
+                username=username
+            )
+            raise UserError('400|Host is inactive')
         
         # Phase 5: Credential Validation - CRITICAL for WebAuthn security
         _logger.debug(f"Validating credential for user {username}")
@@ -610,6 +357,8 @@ class SunrayPasskey(models.Model):
                 ip_address=client_ip,
                 username=username
             )
+            # Ensure audit event is flushed before raising exception
+            self.env.cr.flush()
             raise UserError(f'400|Invalid WebAuthn public key format: {validation_result}')
         
         # Log successful CBOR validation

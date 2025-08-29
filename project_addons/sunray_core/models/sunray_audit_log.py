@@ -27,6 +27,19 @@ class SunrayAuditLog(models.Model):
         ('token.generated', 'Token Generated'),
         ('token.consumed', 'Token Consumed'),
         ('token.cleanup', 'Token Cleanup'),
+        # Setup Token Validation Events
+        ('token.validation.success', 'Setup Token Validation Success'),
+        ('token.validation.expired', 'Setup Token Expired'),
+        ('token.validation.user_not_found', 'Setup Token User Not Found'),
+        ('token.validation.user_inactive', 'Setup Token User Inactive'),
+        ('token.validation.token_not_found', 'Setup Token Not Found'),
+        ('token.validation.consumed', 'Setup Token Already Consumed'),
+        ('token.validation.usage_exceeded', 'Setup Token Usage Exceeded'),
+        ('token.validation.unknown_host', 'Setup Token Unknown Host'),
+        ('token.validation.host_mismatch', 'Setup Token Host Mismatch'),
+        ('token.validation.invalid_ip', 'Setup Token Invalid IP'),
+        ('token.validation.ip_restricted', 'Setup Token IP Restricted'),
+        ('token.validation.error', 'Setup Token Validation Error'),
         # Passkey Events
         ('passkey.registered', 'Passkey Registered'),
         ('passkey.revoked', 'Passkey Revoked'),
@@ -113,7 +126,6 @@ class SunrayAuditLog(models.Model):
         ('security.passkey.creation_failed', 'Passkey Creation Failed'),
         ('security.passkey.domain_mismatch', 'Passkey Domain Mismatch'),
         ('security.passkey.invalid_cbor_format', 'Passkey Invalid CBOR Format'),
-        ('security.passkey.counter_violation', 'Passkey Counter Violation'),
         ('security.passkey.unexpected_error', 'Passkey Unexpected Error'),
     ], required=True, string='Event Type')
     

@@ -788,7 +788,7 @@ curl -X POST https://sunray.example.com/sunray-srvr/v1/users/user@example.com/pa
 
 ### POST /sunray-srvr/v1/sessions
 
-**Purpose**: Creates a new session after successful WebAuthn authentication and updates passkey counter.
+**Purpose**: Creates a new session record. Server acts as storage layer - worker manages counter validation and session expiration calculation.
 
 **Request Body**:
 ```json
@@ -796,7 +796,7 @@ curl -X POST https://sunray.example.com/sunray-srvr/v1/users/user@example.com/pa
   "session_id": "generated_session_id",
   "username": "user@example.com",
   "host_domain": "example.com",
-  "duration": 28800,
+  "expires_at": "2024-01-01T20:00:00Z",
   "credential_id": "credential_id_used",
   "counter": 42,
   "created_ip": "client_ip",
@@ -807,13 +807,11 @@ curl -X POST https://sunray.example.com/sunray-srvr/v1/users/user@example.com/pa
 ```
 
 **Field Descriptions**:
-- `counter` (integer, optional): WebAuthn authentication counter for replay attack prevention. 
-  - **Expected values**: Must be strictly greater than the passkey's current stored counter (not equal)
-  - **Minimum increment**: Current counter + 1
-  - **Valid range**: Any positive integer > current counter (up to 2,147,483,647)
-  - **Initial value**: Passkeys start with counter = 0 upon registration
-  - **Security**: Counter MUST increase on each authentication per WebAuthn specification
-  - If provided with a valid `credential_id`, updates the passkey's counter and last_used timestamp
+- `expires_at` (string, required): ISO 8601 datetime when session expires. Worker calculates this based on its configuration.
+- `counter` (integer, required): WebAuthn authentication counter value managed by worker. Server stores for debugging and audit purposes.
+  - Worker is responsible for counter validation per WebAuthn specification
+  - Server updates passkey counter and last_used timestamp if credential_id provided
+  - No server-side validation - pure storage operation for admin debugging
 
 **Response**:
 ```json
@@ -824,30 +822,19 @@ curl -X POST https://sunray.example.com/sunray-srvr/v1/users/user@example.com/pa
 ```
 
 **Error Responses**:
-- `403 Forbidden`: Counter validation failed (potential replay attack)
-  ```json
-  {
-    "error": "Authentication counter violation: counter must increase (current: 41, attempted: 40)"
-  }
-  ```
+- `400 Bad Request`: Missing required fields (expires_at, counter) or invalid expires_at format
+- `401 Unauthorized`: Invalid or missing API key  
+- `404 Not Found`: User not found
 
-**Counter Examples**:
-If the passkey's current counter is 41:
-- `"counter": 42` ✅ Valid (minimum increment)
-- `"counter": 50` ✅ Valid (larger increment allowed)
-- `"counter": 41` ❌ Invalid (must be greater, not equal)
-- `"counter": 40` ❌ Invalid (rollback not allowed)
-- `"counter": 0`  ❌ Invalid (reset not allowed)
+**Worker Responsibilities**:
+- Counter validation per WebAuthn specification (server only stores for debugging)
+- Session expiration calculation based on host configuration
+- Proper ISO 8601 expires_at formatting
 
-**Security Notes**:
-- The `counter` field implements WebAuthn replay attack prevention
-- Counter violations trigger critical security audit events (`security.passkey.counter_violation`)
-- Each passkey maintains its own independent counter
-- Counter rollback or stagnation may indicate credential cloning or replay attacks
-- Counter must always increase with each authentication
-- Counter violations are logged as critical security events
-- If `counter` is provided without `credential_id`, it will be ignored
-- If `credential_id` doesn't match any passkey for the user, counter validation is skipped
+**Server Behavior**:
+- Stores all provided data without validation
+- Updates passkey counter and last_used if credential_id matches existing passkey
+- Maintains audit trail for debugging and compliance
 
 ### POST /sunray-srvr/v1/sessions/<session_id>/revoke
 

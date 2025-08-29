@@ -265,9 +265,6 @@ class TestUICacheActions(TransactionCase):
 
     def test_user_action_revoke_sessions_invalid_host(self):
         """Test User form action with invalid host ID"""
-        # Call with non-existent host ID
-        result = self.user.action_revoke_sessions_on_host(99999)
-        
         # Should raise UserError
         with self.assertRaises(UserError) as cm:
             self.user.action_revoke_sessions_on_host(99999)

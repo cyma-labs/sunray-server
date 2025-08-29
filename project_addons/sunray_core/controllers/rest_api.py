@@ -210,6 +210,104 @@ class SunrayRESTController(http.Controller):
         
         return self._json_response(health)
     
+    @http.route('/sunray-srvr/v1/setup-tokens/validate', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
+    def validate_setup_token(self, **kwargs):
+        """Validate a setup token before WebAuthn registration
+        
+        This endpoint allows workers to validate setup tokens before initiating
+        the WebAuthn registration ceremony, providing early feedback to users.
+        
+        Required Headers:
+        - Authorization: Bearer <api-key>
+        - X-Worker-ID: <worker-identifier>
+        
+        JSON Body:
+        - username: User's username
+        - token_hash: SHA-512 hash of setup token (prefixed with "sha512:")
+        - client_ip: Client's IP address
+        - host_domain: Domain being protected
+        
+        Returns:
+        - {"valid": true} if token is valid
+        - {"valid": false} if token is invalid
+        """
+        # Set up request context for audit logging
+        context_data = self._setup_request_context(request)
+        
+        # Authenticate API request
+        api_key_obj = self._authenticate_api(request)
+        if not api_key_obj:
+            return self._error_response('Unauthorized', 401)
+        
+        # Parse JSON body
+        try:
+            data = json.loads(request.httprequest.get_data())
+        except (ValueError, TypeError):
+            return self._error_response('Invalid JSON in request body', 400)
+        
+        # Extract required parameters
+        username = data.get('username')
+        token_hash = data.get('token_hash')
+        client_ip = data.get('client_ip')
+        host_domain = data.get('host_domain')
+        
+        # Get optional parameters from headers and body
+        worker_id = context_data['worker_id']
+        user_agent = request.httprequest.headers.get('User-Agent', '')
+        
+        # Validate required fields
+        missing_fields = []
+        if not username:
+            missing_fields.append('username')
+        if not token_hash:
+            missing_fields.append('token_hash')
+        if not client_ip:
+            missing_fields.append('client_ip')
+        if not host_domain:
+            missing_fields.append('host_domain')
+        
+        if missing_fields:
+            return self._error_response(f'Missing required fields: {", ".join(missing_fields)}', 400)
+        
+        # Call centralized validation method
+        try:
+            validation_result = request.env['sunray.setup.token'].validate_setup_token(
+                username=username,
+                token_hash=token_hash,
+                host_domain=host_domain,
+                client_ip=client_ip,
+                user_agent=user_agent,
+                worker_id=worker_id
+            )
+            
+            # Return simple validation result
+            return self._json_response({
+                'valid': validation_result['valid']
+            })
+            
+        except Exception as e:
+            # Log unexpected errors
+            _logger.error(f"Unexpected error in setup token validation: {str(e)}")
+            
+            # Create audit event for system error
+            request.env['sunray.audit.log'].sudo().create_audit_event(
+                event_type='token.validation.system_error',
+                details={
+                    'username': username,
+                    'host_domain': host_domain,
+                    'error': str(e),
+                    'worker_id': worker_id
+                },
+                severity='error',
+                sunray_worker=worker_id,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                username=username
+            )
+            
+            # Return generic error (don't expose internal details)
+            return self._json_response({'valid': False})
+    
     @http.route('/sunray-srvr/v1/config', type='http', auth='none', methods=['GET'], cors='*')
     def get_config(self, **kwargs):
         """Get configuration for Worker"""
@@ -789,7 +887,7 @@ class SunrayRESTController(http.Controller):
     
     @http.route('/sunray-srvr/v1/sessions', type='http', auth='none', methods=['POST'], cors='*', csrf=False)
     def create_session(self, **kwargs):
-        """Create new session record with passkey counter update"""
+        """Create new session record - server acts as storage layer only"""
         api_key_obj = self._authenticate_api(request)
         if not api_key_obj:
             return self._error_response('Unauthorized', 401)
@@ -813,37 +911,37 @@ class SunrayRESTController(http.Controller):
             ('domain', '=', host_domain)
         ])
         
-        # Get credential_id and counter from request
+        # Get credential_id and counter from request (worker managed)
         credential_id = data.get('credential_id')
-        auth_counter = data.get('counter')  # WebAuthn authentication counter
+        auth_counter = data.get('counter')  # Counter managed by worker, required for debugging
+        
+        # Validate required fields
+        if auth_counter is None:
+            return self._error_response('counter is required for debugging and audit purposes', 400)
         
         passkey_obj = None
         if credential_id:
-            # Find the passkey for counter update
+            # Find the passkey for counter storage (no validation)
             passkey_obj = request.env['sunray.passkey'].sudo().search([
                 ('credential_id', '=', credential_id),
                 ('user_id', '=', user_obj.id)
             ], limit=1)
             
-            if passkey_obj and auth_counter is not None:
-                try:
-                    # Update passkey counter (this validates counter increment and updates last_used)
-                    passkey_obj.update_authentication_counter(auth_counter)
-                except UserError as e:
-                    # Counter validation failed - return error
-                    msg = str(e)
-                    parts = msg.split('|', 1)
-                    if len(parts) == 2 and parts[0].isdigit():
-                        status = int(parts[0])
-                        message = parts[1]
-                    else:
-                        status = 403
-                        message = msg
-                    return self._error_response(message, status)
+            if passkey_obj:
+                # Store counter value without validation - worker manages counter logic
+                passkey_obj.counter = auth_counter
+                passkey_obj.last_used = fields.Datetime.now()
         
-        # Calculate expiration using host's session duration
-        duration = host_obj.session_duration_s if host_obj else 3600  # Use host setting or server default
-        expires_at = fields.Datetime.now() + timedelta(seconds=duration)
+        # Get expiration time from worker (worker calculates based on its config)
+        expires_at_str = data.get('expires_at')
+        if not expires_at_str:
+            return self._error_response('expires_at is required', 400)
+        
+        try:
+            # Parse ISO 8601 datetime from worker
+            expires_at = fields.Datetime.from_string(expires_at_str)
+        except ValueError:
+            return self._error_response('Invalid expires_at format, expected ISO 8601', 400)
         
         # Create session with passkey link
         session_obj = request.env['sunray.session'].sudo().create({
@@ -867,8 +965,8 @@ class SunrayRESTController(http.Controller):
                 'session_id': data.get('session_id'),
                 'credential_id': credential_id,
                 'passkey_id': passkey_obj.id if passkey_obj else None,
-                'counter_updated': auth_counter is not None and passkey_obj is not None,
-                'new_counter': auth_counter if auth_counter is not None else None
+                'counter_stored': auth_counter,
+                'expires_at': expires_at_str
             },
             sunray_user_id=user_obj.id,
             sunray_worker=context_data['worker_id'],

@@ -258,8 +258,7 @@
                             </group>
                             
                             <group string="WebSocket Configuration">
-                                <field name="websocket_urls" widget="text" nolabel="1"
-                                       placeholder="^/ws/chat/.*&#10;^/ws/notifications&#10;# WebSocket endpoints that require authentication"/>
+                                <field name="websocket_url_prefix" placeholder="/ws/"/>
                             </group>
                             
                             <group string="WAF Integration">

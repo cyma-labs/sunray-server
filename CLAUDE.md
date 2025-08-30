@@ -462,13 +462,17 @@ bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hou
 ### Security Model
 
 - **Default Locked**: All resources protected by default
-- **NEW: Access Rules System** (unified exceptions management):
+- **Access Rules System** (unified exceptions management):
   - Priority-based rule evaluation (lower number = higher priority)
   - **Public Access**: No authentication required
-  - **CIDR Access**: IP address/range whitelist
+  - **CIDR Access**: IP address/range whitelist  
   - **Token Access**: API/webhook token authentication
   - First matching rule determines access type
-- **Legacy Support**: Fallback to separate fields (deprecated)
+- **WebSocket URLs** (authenticated WebSocket endpoints):
+  - Configured at host level, not in access rules
+  - Always require valid session cookies
+  - Upgraded to WebSocket protocol after authentication
+  - For unauthenticated WebSocket access, use public access rules
 - **WebAuthn/Passkeys**: Primary authentication method
 - **Session Management**: Secure cookies with configurable TTL
 
@@ -809,28 +813,22 @@ bin/test_rest_api.sh --list-tests
 - ✅ Updated documentation
 
 **Key Benefits Achieved:**
-- **Unified Access Control**: Single system for all access exceptions
+- **Unified Access Control**: Single system for all access exceptions (Public, CIDR, Token)
 - **Token Reuse**: Multiple URL patterns can reference same tokens
 - **Priority-Based**: Clear evaluation order (first match wins)
+- **WebSocket Security**: Built-in CSWSH prevention with origin validation enforced by worker
 - **Worker Simplification**: Business logic in server, worker executes decisions
 - **Backward Compatibility**: Legacy fields supported during transition
 - **Future-Ready**: Kubernetes ForwardAuth compatibility
 
-### Architecture Improvements
-
-**Before (Legacy):**
+### Configuration Example
 ```
 Host Configuration:
-├── allowed_cidrs (scattered)
-├── public_url_patterns (scattered)
-├── token_url_patterns (scattered)
-└── webhook_tokens (limited reuse)
-```
-
-**After (Access Rules):**
-```
-Host Configuration:
-├── Access Rules (unified)
+├── WebSocket URLs (authenticated)
+│   ├── /ws/chat/.*
+│   ├── /ws/api/.*
+│   └── /ws/notifications
+├── Access Rules (unified exceptions)
 │   ├── Rule 1: Priority 100, Public, [/health, /status]
 │   ├── Rule 2: Priority 200, CIDR, [/admin/*], [192.168.1.0/24]
 │   └── Rule 3: Priority 300, Token, [/api/*, /webhook/*], [Token1, Token2]

@@ -336,7 +336,7 @@ class SunrayRESTController(http.Controller):
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
-                'websocket_urls': host_obj.get_websocket_urls(),
+                'websocket_url_prefix': host_obj.websocket_url_prefix,
                 
                 # NEW: Access Rules - unified exceptions tree
                 'exceptions_tree': host_obj.get_exceptions_tree(),
@@ -560,7 +560,7 @@ class SunrayRESTController(http.Controller):
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
-                'websocket_urls': host_obj.get_websocket_urls(),
+                'websocket_url_prefix': host_obj.websocket_url_prefix,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,
@@ -641,7 +641,7 @@ class SunrayRESTController(http.Controller):
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
-                'websocket_urls': host_obj.get_websocket_urls(),
+                'websocket_url_prefix': host_obj.websocket_url_prefix,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,
                 'waf_bypass_revalidation_s': host_obj.waf_bypass_revalidation_s,

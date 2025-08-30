@@ -46,14 +46,13 @@ class SunrayHost(models.Model):
         string='Access Rules'
     )
     
-    # WebSocket URLs (authenticated paths that upgrade to WebSocket protocol)
-    websocket_urls = fields.Text(
-        string='WebSocket URLs',
-        help='URL patterns for authenticated WebSocket connections (one per line, # for comments)\n'
-             'These paths require valid session cookies but will be upgraded to WebSocket protocol.\n'
-             'Examples:\n'
-             '^/ws/chat/.*     # Chat WebSocket endpoints\n'
-             '^/ws/notifications   # Real-time notifications\n'
+    # WebSocket URL Prefix (authenticated paths that upgrade to WebSocket protocol)
+    websocket_url_prefix = fields.Char(
+        string='WebSocket URL Prefix',
+        default='',
+        help='URL prefix for authenticated WebSocket connections (e.g., /ws/). '
+             'Leave empty if no WebSocket support needed. '
+             'All URLs starting with this prefix will be upgraded to WebSocket protocol after authentication. '
              'For unauthenticated WebSocket access, create a Public access rule instead.'
     )
     
@@ -401,21 +400,6 @@ class SunrayHost(models.Model):
             if line:
                 result.append(line)
         return result
-    
-    def get_websocket_urls(self, format='json'):
-        """Parse WebSocket URLs from line-separated format
-        
-        Args:
-            format: Output format ('json' returns list, future: 'txt', 'yaml')
-            
-        Returns:
-            Parsed data in requested format
-        """
-        if format == 'json':
-            return self._parse_line_separated_field(self.websocket_urls)
-        # Future formats can be added here
-        else:
-            raise ValueError(f"Unsupported format: {format}")
     
     def get_exceptions_tree(self):
         """Generate exceptions tree for Worker using Access Rules

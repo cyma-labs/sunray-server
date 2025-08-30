@@ -204,6 +204,13 @@ The `/config/register` endpoint handles all migration logic:
               }
             ]
           }
+        ],
+        "websocket_rules": [
+          {
+            "priority": 150,
+            "patterns": ["^/ws/chat/.*", "^/ws/notifications"],
+            "description": "Real-time communication endpoints"
+          }
         ]
       },
       "bypass_waf_for_authenticated": true,
@@ -227,7 +234,7 @@ The `/config/register` endpoint handles all migration logic:
 - `backend`: Backend service URL to proxy to
 - `authorized_users`: List of usernames allowed access
 - `session_duration_s`: Session duration in seconds (always present, default: 3600)
-- `exceptions_tree`: Access rules for public, CIDR, and token-based access
+- `exceptions_tree`: Access rules for public, CIDR, token, and WebSocket-based access
 - `bypass_waf_for_authenticated`: Enable WAF bypass for authenticated users
 - `waf_bypass_revalidation_s`: WAF bypass cookie revalidation period in seconds (always present, default: 900)
 - `worker_id`: ID of the worker protecting this host (null if not yet bound)
@@ -282,6 +289,13 @@ The `/config/register` endpoint handles all migration logic:
               "token_source": "header"
             }
           ]
+        }
+      ],
+      "websocket_rules": [
+        {
+          "priority": 150,
+          "patterns": ["^/ws/chat/.*", "^/ws/notifications"],
+          "description": "Real-time communication endpoints"
         }
       ]
     },
@@ -382,6 +396,13 @@ The `/config/register` endpoint handles all migration logic:
               "token_source": "header"
             }
           ]
+        }
+      ],
+      "websocket_rules": [
+        {
+          "priority": 150,
+          "patterns": ["^/ws/chat/.*", "^/ws/notifications"],
+          "description": "Real-time communication endpoints"
         }
       ]
     },

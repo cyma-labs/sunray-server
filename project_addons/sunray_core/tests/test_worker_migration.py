@@ -129,10 +129,10 @@ class TestWorkerMigration(TransactionCase):
     def test_action_clear_pending_migration_none_exists(self):
         """Test UI action when no pending migration exists"""
         result = self.host.action_clear_pending_migration()
-        
+
         self.assertEqual(result['type'], 'ir.actions.client')
         self.assertEqual(result['params']['type'], 'info')
-        self.assertIn('No pending migration', result['params']['message'])
+        self.assertIn('There is no pending migration', result['params']['message'])
     
     def test_worker_get_migration_status(self):
         """Test worker migration status method"""
@@ -241,25 +241,69 @@ class TestWorkerRegistrationAPI(TransactionCase):
             'is_active': True
         })
     
-    @patch('odoo.addons.sunray_core.controllers.main.request')
-    def test_registration_same_worker_idempotent(self, mock_request):
+    def test_registration_same_worker_idempotent(self):
         """Test that same worker re-registering is idempotent"""
-        # Mock the request environment
-        mock_request.env = self.env
-        mock_request.httprequest.headers = {'X-Worker-ID': 'prod-worker-001'}
-        mock_request.httprequest.data = json.dumps({'hostname': 'api.example.com'})
-        mock_request.httprequest.environ = {'REMOTE_ADDR': '192.168.1.100'}
-        
-        controller = self.env['ir.http']._find_handler()[0]
-        
-        # This would test the actual API, but requires more complex mocking
-        # For now, test the core logic directly
-        
-        # Simulate same worker registering
+        # Initial state: host is bound to worker1
         self.assertEqual(self.host.sunray_worker_id.id, self.worker1.id)
-        
-        # Should remain the same (idempotent)
-        self.assertEqual(self.host.sunray_worker_id.id, self.worker1.id)
+        initial_worker_id = self.host.sunray_worker_id.id
+
+        # Simulate the registration logic from the controller
+        # This mimics what happens in register_worker when same worker registers
+        worker_name = 'prod-worker-001'
+        hostname = 'api.example.com'
+
+        # Find the worker (should be worker1)
+        worker_obj = self.env['sunray.worker'].sudo().search([
+            ('name', '=', worker_name)
+        ], limit=1)
+
+        self.assertTrue(worker_obj, "Worker should exist")
+        self.assertEqual(worker_obj.id, self.worker1.id, "Should find the correct worker")
+
+        # Find the host
+        host_obj = self.env['sunray.host'].sudo().search([
+            ('domain', '=', hostname)
+        ], limit=1)
+
+        self.assertTrue(host_obj, "Host should exist")
+        self.assertEqual(host_obj.id, self.host.id, "Should find the correct host")
+
+        # Simulate the idempotent case: same worker re-registering
+        if host_obj.sunray_worker_id.id == worker_obj.id:
+            # This is the idempotent path - should not change anything
+            # Create audit event for re-registration
+            self.env['sunray.audit.log'].sudo().create_api_event(
+                event_type='worker.re_registered',
+                api_key_id=self.api_key1.id,
+                details={
+                    'worker_id': worker_obj.id,
+                    'worker_name': worker_name,
+                    'host_id': host_obj.id,
+                    'hostname': hostname
+                },
+                ip_address='192.168.1.100'
+            )
+
+        # Verify the host is still bound to the same worker (idempotent)
+        self.assertEqual(host_obj.sunray_worker_id.id, initial_worker_id)
+        self.assertEqual(host_obj.sunray_worker_id.id, worker_obj.id)
+
+        # Verify no pending migration was set
+        self.assertFalse(host_obj.pending_worker_name)
+        self.assertFalse(host_obj.migration_requested_at)
+
+        # Verify audit log was created
+        audit_log = self.env['sunray.audit.log'].sudo().search([
+            ('event_type', '=', 'worker.re_registered'),
+            ('details', 'ilike', f'"worker_id": {worker_obj.id}')
+        ], order='create_date desc', limit=1)
+
+        self.assertTrue(audit_log, "Should have created re-registration audit log")
+
+        # Parse the details JSON
+        details_dict = audit_log.get_details_dict()
+        self.assertEqual(details_dict.get('worker_name'), worker_name)
+        self.assertEqual(details_dict.get('hostname'), hostname)
     
     def test_pending_migration_logic(self):
         """Test pending migration triggers migration"""

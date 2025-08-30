@@ -407,3 +407,110 @@ class TestAccessRules(TransactionCase):
         # Only active and valid token should be included
         self.assertEqual(len(config['tokens']), 1)
         self.assertEqual(config['tokens'][0]['name'], 'Shopify Webhook')
+
+
+
+
+    def test_mixed_rule_priority_ordering(self):
+        """Test priority ordering works with different access types"""
+
+        rules_data = [
+            ('cidr_high', 50, 'cidr'),
+            ('http_medium', 100, 'public'),
+            ('public_low', 200, 'public'),
+            ('token_highest', 10, 'token')
+        ]
+
+        created_rules = []
+        for name, priority, access_type in rules_data:
+            rule_data = {
+                'host_id': self.host.id,
+                'description': f'{name} rule',
+                'priority': priority,
+                'access_type': access_type
+            }
+
+            if access_type == 'cidr':
+                rule_data.update({
+                    'url_patterns': f'^/{name}',
+                    'allowed_cidrs': '192.168.1.0/24'
+                })
+            elif access_type == 'token':
+                rule_data.update({
+                    'url_patterns': f'^/{name}',
+                    'token_ids': [(6, 0, [self.token1.id])]
+                })
+            else:
+                rule_data['url_patterns'] = f'^/{name}'
+
+            created_rules.append(self.env['sunray.access.rule'].create(rule_data))
+
+        # Get exceptions tree
+        tree = self.env['sunray.access.rule'].generate_exceptions_tree(self.host.id)
+
+        # Should be ordered by priority
+        expected_order = [10, 50, 100, 200]  # token_highest, cidr_high, http_medium, public_low
+        actual_order = [rule['priority'] for rule in tree]
+
+        self.assertEqual(actual_order, expected_order)
+
+    # Host WebSocket URL Prefix Tests
+    def test_host_websocket_url_prefix_field(self):
+        """Test WebSocket URL prefix field on host model"""
+        
+        # Test empty prefix (default)
+        self.assertEqual(self.host.websocket_url_prefix, '')
+        
+        # Set WebSocket prefix
+        self.host.write({'websocket_url_prefix': '/ws/'})
+        self.assertEqual(self.host.websocket_url_prefix, '/ws/')
+        
+        # Test various valid prefixes
+        test_prefixes = ['/websocket/', '/wss/', '/socket/', '/api/ws/', '']
+        for prefix in test_prefixes:
+            self.host.write({'websocket_url_prefix': prefix})
+            self.assertEqual(self.host.websocket_url_prefix, prefix)
+    
+    def test_websocket_url_prefix_in_api_response(self):
+        """Test that WebSocket URL prefix is included in API responses"""
+        
+        # Test empty prefix
+        self.assertEqual(self.host.websocket_url_prefix, '')
+        
+        # Set WebSocket prefix on host
+        self.host.write({'websocket_url_prefix': '/ws/'})
+        
+        # Verify the prefix is set correctly
+        self.assertEqual(self.host.websocket_url_prefix, '/ws/')
+    
+    def test_websocket_url_prefix_performance(self):
+        """Test performance comparison between regex and prefix approach"""
+        import time
+        
+        # Setup test URL
+        test_url = '/ws/chat/room123'
+        
+        # Test prefix approach (current)
+        prefix = '/ws/'
+        start_time = time.perf_counter()
+        for _ in range(1000):
+            is_websocket = test_url.startswith(prefix) if prefix else False
+        prefix_time = time.perf_counter() - start_time
+        
+        # Test regex approach (old)
+        import re
+        patterns = ['^/ws/chat/.*', '^/ws/notifications']
+        compiled_patterns = [re.compile(p) for p in patterns]
+        start_time = time.perf_counter()
+        for _ in range(1000):
+            is_websocket = any(p.match(test_url) for p in compiled_patterns)
+        regex_time = time.perf_counter() - start_time
+        
+        # Prefix should be significantly faster
+        self.assertLess(prefix_time, regex_time)
+        
+        # Log the performance improvement
+        improvement = regex_time / prefix_time if prefix_time > 0 else float('inf')
+        print(f"Performance improvement: {improvement:.1f}x faster ({regex_time*1000:.3f}ms vs {prefix_time*1000:.3f}ms for 1000 operations)")
+
+

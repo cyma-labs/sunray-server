@@ -52,3 +52,6 @@ test_logs_and_coverage/*
 # Local environment configuration
 .claude.local.md
 *.local.md
+
+docs/specs/
+specs/

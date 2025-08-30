@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) and all others IA when working with code in this repository.
 
 ## Project Overview
 
@@ -98,7 +98,6 @@ Sunray is organized as separate repositories following a server-centric architec
 │   │   └── security/
 │   └── sunray_enterprise/     # Advanced edition addon (future)
 ├── docs/                      # Documentation
-│   ├── specs/                 # Technical specifications
 │   ├── market_analysis_pricing_comparison.md
 │   └── mvp_implementation_plan.md
 ├── config/                    # Configuration examples
@@ -107,6 +106,7 @@ Sunray is organized as separate repositories following a server-centric architec
 │   ├── sunray-srvr            # Odoo launcher script
 │   ├── test_server.sh         # Internal Odoo test runner
 │   └── test_rest_api.sh       # External REST API tester
+├── specs/                     # PRD / Technical specifications 
 └── etc/                       # Configuration files
     └── odoo.buildit.cfg       # Generated Odoo config
 ```

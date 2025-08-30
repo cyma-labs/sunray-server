@@ -70,33 +70,34 @@ class SunrayAccessRule(models.Model):
     )
     
     # SQL constraints removed to allow Python constraints to provide better error handling
-    # Python constraints in _check_access_configuration() and _check_url_patterns() 
-    # provide the same validation with better user-friendly error messages
+    # Unified Python constraint in _validate_access_rule() provides comprehensive validation
+    # with user-friendly error messages and optimal performance
     
-    @api.constrains('access_type', 'allowed_cidrs', 'token_ids')
-    def _check_access_configuration(self):
-        """Validate access configuration based on type"""
+    @api.constrains('access_type', 'url_patterns', 'allowed_cidrs', 'token_ids', 'priority')
+    def _validate_access_rule(self):
+        """Comprehensive validation of access rule configuration
+        
+        Validates all aspects of an access rule in a single pass for optimal performance:
+        - Priority must be positive
+        - URL patterns must exist and be valid
+        - Type-specific requirements (CIDR blocks for cidr type, tokens for token type)
+        """
         for rule in self:
+            # Priority validation
+            if rule.priority <= 0:
+                raise ValidationError("Priority must be positive!")
+            
+            # URL patterns validation (required for all access types)
+            patterns = rule.get_url_patterns()
+            if not patterns:
+                raise ValidationError("At least one valid URL pattern is required!")
+            
+            # Type-specific validation
             if rule.access_type == 'cidr' and not rule.allowed_cidrs:
                 raise ValidationError("CIDR access type requires CIDR blocks to be specified!")
             
             if rule.access_type == 'token' and not rule.token_ids:
                 raise ValidationError("Token access type requires at least one token to be selected!")
-    
-    @api.constrains('url_patterns')
-    def _check_url_patterns(self):
-        """Validate URL patterns are not empty"""
-        for rule in self:
-            patterns = rule.get_url_patterns()
-            if not patterns:
-                raise ValidationError("At least one valid URL pattern is required!")
-    
-    @api.constrains('priority')
-    def _check_priority(self):
-        """Validate priority is positive"""
-        for rule in self:
-            if rule.priority <= 0:
-                raise ValidationError("Priority must be positive!")
     
     def btn_refresh(self):
         pass

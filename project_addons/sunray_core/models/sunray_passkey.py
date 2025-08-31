@@ -260,6 +260,11 @@ class SunrayPasskey(models.Model):
             # Convert validation error to UserError for consistency
             error_code = validation_result['error_code']
             error_message = validation_result['error_message']
+            # Harmonize error messages with API contract for passkey registration
+            if error_code == '403' and error_message == 'IP address not allowed for this token':
+                error_message = 'IP not allowed'
+            if error_code == '403' and error_message == 'Token not valid for this host domain':
+                error_message = 'Token not valid for this host'
             raise UserError(f'{error_code}|{error_message}')
         
         # Extract validated objects from result

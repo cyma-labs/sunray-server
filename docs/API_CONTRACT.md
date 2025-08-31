@@ -654,13 +654,14 @@ const token_hash = `sha512:${hash}`;
 }
 ```
 
-## Public Key Format Requirements
+## Public Key Storage Requirements
 
-All WebAuthn public keys MUST be provided in CBOR/COSE format:
+WebAuthn public keys are provided by workers for server storage:
 
-**Format**: CBOR-encoded COSE_Key structure, base64-encoded
-**Validation**: Server validates CBOR structure and COSE format on registration
-**Standards**: Compliant with WebAuthn Level 2/3 specifications
+**Format**: As provided by the worker (typically CBOR-encoded COSE_Key structure, base64-encoded)
+**Storage**: Server stores the public key data exactly as provided by the worker
+**Validation**: Server does NOT validate public key format - validation is performed by the worker
+**Standards**: Worker should ensure compliance with WebAuthn Level 2/3 specifications
 
 **Example COSE Key Structure (before CBOR encoding)**:
 ```json
@@ -676,9 +677,10 @@ All WebAuthn public keys MUST be provided in CBOR/COSE format:
 **Worker Implementation Requirements**:
 - Extract public key from `attestationObject.authData.attestedCredentialData`
 - Ensure key is in COSE format before base64 encoding
-- Include CBOR validation in worker-side code for early error detection
+- Perform CBOR validation in worker-side code before sending to server
+- Store key for signature verification during authentication
 
-**Important Note**: The `public_key` field is REQUIRED because it's the fundamental component of WebAuthn/Passkey authentication. Without it, signature verification during authentication would be impossible.
+**Important Note**: The `public_key` field is REQUIRED because it's the fundamental component of WebAuthn/Passkey authentication. The worker performs all signature verification - the server acts as a storage layer only.
 
 **Validation Flow**:
 1. API key authentication
@@ -693,7 +695,7 @@ All WebAuthn public keys MUST be provided in CBOR/COSE format:
 10. Token-host binding verification
 11. User-host authorization
 12. IP CIDR restrictions (if configured)
-13. Credential format validation
+13. Public key presence check (worker-provided data stored as-is)
 14. Duplicate credential check
 15. Atomic passkey creation and token consumption
 

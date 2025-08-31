@@ -38,7 +38,7 @@ class SunrayPasskey(models.Model):
     public_key = fields.Text(
         string='Public Key', 
         required=True,
-        help='WebAuthn public key in CBOR/COSE format (base64-encoded). Must be a valid COSE_Key structure per WebAuthn specification.'
+        help='WebAuthn public key data as provided by the worker. Server stores but does not validate format.'
     )
     name = fields.Char(
         string='Device Name', 
@@ -338,53 +338,6 @@ class SunrayPasskey(models.Model):
             )
             raise UserError('400|Public key is required for passkey registration')
         
-        # Phase 5.5: CBOR Format Validation - NEW
-        _logger.debug(f"Validating CBOR/COSE format for public key")
-        is_valid_cbor, validation_result = self._validate_cbor_public_key(public_key.strip())
-        
-        if not is_valid_cbor:
-            # AUDIT: Log CBOR validation failure
-            self.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='security.passkey.invalid_cbor_format',
-                details={
-                    'username': username,
-                    'credential_id': credential_id,
-                    'host_domain': host_domain,
-                    'validation_error': validation_result,
-                    'public_key_length': len(public_key),
-                    'token_id': token_obj.id,
-                    'worker_id': worker_id,
-                    'cose_available': COSE_AVAILABLE
-                },
-                severity='critical',
-                sunray_user_id=user_obj.id,
-                sunray_worker=worker_id,
-                ip_address=client_ip,
-                username=username
-            )
-            # Ensure audit event is flushed before raising exception
-            self.env.cr.flush()
-            raise UserError(f'400|Invalid WebAuthn public key format: {validation_result}')
-        
-        # Log successful CBOR validation
-        _logger.info(f"CBOR validation successful for user {username}")
-        self.env['sunray.audit.log'].sudo().create_audit_event(
-            event_type='passkey.cbor_validation_success',
-            details={
-                'username': username,
-                'credential_id': credential_id,
-                'host_domain': host_domain,
-                'validation_result': 'Valid CBOR/COSE format',
-                'cose_available': COSE_AVAILABLE,
-                'token_id': token_obj.id,
-                'worker_id': worker_id
-            },
-            severity='info',
-            sunray_user_id=user_obj.id,
-            sunray_worker=worker_id,
-            ip_address=client_ip,
-            username=username
-        )
         
         # Phase 6: Duplicate Check
         _logger.debug(f"Checking for duplicate credential: {credential_id}")

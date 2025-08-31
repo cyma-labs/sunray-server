@@ -7,8 +7,6 @@ from datetime import datetime, timedelta
 import json
 import hashlib
 import logging
-import cbor2
-import base64
 
 _logger = logging.getLogger(__name__)
 
@@ -77,27 +75,11 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         """Helper to compute SHA-512 hash for tokens"""
         return f"sha512:{hashlib.sha512(token_value.encode()).hexdigest()}"
     
-    def create_valid_cbor_public_key(self, key_id=None):
-        """Helper to create valid CBOR-encoded public key for testing"""
-        # Create a minimal valid COSE key structure
-        # This follows RFC 8152 - CBOR Object Signing and Encryption (COSE)
-        cose_key = {
-            1: 2,  # kty (key type): EC2 (Elliptic Curve Keys w/ x- and y-coordinate pair)
-            3: -7,  # alg (algorithm): ES256 (ECDSA w/ SHA-256)
-            -1: 1,  # crv (curve): P-256
-            -2: b'x' * 32,  # x coordinate (32 bytes for P-256)
-            -3: b'y' * 32   # y coordinate (32 bytes for P-256)
-        }
-        
-        # Add unique identifier if provided
+    def create_valid_public_key(self, key_id=None):
+        """Helper to create a valid public key string for testing"""
         if key_id:
-            cose_key[2] = key_id.encode() if isinstance(key_id, str) else key_id
-        
-        # Encode to CBOR and then base64
-        cbor_data = cbor2.dumps(cose_key)
-        b64_data = base64.b64encode(cbor_data).decode('ascii')
-        
-        return b64_data
+            return f"test_public_key_{key_id}"
+        return "test_public_key_data"
     
     def make_api_call(self, username, data, **kwargs):
         """Call the model method directly instead of HTTP controller"""
@@ -165,7 +147,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_success_123',
-                'public_key': self.create_valid_cbor_public_key('success_key_123')
+                'public_key': self.create_valid_public_key('success_key_123')
             },
             'host_domain': 'test.example.com',
             'name': 'My Test Device'
@@ -184,7 +166,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         self.assertEqual(passkey.user_id.id, self.user_obj.id)
         self.assertEqual(passkey.name, 'My Test Device')
         self.assertEqual(passkey.host_domain, 'test.example.com')
-        self.assertEqual(passkey.public_key, self.create_valid_cbor_public_key('success_key_123'))
+        self.assertEqual(passkey.public_key, self.create_valid_public_key('success_key_123'))
         self.assertEqual(passkey.setup_token_id.id, token_obj.id)  # NEW: Token link
         self.assertEqual(passkey.created_ip, '192.168.1.100')
         
@@ -329,7 +311,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_first',
-                'public_key': self.create_valid_cbor_public_key('first_key')
+                'public_key': self.create_valid_public_key('first_key')
             },
             'host_domain': 'test.example.com'
         })
@@ -344,7 +326,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_replay',
-                'public_key': self.create_valid_cbor_public_key('replay_key')
+                'public_key': self.create_valid_public_key('replay_key')
             },
             'host_domain': 'test.example.com'
         })
@@ -414,7 +396,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_ip_allowed',
-                'public_key': self.create_valid_cbor_public_key('ip_allowed_key')
+                'public_key': self.create_valid_public_key('ip_allowed_key')
             },
             'host_domain': 'test.example.com'
         }, client_ip='192.168.1.50')
@@ -428,7 +410,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_ip_blocked',
-                'public_key': self.create_valid_cbor_public_key('ip_blocked_key')
+                'public_key': self.create_valid_public_key('ip_blocked_key')
             },
             'host_domain': 'test.example.com'
         }, client_ip='172.16.0.1')  # Not in allowed CIDRs
@@ -455,7 +437,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         existing = self.env['sunray.passkey'].create({
             'user_id': self.user_obj.id,
             'credential_id': 'cred_duplicate',
-            'public_key': self.create_valid_cbor_public_key('first_device'),
+            'public_key': self.create_valid_public_key('first_device'),
             'name': 'First Device',
             'host_domain': 'test.example.com'
         })
@@ -466,7 +448,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': f"sha512:{hashlib.sha512(token_value.encode()).hexdigest()}",
             'credential': {
                 'id': 'cred_duplicate',  # Same ID!
-                'public_key': self.create_valid_cbor_public_key('duplicate_attempt')
+                'public_key': self.create_valid_public_key('duplicate_attempt')
             },
             'host_domain': 'test.example.com'
         })
@@ -502,7 +484,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_multi_1',
-                'public_key': self.create_valid_cbor_public_key('multi_1')
+                'public_key': self.create_valid_public_key('multi_1')
             },
             'host_domain': 'test.example.com'
         })
@@ -516,7 +498,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_multi_2',
-                'public_key': self.create_valid_cbor_public_key('multi_2')
+                'public_key': self.create_valid_public_key('multi_2')
             },
             'host_domain': 'test.example.com'
         })
@@ -530,7 +512,7 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
             'setup_token_hash': token_hash,
             'credential': {
                 'id': 'cred_multi_3',
-                'public_key': self.create_valid_cbor_public_key('multi_3')
+                'public_key': self.create_valid_public_key('multi_3')
             },
             'host_domain': 'test.example.com'
         })
@@ -754,7 +736,6 @@ class TestPasskeyRegistrationSecurity(TransactionCase):
         self.assertIn('token.validation.expired', event_types)
         self.assertIn('passkey.registered', event_types)
         self.assertIn('token.validation.consumed', event_types)
-        self.assertIn('passkey.cbor_validation_success', event_types)
 
 
 @tagged('sunray', 'model', 'users', 'passkeys')

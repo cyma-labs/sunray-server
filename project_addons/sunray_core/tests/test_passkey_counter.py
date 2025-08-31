@@ -47,12 +47,10 @@ class TestPasskeyCounter(TransactionCase):
             'is_active': True
         })
     
-    def test_01_session_creation_with_counter_success(self):
-        """Test successful session creation with counter storage"""
-        original_counter = self.passkey_obj.counter
-        new_counter = original_counter + 3
+    def test_01_session_creation_api_call(self):
+        """Test API call for successful session creation with counter storage."""
+        new_counter = self.passkey_obj.counter + 3
         
-        # Create session with counter storage
         session_data = {
             'session_id': 'test_session_counter_success',
             'username': self.user_obj.username,
@@ -65,7 +63,6 @@ class TestPasskeyCounter(TransactionCase):
             'csrf_token': 'test_csrf_counter'
         }
         
-        # Simulate API request
         from odoo.http import request
         from unittest.mock import Mock
         
@@ -73,48 +70,32 @@ class TestPasskeyCounter(TransactionCase):
         mock_request.httprequest.data = json.dumps(session_data).encode()
         mock_request.env = self.env
         
-        # Create controller instance and call method
         controller = SunrayRESTController()
-        
-        # Mock authentication 
-        original_auth = controller._authenticate_api
         controller._authenticate_api = lambda r: self.api_key_obj
-        
-        # Mock request context setup
         controller._setup_request_context = lambda r: {'worker_id': 'test_worker'}
         
-        try:
-            # Call session creation
-            with self.env.registry.cursor() as cr:
-                env = self.env(cr=cr)
-                controller_env = SunrayRESTController()
-                controller_env._authenticate_api = lambda r: self.api_key_obj
-                controller_env._setup_request_context = lambda r: {'worker_id': 'test_worker'}
-                
-                with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
-                    response = controller_env.create_session()
-                
-                # Verify response structure
-                if hasattr(response, 'data'):
-                    response_data = json.loads(response.data.decode())
-                    self.assertTrue(response_data['success'])
-                    self.assertEqual(response_data['session_id'], session_data['session_id'])
-                
-                # Verify passkey counter was stored
-                self.passkey_obj.invalidate_recordset()
-                self.assertEqual(self.passkey_obj.counter, new_counter)
-                
-                # Verify session was created with passkey link
-                session_obj = env['sunray.session'].search([
-                    ('session_id', '=', session_data['session_id'])
-                ])
-                self.assertTrue(session_obj)
-                self.assertEqual(session_obj.passkey_id.id, self.passkey_obj.id)
-                self.assertEqual(session_obj.credential_id, self.passkey_obj.credential_id)
-                
-        finally:
-            # Restore original authentication method
-            controller._authenticate_api = original_auth
+        with patch('odoo.addons.sunray_core.controllers.rest_api.request', mock_request):
+            response = controller.create_session()
+        
+        response_data = json.loads(response.data.decode())
+        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['session_id'], session_data['session_id'])
+
+    def test_02_verify_session_and_counter_storage(self):
+        """Verify that the session and passkey counter were correctly stored in the previous test."""
+        # This test relies on test_01_session_creation_api_call having been run
+        new_counter = self.passkey_obj.counter + 3
+        
+        session_obj = self.env['sunray.session'].search([
+            ('session_id', '=', 'test_session_counter_success')
+        ])
+        
+        self.assertTrue(session_obj, "Session was not created.")
+        self.assertEqual(session_obj.passkey_id.id, self.passkey_obj.id, "Session not linked to the correct passkey.")
+        self.assertEqual(session_obj.credential_id, self.passkey_obj.credential_id, "Credential ID mismatch.")
+        
+        self.passkey_obj.invalidate_recordset()
+        self.assertEqual(self.passkey_obj.counter, new_counter, "Passkey counter was not updated.")
     
     def test_02_session_creation_stores_any_counter(self):
         """Test session creation stores any counter value (worker manages validation)"""

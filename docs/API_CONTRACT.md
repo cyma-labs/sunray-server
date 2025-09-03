@@ -523,6 +523,15 @@ The `/config/register` endpoint handles all migration logic:
 
 ## Setup Token Management
 
+> **⚠️ CRITICAL: Token Normalization Required**
+> 
+> Workers MUST normalize setup tokens before hashing:
+> 1. Remove all dashes (-) and spaces
+> 2. Convert to uppercase  
+> 3. Then compute SHA-512 hash
+> 
+> Example: "a2b3c-4d5e6" → normalize → "A2B3C4D5E6" → hash
+
 ### POST /sunray-srvr/v1/setup-tokens/validate
 
 **Purpose**: Validate a setup token before WebAuthn registration ceremony.
@@ -611,7 +620,12 @@ The token hash is computed by workers as follows:
 // If user's setup token is "ABCD-1234-EFGH-5678"
 const crypto = require('crypto');
 const token = "ABCD-1234-EFGH-5678";
-const hash = crypto.createHash('sha512').update(token).digest('hex');
+
+// IMPORTANT: Normalize token before hashing (remove dashes/spaces, uppercase)
+const normalizedToken = token.replace(/-/g, '').replace(/ /g, '').toUpperCase();
+// normalizedToken is now "ABCD1234EFGH5678"
+
+const hash = crypto.createHash('sha512').update(normalizedToken).digest('hex');
 const token_hash = `sha512:${hash}`;
 ```
 
@@ -750,7 +764,8 @@ All registration attempts are logged with comprehensive details:
 **Example**:
 ```bash
 # First compute the hash (in worker code):
-# setup_token_hash = "sha512:" + hashlib.sha512("abc123def456".encode()).hexdigest()
+# Normalize token: "ABC-123-DEF-456" becomes "ABC123DEF456"
+# setup_token_hash = "sha512:" + hashlib.sha512("ABC123DEF456".encode()).hexdigest()
 
 curl -X POST https://sunray.example.com/sunray-srvr/v1/users/user@example.com/passkeys \
   -H "Authorization: Bearer your_api_key" \

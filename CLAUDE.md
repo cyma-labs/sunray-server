@@ -330,6 +330,24 @@ npm run test:watch           # Run tests in watch mode
 npm run test:coverage        # Run tests with coverage report
 ```
 
+#### Setup Token Handling
+
+Workers MUST normalize setup tokens before hashing and sending to the server:
+
+```javascript
+function normalizeSetupToken(token) {
+    // Remove dashes, spaces, and convert to uppercase
+    return token.replace(/-/g, '').replace(/ /g, '').toUpperCase();
+}
+
+// Usage in worker
+const userToken = "A2B3C-4D5E6-F7G8H-9J2K3";
+const normalized = normalizeSetupToken(userToken);
+const tokenHash = "sha512:" + crypto.createHash('sha512').update(normalized).digest('hex');
+```
+
+This normalization ensures compatibility with both old (urlsafe) and new (readable) token formats.
+
 #### Testing Framework
 
 The Cloudflare Worker uses **Vitest** as its testing framework. Vitest is chosen for:

@@ -202,15 +202,6 @@ bin/sunray-srvr srctl host clear-pending-worker app.example.com
 
 The server provides a comprehensive REST API at `/sunray-srvr/v1/*`:
 
-### Core Endpoints
-- `/config` - Get global configuration (Admin monitoring only)
-- `/config/{hostname}` - Get host-specific configuration (Recommended for Workers)
-- `/config/register` - Register worker and bind to host
-- `/setup-tokens/validate` - Validate setup tokens
-- `/users/<username>/passkeys` - Register passkeys
-- `/sessions/validate` - Validate sessions
-- `/audit` - Record audit events
-
 See [API_CONTRACT.md](./docs/API_CONTRACT.md) for complete API specification.
 
 ## 🧪 Testing
@@ -266,8 +257,6 @@ docker run -e IKB_ODOO_ADMIN_PASSWORD="admin" -it sunray-srvr18:latest
 - [Worker Management and Migration](./docs/worker_management_and_migration.md) - Complete worker lifecycle guide
 - [WAF Bypass Guide](./docs/waf_bypass_guide.md) - Enhanced security for authenticated users
 
-### Technical Specifications
-- [docs/specs/](./docs/specs/) - Detailed technical specifications
 
 ## 🤝 Contributing
 

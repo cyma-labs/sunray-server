@@ -192,7 +192,7 @@ class SunrayHost(models.Model):
             if record.waf_bypass_revalidation_s < 60:
                 raise ValidationError("WAF bypass revalidation period must be at least 60 seconds (1 minute)")
             if record.waf_bypass_revalidation_s > max_revalidation:
-                raise ValidationError(f"WAF bypass revalidation period cannot exceed {max_revalidation} seconds")
+                raise ValidationError(f"WAF bypass revalidation period cannot exceed {max_revalidation} seconds (cf. System Parameter 'sunray.max_waf_bypass_revalidation_s').")
     
     @api.depends('migration_requested_at')
     def _compute_migration_pending_duration(self):

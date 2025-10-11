@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- List View -->
-    <record id="view_sunray_host_tree" model="ir.ui.view">
+    <record id="sunray_host__listview" model="ir.ui.view">
         <field name="name">sunray.host.list</field>
         <field name="model">sunray.host</field>
         <field name="arch" type="xml">
@@ -109,54 +109,10 @@
                     
                     <notebook>
                         <page string="Access Rules">
-                            <field name="access_rule_ids">
-                                <list default_order="priority, id">
-                                    <field name="priority"/>
-                                    <field name="description"/>
-                                    <field name="access_type" widget="badge" decoration-success="access_type == 'public'" decoration-info="access_type == 'cidr'" decoration-warning="access_type == 'token'"/>
-                                    <field name="is_active" widget="boolean_toggle"/>
-                                </list>
-                                <form>
-                                    <sheet>
-                                        <group>
-                                            <group>
-                                                <field name="description" placeholder="e.g., GitLab Webhook for CI/CD"/>
-                                                <field name="priority"/>
-                                                <field name="access_type"/>
-                                                <field name="is_active"/>
-                                            </group>
-                                        </group>
-                                        
-                                        <group string="URL Patterns">
-                                            <field name="url_patterns" widget="text" nolabel="1" 
-                                                   placeholder="^/api/webhook.*&#10;^/public/.*"/>
-                                        </group>
-                                        
-                                        <group string="CIDR Configuration" invisible="access_type != 'cidr'">
-                                            <field name="allowed_cidrs" widget="text" nolabel="1"
-                                                   placeholder="192.168.1.0/24&#10;10.0.0.0/8"/>
-                                        </group>
-                                        
-                                        <group string="Token Configuration" invisible="access_type != 'token'">
-                                            <field name="token_ids" nolabel="1" 
-                                                   context="{'default_host_id': parent.id}"
-                                                   domain="[('host_id', '=', parent.id)]">
-                                                <list>
-                                                    <field name="name"/>
-                                                    <field name="token_source"/>
-                                                    <field name="is_active" widget="boolean_toggle"/>
-                                                </list>
-                                            </field>
-                                        </group>
-                                    </sheet>
-                                </form>
-                            </field>
+                            <field name="access_rule_ids" 
+                                   context="{'list_view_ref':'sunray_core.sunray_access_rule_listview_embedded'}"
+                                    />
                             
-                            <div class="mt16">
-                                <h3>Access Rule Priority</h3>
-                                <p>Rules are evaluated in priority order (lower number = higher priority).</p>
-                                <p>The first matching rule determines access type. If no rule matches, passkey authentication is required.</p>
-                            </div>
                         </page>
                                                 
                         <page string="Authorized Users">

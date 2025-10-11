@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+import json
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 
@@ -39,6 +39,7 @@ class SunrayAccessRule(models.Model):
         required=True,
         help='Regex patterns for URLs (one per line, # for comments)\n'
              'Examples:\n'
+             '^/*  # This rule is the way to allow all requests!\n'
              '^/api/webhook\n'
              '^/public/.*\n'
              '^/health$\n'
@@ -48,13 +49,23 @@ class SunrayAccessRule(models.Model):
     # CIDR Configuration (for cidr type)
     allowed_cidrs = fields.Text(
         string='Allowed CIDR Blocks',
-        help='CIDR blocks for IP-based access (one per line, # for comments)\n'
+        help='CIDR blocks or IP address for IP-based access (one per line, # for comments)\n'
              'Examples:\n'
              '192.168.1.0/24\n'
-             '10.0.0.0/8\n'
-             '203.0.113.0/32'
+             '234.170.10.5\n'
+             '234.170.10.5/32. # Same as IP\n'
+    ) 
+    parsed_allowed_cidrs = fields.Text(
+        string="Parsed CIDRs",
+        store=True,
+        compute='compute_parsed_allowed_cidrs'
     )
-    
+    @api.depends('allowed_cidrs')
+    def compute_parsed_allowed_cidrs(self):
+        for record in self:
+            _cidr_list = record.get_allowed_cidrs(format='json')
+            record.parsed_allowed_cidrs = json.dumps(_cidr_list, indent=2)
+
     # Token Configuration (for token type)
     token_ids = fields.Many2many(
         'sunray.webhook.token',

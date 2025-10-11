@@ -33,7 +33,7 @@
     <menuitem id="menu_sunray_access_rules" 
               name="Access Rules" 
               parent="menu_sunray_config" 
-              action="action_sunray_access_rules"
+              action="sunray_access_rules_action"
               sequence="25"/>
 
     <menuitem id="menu_sunray_workers" 

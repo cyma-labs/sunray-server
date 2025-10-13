@@ -3,6 +3,7 @@ from . import sunray_passkey
 from . import sunray_setup_token
 from . import sunray_host
 from . import sunray_access_rule
+from . import sunray_host_access_rule
 from . import sunray_session
 from . import sunray_webhook_token
 from . import sunray_api_key

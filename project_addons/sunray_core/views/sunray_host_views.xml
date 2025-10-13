@@ -109,10 +109,54 @@
                     
                     <notebook>
                         <page string="Access Rules">
-                            <field name="access_rule_ids" 
-                                   context="{'list_view_ref':'sunray_core.sunray_access_rule_listview_embedded'}"
-                                    />
-                            
+                            <div class="alert alert-info" role="status">
+                                <h3>Reusable Access Rule Library</h3>
+                                <p>
+                                    Access rules are now reusable! Select rules from the library and set their priority for this host.
+                                    The same rule can be used on multiple hosts with different priorities.
+                                </p>
+                                <p><strong>How to manage rules:</strong></p>
+                                <ul>
+                                    <li><strong>Select Rule:</strong> Choose from active rules in the library</li>
+                                    <li><strong>Set Priority:</strong> Lower number = higher priority (use drag-and-drop or edit manually)</li>
+                                    <li><strong>Active Toggle:</strong> Enable/disable rule on this specific host</li>
+                                    <li><strong>Create New Rules:</strong> Navigate to <strong>Sunray → Access Rule Library</strong></li>
+                                </ul>
+                            </div>
+
+                            <field name="access_rule_rel_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <!-- Drag-and-drop handle for priority reordering -->
+                                    <field name="priority" widget="handle"/>
+
+                                    <!-- Rule selector (only active library rules) -->
+                                    <field name="rule_id"
+                                           options="{'no_create': True}"
+                                           domain="[('is_active', '=', True)]"/>
+
+                                    <!-- Display rule type (read-only) -->
+                                    <field name="rule_type" widget="badge" readonly="1"
+                                           decoration-success="rule_type == 'public'"
+                                           decoration-info="rule_type == 'cidr'"
+                                           decoration-warning="rule_type == 'token'"/>
+
+                                    <!-- Per-host active toggle -->
+                                    <field name="is_active" widget="boolean_toggle"/>
+
+                                    <!-- Quick view button -->
+                                    <button name="action_view_rule" type="object"
+                                            icon="fa-external-link"
+                                            title="View Rule Details"
+                                            class="btn-link"/>
+                                </list>
+                            </field>
+
+                            <div class="alert alert-success mt16" role="status">
+                                <p class="mb-0">
+                                    <strong>Tip:</strong> Drag rows to reorder priorities. Changes to rules in the library
+                                    automatically affect all hosts using them. Priority and active status are per-host.
+                                </p>
+                            </div>
                         </page>
                                                 
                         <page string="Authorized Users">
@@ -162,57 +206,30 @@
                         </page>
                         
                         <page string="API &amp; Webhook Tokens">
-                            <field name="webhook_token_ids">
-                                <list>
-                                    <field name="name"/>
-                                    <field name="token_source"/>
-                                    <field name="header_name" optional="show"/>
-                                    <field name="param_name" optional="show"/>
-                                    <field name="is_active" widget="boolean_toggle"/>
-                                    <field name="expires_at" optional="show"/>
-                                    <field name="last_used" optional="show"/>
-                                    <field name="usage_count" optional="show"/>
-                                </list>
-                                <form>
-                                    <sheet>
-                                        <group>
-                                            <group name="basic_info">
-                                                <field name="name"/>
-                                                <field name="token" password="True"/>
-                                                <field name="is_active"/>
-                                            </group>
-                                            <group name="extraction_config">
-                                                <field name="token_source"/>
-                                                <field name="header_name" 
-                                                       invisible="token_source == 'param'"
-                                                       required="token_source in ('header', 'both')"/>
-                                                <field name="param_name" 
-                                                       invisible="token_source == 'header'"
-                                                       required="token_source in ('param', 'both')"/>
-                                            </group>
-                                        </group>
-                                        
-                                        <group string="Access Restrictions">
-                                            <field name="allowed_cidrs" 
-                                                   placeholder="192.168.1.0/24&#10;10.0.0.0/8&#10;# Comments supported"/>
-                                            <field name="expires_at"/>
-                                        </group>
-                                        
-                                        <group string="Usage Statistics">
-                                            <field name="usage_count" readonly="1"/>
-                                            <field name="last_used" readonly="1"/>
-                                        </group>
-                                    </sheet>
-                                </form>
-                            </field>
-                            
+                            <div class="alert alert-info" role="status">
+                                <h3>Token Management via Access Rules</h3>
+                                <p>
+                                    Webhook tokens are now managed globally and can be reused across multiple hosts.
+                                    This allows the same token (e.g., a Shopify webhook token) to authenticate to multiple protected hosts.
+                                </p>
+                                <p><strong>How to use tokens with this host:</strong></p>
+                                <ol>
+                                    <li>Navigate to <strong>Sunray → Webhook Tokens</strong> menu to create or view global tokens</li>
+                                    <li>Create an <strong>Access Rule</strong> (see "Access Rules" tab above) with type "Token Access"</li>
+                                    <li>In the Access Rule, specify URL patterns and select one or more tokens</li>
+                                    <li>The selected tokens will be able to authenticate requests matching those URL patterns</li>
+                                </ol>
+                                <p class="mb-0">
+                                    <strong>Benefits:</strong> Token reuse, centralized management, flexible URL pattern mapping.
+                                </p>
+                            </div>
+
                             <div class="mt16">
                                 <h3>Examples for Common Providers:</h3>
                                 <p><strong>Shopify Webhooks:</strong> Header = X-Shopify-Hmac-Sha256, Source = Header Only</p>
                                 <p><strong>Stripe Webhooks:</strong> Header = Stripe-Signature, Source = Header Only</p>
                                 <p><strong>GitHub Webhooks:</strong> Header = X-Hub-Signature-256, Source = Header Only</p>
                                 <p><strong>Generic APIs:</strong> Parameter = api_key, Source = Parameter Only</p>
-                                <p><strong>Note:</strong> Create tokens here, then reference them in Access Rules to define which URLs they can access.</p>
                             </div>
                         </page>
 

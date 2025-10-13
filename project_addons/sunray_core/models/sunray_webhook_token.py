@@ -11,17 +11,12 @@ class SunrayWebhookToken(models.Model):
     _description = 'API and Webhook Authentication Token'
     _rec_name = 'name'
     _order = 'name'
-    
-    host_id = fields.Many2one(
-        'sunray.host', 
-        required=True, 
-        ondelete='cascade',
-        string='Host'
-    )
+
     name = fields.Char(
-        string='Token Name', 
+        string='Token Name',
         required=True,
-        help='Descriptive name for this token (e.g., "Shopify Webhook", "Payment API", "CI/CD Pipeline")'
+        help='Descriptive name for this token (e.g., "Shopify Webhook", "Payment API", "CI/CD Pipeline"). '
+             'Tokens are reusable across multiple hosts via Access Rules.'
     )
     token = fields.Char(
         string='Token Value', 
@@ -43,7 +38,20 @@ class SunrayWebhookToken(models.Model):
         string='Usage Count',
         help='Number of times this token has been used'
     )
-    
+
+    # UI display helper field
+    show_full_token = fields.Boolean(
+        string='Show Full Token',
+        default=False,
+        store=False,
+        help='Toggle to show/hide full token value in form view',
+        inverse='_inverse_show_full_token'
+    )
+    def _inverse_show_full_token(self):
+        for record in self:
+            pass
+            #record.show_full_token = record.show_full_token
+
     # Optional restrictions
     allowed_cidrs = fields.Text(
         string='Allowed CIDRs', 
@@ -98,6 +106,10 @@ class SunrayWebhookToken(models.Model):
                 vals['token'] = self.generate_token()
         return super().create(vals_list)
     
+    #def write(self, vals):
+    #    result = super().write(vals)
+    #    return result
+
     def generate_token(self):
         """Generate a secure random token"""
         alphabet = string.ascii_letters + string.digits
@@ -107,16 +119,16 @@ class SunrayWebhookToken(models.Model):
         """Generate a new token value"""
         self.ensure_one()
         new_token = self.generate_token()
-        
+
         # Log token regeneration
         self.env['sunray.audit.log'].create_admin_event(
             event_type='webhook.regenerated',
             details={
                 'token_name': self.name,
-                'host': self.host_id.domain
+                'token_id': self.id
             }
         )
-        
+
         self.token = new_token
         return new_token
     
@@ -187,24 +199,33 @@ class SunrayWebhookToken(models.Model):
         else:
             raise ValueError(f"Unsupported format: {format}")
     
-    def track_usage(self, client_ip=None):
-        """Update usage statistics"""
+    def track_usage(self, client_ip=None, host_domain=None):
+        """Update usage statistics
+
+        Args:
+            client_ip: IP address of the client using the token
+            host_domain: Domain of the host where token was used (optional, for audit context)
+        """
         self.write({
             'last_used': fields.Datetime.now(),
             'usage_count': self.usage_count + 1
         })
-        
+
         # Log usage
+        details = {
+            'token_name': self.name,
+            'token_id': self.id
+        }
+        if host_domain:
+            details['host'] = host_domain
+
         self.env['sunray.audit.log'].create_audit_event(
             event_type='webhook.used',
-            details={
-                'token_name': self.name,
-                'host': self.host_id.domain
-            },
+            details=details,
             ip_address=client_ip,
             event_source='api'
         )
-        
+
         return True
     
     def get_extraction_config(self):
@@ -219,4 +240,26 @@ class SunrayWebhookToken(models.Model):
             'allowed_cidrs': self.get_allowed_cidrs(),
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
             'is_active': self.is_active
+        }
+
+    def btn_refresh(self):
+        """Refresh button action - reload the form"""
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
+
+    def action_view_usage_logs(self):
+        """View audit logs for this token's usage"""
+        self.ensure_one()
+        return {
+            'name': f'Usage Logs: {self.name}',
+            'type': 'ir.actions.act_window',
+            'res_model': 'sunray.audit.log',
+            'view_mode': 'list,form',
+            'domain': [
+                ('event_type', '=', 'webhook.used'),
+                ('details', 'ilike', f'"token_name": "{self.name}"')
+            ],
+            'context': {'search_default_group_by_date': 1}
         }

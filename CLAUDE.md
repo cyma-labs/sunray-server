@@ -819,53 +819,97 @@ bin/test_rest_api.sh --list-tests
 
 ## Current Development Status
 
-### Access Rules System Implementation ✅
+### Access Rules System - Reusable Library Architecture ✅
 
-**Phase 1: Core Implementation** (COMPLETED)
-- ✅ Created `sunray.access.rule` model with priority-based evaluation
-- ✅ Updated `sunray.host` model to support Access Rules
-- ✅ Enhanced `sunray.webhook.token` descriptions for API/webhook clarity
-- ✅ Built comprehensive UI (list, form, search views)
-- ✅ Updated REST API to generate exceptions tree (Config API v4)
-- ✅ Simplified Worker handler.js to use exceptions tree
-- ✅ Created comprehensive test suite
-- ✅ Updated documentation
+**Implementation Status: COMPLETED**
 
-**Key Benefits Achieved:**
-- **Unified Access Control**: Single system for all access exceptions (Public, CIDR, Token)
-- **Token Reuse**: Multiple URL patterns can reference same tokens
-- **Priority-Based**: Clear evaluation order (first match wins)
-- **WebSocket Security**: Built-in CSWSH prevention with origin validation enforced by worker
-- **Worker Simplification**: Business logic in server, worker executes decisions
-- **Backward Compatibility**: Legacy fields supported during transition
-- **Future-Ready**: Kubernetes ForwardAuth compatibility
+Access rules are now **reusable libraries** that can be applied to multiple hosts with different priorities and active statuses per host.
+
+**Architecture:**
+```
+┌─────────────────────────────────────────┐
+│  sunray.access.rule (Reusable Library) │
+│  - name: "GitLab Webhook"               │
+│  - access_type: token                   │
+│  - url_patterns: [...]                  │
+│  - token_ids: [...]                     │
+│  - is_active: True (library level)      │
+└─────────────────────────────────────────┘
+                ↓ Referenced by
+┌─────────────────────────────────────────┐
+│  sunray.host.access.rule (Association)  │
+│  - host_id: Host A                      │
+│  - rule_id: "GitLab Webhook"            │
+│  - priority: 100 (per-host priority)    │
+│  - is_active: True (per-host status)    │
+└─────────────────────────────────────────┘
+```
+
+**Key Features:**
+- **Rule Library**: Create rules once (e.g., "Health Checks", "Office Access"), reuse everywhere
+- **Per-Host Priority**: Same rule can have different priorities on different hosts
+- **Per-Host Activation**: Enable/disable rules per host without affecting others
+- **Token Reuse**: Tokens are also reusable across rules and hosts
+- **Usage Tracking**: See which hosts use each rule
+- **Deletion Protection**: Cannot delete rules that are in use
+- **Priority Management**: Drag-and-drop reordering in host view
+
+**Benefits Achieved:**
+- **Centralized Management**: Update "Office IPs" once, affects all 50 hosts automatically
+- **Reduced Duplication**: Define "Health Checks" rule once instead of 100 times
+- **Flexible Composition**: Mix library rules with different priorities per host
+- **Clear Ownership**: Rules are named and described for team collaboration
+- **Audit Trail**: Track rule usage and changes
+- **Worker Simplification**: Business logic in server, worker executes flat config
 
 ### Configuration Example
 ```
-Host Configuration:
+Rule Library:
+├── "Health Checks" (Public)
+│   └── URL Patterns: [/health, /status, /ping]
+├── "Office Access" (CIDR)
+│   ├── URL Patterns: [/admin/.*]
+│   └── CIDRs: [192.168.1.0/24, 10.0.0.0/8]
+└── "GitLab Webhook" (Token)
+    ├── URL Patterns: [/api/gitlab/webhook]
+    └── Tokens: [GitLab Token]
+
+Host Configuration (app.example.com):
 ├── WebSocket URLs (authenticated)
-│   ├── /ws/chat/.*
-│   ├── /ws/api/.*
-│   └── /ws/notifications
-├── Access Rules (unified exceptions)
-│   ├── Rule 1: Priority 100, Public, [/health, /status]
-│   ├── Rule 2: Priority 200, CIDR, [/admin/*], [192.168.1.0/24]
-│   └── Rule 3: Priority 300, Token, [/api/*, /webhook/*], [Token1, Token2]
-└── exceptions_tree (preprocessed for worker)
+│   └── Prefix: /ws/
+└── Access Rule Associations
+    ├── [100] "Health Checks" (active)
+    ├── [200] "Office Access" (active)
+    └── [300] "GitLab Webhook" (inactive on this host)
+
+Worker Receives (exceptions_tree):
+├── {priority: 100, type: public, patterns: [/health, /status, /ping]}
+└── {priority: 200, type: cidr, patterns: [/admin/.*], cidrs: [...]}
 ```
 
-### Next Development Phases
+**Usage Workflow:**
+1. **Create Rules**: Navigate to Sunray → Access Rule Library
+2. **Attach to Hosts**: In host form, add rules with desired priorities
+3. **Manage Per-Host**: Drag to reorder, toggle active/inactive per host
+4. **Update Centrally**: Changes to library rules affect all using hosts
 
-**Phase 2: Migration Tools** (Future)
-- Legacy field migration utilities
-- Bulk rule creation from existing configurations
-- Migration validation and testing
+### Implementation Details
 
-**Phase 3: Advanced Features** (Future)
-- Time-based access rules
+**Models:**
+- `sunray.access.rule`: Reusable rule library (name, access_type, url_patterns, cidrs, tokens)
+- `sunray.host.access.rule`: Association with host-specific priority and active status
+- No migration needed (not public yet)
+
+**API Impact:**
+- Zero changes to worker API
+- Workers still receive flat `exceptions_tree` array
+- Priority injection happens server-side during tree generation
+
+**Future Enhancements:**
+- Time-based access rules (schedule-based activation)
 - Geographic restrictions
+- Rule templates and sharing
 - Advanced audit reporting
-- Rule templates and presets
 
 ## Configuration Management
 

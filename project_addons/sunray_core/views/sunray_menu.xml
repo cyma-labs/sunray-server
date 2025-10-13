@@ -42,12 +42,18 @@
               action="action_sunray_workers"
               sequence="30"/>
               
-    <menuitem id="menu_sunray_api_keys" 
-              name="API Keys" 
-              parent="menu_sunray_config" 
+    <menuitem id="menu_sunray_api_keys"
+              name="API Keys"
+              parent="menu_sunray_config"
               action="action_sunray_api_keys"
               sequence="35"/>
-    
+
+    <menuitem id="menu_sunray_webhook_tokens"
+              name="Webhook Tokens"
+              parent="menu_sunray_config"
+              action="sunray_webhook_tokens_action"
+              sequence="40"/>
+
     <!-- Monitoring -->
     <menuitem id="menu_sunray_monitoring" 
               name="Monitoring" 

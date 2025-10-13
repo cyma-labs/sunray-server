@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="sunray_webhook_token_listview" model="ir.ui.view">
+        <field name="name">sunray.webhook.token.list</field>
+        <field name="model">sunray.webhook.token</field>
+        <field name="arch" type="xml">
+            <list default_order="name, id">
+                <field name="name"/>
+                <field name="token_source" widget="badge"
+                       decoration-info="token_source == 'header'"
+                       decoration-warning="token_source == 'param'"
+                       decoration-success="token_source == 'both'"/>
+                <field name="header_name" optional="show"/>
+                <field name="param_name" optional="show"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="expires_at" optional="show"/>
+                <field name="last_used" optional="show"/>
+                <field name="usage_count" optional="show"/>
+                <field name="create_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Embedded List View (for use in host form) -->
+    <record id="sunray_webhook_token_listview_embedded" model="ir.ui.view">
+        <field name="name">sunray.webhook.token.list.embedded</field>
+        <field name="model">sunray.webhook.token</field>
+        <field name="arch" type="xml">
+            <list default_order="name">
+                <field name="name"/>
+                <field name="token_source" widget="badge"
+                       decoration-info="token_source == 'header'"
+                       decoration-warning="token_source == 'param'"
+                       decoration-success="token_source == 'both'"/>
+                <field name="header_name" optional="show"/>
+                <field name="param_name" optional="show"/>
+                <field name="is_active" widget="boolean_toggle"/>
+                <field name="expires_at" optional="show"/>
+                <field name="last_used" optional="show"/>
+                <field name="usage_count" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="sunray_webhook_token_searchview" model="ir.ui.view">
+        <field name="name">sunray.webhook.token.search</field>
+        <field name="model">sunray.webhook.token</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="header_name"/>
+                <field name="param_name"/>
+                <separator/>
+                <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="header_source" string="Header Source" domain="[('token_source', '=', 'header')]"/>
+                <filter name="param_source" string="Parameter Source" domain="[('token_source', '=', 'param')]"/>
+                <filter name="both_source" string="Both Sources" domain="[('token_source', '=', 'both')]"/>
+                <separator/>
+                <filter name="expired" string="Expired"
+                        domain="[('expires_at', '!=', False), ('expires_at', '&lt;', datetime.datetime.now())]"/>
+                <filter name="never_expires" string="Never Expires" domain="[('expires_at', '=', False)]"/>
+                <filter name="used_recently" string="Used Recently (7 days)"
+                        domain="[('last_used', '&gt;=', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Token Source" name="group_by_token_source" context="{'group_by': 'token_source'}"/>
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
+                    <filter string="Has Expiration" name="group_by_expiration"
+                            domain="[]" context="{'group_by': 'expires_at:bool'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="sunray_webhook_token_formview" model="ir.ui.view">
+        <field name="name">sunray.webhook.token.form</field>
+        <field name="model">sunray.webhook.token</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="regenerate_token"
+                            type="object"
+                            string="Regenerate Token"
+                            class="btn-warning"
+                            invisible="not id"
+                            confirm="Are you sure you want to regenerate this token? The old token will stop working immediately and all systems using it will need to be updated."/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button"
+                                type="object"
+                                string="Refresh"
+                                icon="fa-refresh"
+                                name="btn_refresh" />
+                        <button class="oe_stat_button"
+                                type="object"
+                                name="action_view_usage_logs"
+                                icon="fa-history"
+                                invisible="usage_count == 0">
+                            <field name="usage_count" widget="statinfo" string="Uses"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g., Shopify Webhook, Payment Gateway API, CI/CD Pipeline"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group name="basic_info_left">
+                            <field name="is_active" widget="boolean_toggle"/>
+                            <field name="expires_at" placeholder="Leave empty for no expiration"/>
+                        </group>
+                        <group name="basic_info_right">
+                            <field name="last_used" readonly="1"/>
+                            <field name="usage_count" readonly="1"/>
+                            <field name="create_date" readonly="1" string="Created"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="status">
+                        <p><strong>Token Reusability:</strong> This token can be used across multiple hosts by attaching it to Access Rules.
+                        Navigate to each host's Access Rules to configure which URL patterns can use this token.</p>
+                    </div>
+
+                    <group string="Token Configuration">
+                        <group colspan="2">
+                            <!-- For new records: editable token field -->
+                            <field name="token"
+                                   invisible="id"
+                                   placeholder="Leave empty to auto-generate a secure token (recommended)"
+                                   help="Leave empty for secure auto-generation (32 characters). Only set manually if required for compatibility."/>
+
+                            <!-- For existing records: display with toggle -->
+                            <field name="show_full_token"
+                                   groups="sunray_core.group_sunray_admin"                            
+                                   widget="boolean_toggle" />
+
+                            <!-- Partial display when toggle is off -->
+                            <field name="token"
+                                   readonly="1"
+                                   invisible="show_full_token"
+                                   string="Token (Partial)"
+                                   password="True"/>
+
+                            <!-- Full token with clipboard widget when toggle is on -->
+                            <field name="token"
+                                   readonly="1"
+                                   invisible="not show_full_token"
+                                   widget="CopyClipboardChar"
+                                   string="Token (Full)"
+                                   groups="sunray_core.group_sunray_admin"/>
+                        </group>
+                    </group>
+
+                    <group string="Token Extraction Configuration">
+                        <group>
+                            <field name="token_source" required="1"
+                                   help="Where the worker should look for the token in incoming requests"/>
+                        </group>
+                        <group>
+                            <field name="header_name"
+                                   placeholder="e.g., X-Shopify-Hmac-Sha256, Authorization, X-API-Key"
+                                   invisible="token_source == 'param'"
+                                   required="token_source != 'param'"
+                                   help="HTTP header name where the token is sent"/>
+                            <field name="param_name"
+                                   placeholder="e.g., api_key, token, key"
+                                   invisible="token_source == 'header'"
+                                   required="token_source != 'header'"
+                                   help="URL parameter name where the token is sent"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Security Restrictions">
+                            <group>
+                                <field name="allowed_cidrs" widget="text"
+                                       placeholder="IP addresses or CIDR blocks allowed to use this token (one per line, # for comments)&#10;Examples:&#10;192.168.1.100    # Office gateway&#10;10.0.0.0/8       # Internal network&#10;203.0.113.0/24   # Partner network&#10;&#10;Leave empty to allow from any IP"/>
+                            </group>
+                            <div class="alert alert-info" role="status">
+                                <h4>CIDR Restrictions</h4>
+                                <p>Optionally restrict this token to specific IP addresses or CIDR blocks.<br/>
+                                If configured, the token will only be accepted from these sources.<br/>
+                                This adds an extra layer of security for sensitive APIs.</p>
+                            </div>
+                        </page>
+
+                        <page string="Usage Examples">
+                            <div class="alert alert-success" role="status" invisible="token_source != 'header'">
+                                <h4>Header-based Authentication</h4>
+                                <p><strong>curl example:</strong></p>
+                                <code>curl -H "<field name="header_name" readonly="1"/>: YOUR_TOKEN" https://your-host.com/api/endpoint</code>
+                            </div>
+                            <div class="alert alert-success" role="status" invisible="token_source != 'param'">
+                                <h4>Parameter-based Authentication</h4>
+                                <p><strong>URL example:</strong></p>
+                                <code>https://your-host.com/api/endpoint?<field name="param_name" readonly="1"/>=YOUR_TOKEN</code>
+                            </div>
+                            <div class="alert alert-success" role="status" invisible="token_source != 'both'">
+                                <h4>Dual Authentication Support</h4>
+                                <p>This token accepts authentication via either method:</p>
+                                <p><strong>Header:</strong> <code>curl -H "<field name="header_name" readonly="1"/>: YOUR_TOKEN" https://your-host.com/api/endpoint</code></p>
+                                <p><strong>Parameter:</strong> <code>https://your-host.com/api/endpoint?<field name="param_name" readonly="1"/>=YOUR_TOKEN</code></p>
+                                <p><em>Note: Header is checked first if both are present.</em></p>
+                            </div>
+                        </page>
+
+                        <page string="Advanced" name="page_debug" groups="base.group_no_one">
+                            <group>
+                                <group>
+                                    <field name="id" readonly="1"/>
+                                    <field name="write_uid" readonly="1" string="Last Modified By"/>
+                                    <field name="write_date" readonly="1" string="Last Modified"/>
+                                </group>
+                                <group>
+                                    <field name="create_uid" readonly="1" string="Created By"/>
+                                    <separator string="Parsed CIDR Blocks"/>
+                                    <field name="allowed_cidrs" readonly="1" widget="text"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="sunray_webhook_tokens_action" model="ir.actions.act_window">
+        <field name="name">Webhook Tokens</field>
+        <field name="res_model">sunray.webhook.token</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="sunray_webhook_token_searchview"/>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first webhook token
+            </p>
+            <p>
+                Webhook tokens provide authentication for APIs and webhooks that cannot use passkeys.
+                They are perfect for third-party integrations, CI/CD pipelines, and automated systems.
+                <strong>Tokens are reusable across multiple hosts via Access Rules.</strong>
+            </p>
+            <p>
+                <strong>Common Use Cases:</strong><br/>
+                • <span class="badge badge-info">Webhooks</span>: Shopify, Stripe, GitHub notifications<br/>
+                • <span class="badge badge-warning">APIs</span>: Payment gateways, external services<br/>
+                • <span class="badge badge-success">CI/CD</span>: GitLab, Jenkins, deployment pipelines<br/>
+                • <span class="badge badge-primary">Monitoring</span>: Health checks, status endpoints
+            </p>
+            <p>
+                <strong>Security Features:</strong><br/>
+                • Auto-generated secure tokens (32 characters)<br/>
+                • Reusable across multiple hosts and URL patterns<br/>
+                • Optional IP/CIDR restrictions<br/>
+                • Expiration dates for temporary access<br/>
+                • Usage tracking and audit logging
+            </p>
+        </field>
+    </record>
+</odoo>

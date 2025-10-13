@@ -1,13 +1,13 @@
 {
     'name': 'Sunray Core',
-    'version': '18.0.1.0.0',
+    'version': '18.0.1.1.0',
     'category': 'Security',
     'summary': 'WebAuthn/Passkey authentication system for Cloudflare Workers',
     'description': """
 Sunray Core - Free Edition
 ==========================
 
-A lightweight, secure, self-hosted solution for authorizing HTTP access 
+A lightweight, secure, self-hosted solution for authorizing HTTP access
 to private cloud services without VPN or fixed IPs.
 
 Features:
@@ -16,10 +16,16 @@ Features:
 * Session management with JWT
 * User and host configuration
 * Setup token generation
-* Webhook token management
+* Reusable webhook tokens across multiple hosts
 * Audit logging
 * CIDR bypass rules
 * Public URL patterns
+
+Version 1.1.0 Changes:
+---------------------
+* Webhook tokens are now global and reusable across multiple hosts
+* Tokens managed via Access Rules for flexible URL pattern mapping
+* Simplified token management with centralized administration
 
 Technical Components:
 --------------------
@@ -56,8 +62,9 @@ Technical Components:
         'views/sunray_session_views.xml',
         'views/sunray_audit_log_views.xml',
         'views/sunray_api_key_views.xml',
+        'views/sunray_webhook_token_views.xml',
         'views/sunray_worker_views.xml',
-        
+
         # Menu (must be last)
         'views/sunray_menu.xml',
     ],

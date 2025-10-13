@@ -155,11 +155,10 @@ class TestVersionTracking(TransactionCase):
         import time
         time.sleep(1)
         
-        # Create webhook token for host - providing token explicitly to avoid create() issue
+        # Create webhook token (no longer tied to specific host)
         webhook_token = self.env['sunray.webhook.token'].create([{
             'name': 'Test Webhook',
             'token': 'webhook-token-123',
-            'host_id': self.test_host.id,
             'header_name': 'X-Test-Token',  # Required for token_source='header' (default)
             'is_active': True
         }])

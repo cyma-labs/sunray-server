@@ -38,7 +38,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Shopify webhook token
         shopify_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Shopify Webhook',
             'header_name': 'X-Shopify-Hmac-Sha256',
             'token_source': 'header'
@@ -51,7 +50,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Mirakl API token
         mirakl_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Mirakl API',
             'header_name': 'Authorization',
             'token_source': 'header'
@@ -62,7 +60,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Legacy system with URL parameter
         legacy_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Legacy System',
             'param_name': 'api_key',
             'token_source': 'param'
@@ -74,7 +71,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Flexible token supporting both
         flexible_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Flexible API',
             'header_name': 'X-API-Key',
             'param_name': 'key',
@@ -89,7 +85,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         """Test the get_extraction_config method"""
         
         token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Test Token',
             'token': 'custom_token_123',
             'header_name': 'X-Custom-Token',
@@ -117,7 +112,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Create multiple webhook tokens with different configurations
         shopify_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Shopify Webhook',
             'token': 'shopify_secret_123',
             'header_name': 'X-Shopify-Hmac-Sha256',
@@ -125,7 +119,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         }])
         
         mirakl_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Mirakl API',
             'token': 'mirakl_key_456',
             'header_name': 'Authorization',
@@ -133,7 +126,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         }])
         
         legacy_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Legacy System',
             'token': 'legacy_789',
             'param_name': 'api_key',
@@ -182,8 +174,7 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         # SQL constraints fire first, causing database error
         with self.assertRaises(Exception):  # Database constraint violation
             self.env['sunray.webhook.token'].create([{
-                'host_id': self.host.id,
-                'name': 'Invalid Header Token',
+                    'name': 'Invalid Header Token',
                 'token': 'test_token_123',  # Add required token field
                 'token_source': 'header'
                 # Missing header_name - triggers SQL constraint first
@@ -192,8 +183,7 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         # Test that param source requires param_name  
         with self.assertRaises(Exception):  # Database constraint violation
             self.env['sunray.webhook.token'].create([{
-                'host_id': self.host.id,
-                'name': 'Invalid Param Token',
+                    'name': 'Invalid Param Token',
                 'token': 'test_token_456',  # Add required token field
                 'token_source': 'param'
                 # Missing param_name - triggers SQL constraint first
@@ -202,7 +192,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         # Test that both source requires at least one of header_name or param_name
         # This should work (has header_name)
         token1 = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Valid Both Token 1',
             'token': 'valid_token_123',  # Add required token field
             'header_name': 'X-Token',
@@ -212,7 +201,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # This should also work (has param_name)
         token2 = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Valid Both Token 2',
             'token': 'valid_token_456',  # Add required token field
             'param_name': 'token',
@@ -236,8 +224,7 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         for name, header, param, source in providers:
             token_data = {
-                'host_id': self.host.id,
-                'name': f'{name} Token',
+                    'name': f'{name} Token',
                 'token_source': source
             }
             if header:
@@ -266,7 +253,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Create a token
         test_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Test Token',
             'header_name': 'X-Test-Token',
             'token_source': 'header'
@@ -309,7 +295,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Create tokens for different providers
         shopify_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Shopify Webhook',
             'token': 'shopify_secret_123',
             'header_name': 'X-Shopify-Hmac-Sha256',
@@ -317,7 +302,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         }])
         
         stripe_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'Stripe Webhook',
             'token': 'stripe_secret_456',
             'header_name': 'Stripe-Signature',
@@ -368,7 +352,6 @@ class TestWebhookTokenMultiProvider(TransactionCase):
         
         # Create webhook token
         webhook_token = self.env['sunray.webhook.token'].create([{
-            'host_id': self.host.id,
             'name': 'CI/CD Webhook',
             'token': 'cicd_secret_789',
             'header_name': 'X-CI-Token',
@@ -383,7 +366,7 @@ class TestWebhookTokenMultiProvider(TransactionCase):
             'access_type': 'public',
             'url_patterns': '^/health$\n^/status$'
         }])
-        
+
         cidr_rule = self.env['sunray.access.rule'].create([{
             'host_id': self.host.id,
             'description': 'Admin Network',
@@ -392,7 +375,7 @@ class TestWebhookTokenMultiProvider(TransactionCase):
             'url_patterns': '^/admin/.*',
             'allowed_cidrs': '192.168.1.0/24\n10.0.0.0/8'
         }])
-        
+
         token_rule = self.env['sunray.access.rule'].create([{
             'host_id': self.host.id,
             'description': 'Webhook Endpoints',

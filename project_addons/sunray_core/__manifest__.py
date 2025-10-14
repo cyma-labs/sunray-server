@@ -57,7 +57,7 @@ Technical Components:
         'views/sunray_audit_log_views.xml',
         'views/sunray_api_key_views.xml',
         'views/sunray_worker_views.xml',
-        
+
         # Menu (must be last)
         'views/sunray_menu.xml',
     ],
@@ -70,12 +70,11 @@ Technical Components:
     'external_dependencies': {
         'python': ['pyotp', 'qrcode', 'python-jose', 'PyYAML'],
     },
-    # 'assets': {
-    #     'web.assets_backend': [
-    #         'sunray_core/static/src/css/sunray.css',
-    #         'sunray_core/static/src/js/sunray.js',
-    #     ],
-    # },
+    'assets': {
+        'web.assets_backend': [
+            'sunray_core/static/src/js/user_menu.js',
+        ],
+    },
     'cli': {
         'sunray_core.cli.sunray_cli': ['sunray'],
     },

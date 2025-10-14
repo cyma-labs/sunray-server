@@ -51,6 +51,9 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="%(action_sunray_setup_token_wizard)d" string="Generate Setup Token" icon="fa-key" type="action" class="btn-warning"
+                            context="{'default_host_id': id}"
+                            help="Generate a new setup token for a user to register their device for this host"/>
                     <button name="force_cache_refresh" string="Force Config Refresh" icon="fa-refresh" type="object" class="btn-warning"
                             help="Forces the worker to immediately refresh its cached configuration for this host. Use this after making changes to access rules, webhook tokens, or other host settings that need to take effect immediately. This does not affect user sessions - users remain logged in."
                             confirm="This will immediately invalidate cached configuration for this host. Continue?"/>

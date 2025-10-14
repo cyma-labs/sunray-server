@@ -130,6 +130,14 @@
                     "directory": "inouk_odoo_cli",
                     "refspec": "18.0",
                     "group": "parts/inouk_addons/"
+                },
+                "sunray_advanced": {
+                    "install": true,
+                    "type": "git",
+                    "repository": "https://sunray:${ENV:MPY_REPO_GIT_TOKEN}@gitlab.com/cmorisse/sunray-server-advanced.git",
+                    "directory": "advanced_addons",
+                    "refspec": "main"
+                    //"group": "parts/inouk_addons/"
                 }
             },
             "config": {

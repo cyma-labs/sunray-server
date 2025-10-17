@@ -18,14 +18,13 @@ class SunrayUser(models.Model):
         string='Username', 
         required=True, 
         index=True,
-        help='Unique username for authentication'
+        help='username used for authentication. Must be unique per Protected Host'
     )
     email = fields.Char(
         string='Email', 
         required=True,
         help='User email address for notifications'
     )
-
     is_active = fields.Boolean(
         string='Active', 
         default=True,

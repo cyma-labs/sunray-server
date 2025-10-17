@@ -60,3 +60,6 @@ specs
 node_modules/
 
 advanced_addons/
+
+inouk-sunray-worker-cloudflare
+inouk-sunray-worker-cloudflare/

@@ -60,6 +60,38 @@ Think of Sunray as a security bouncer at a club entrance:
 - Setup tokens are validated in the model layer (register_with_setup_token method)
 - Comprehensive audit logging tracks all registration attempts
 
+### Worker-Specific Documentation
+
+When working on code in any worker directory, **ALWAYS read the worker's CLAUDE.md first** before making changes. Worker repositories contain their own CLAUDE.md files with:
+- Worker-specific architecture and design patterns
+- Platform-specific constraints and best practices
+- Testing frameworks and conventions
+- Deployment procedures
+- API client implementation guidelines
+
+**Workflow:**
+1. User asks to work on worker code (e.g., "fix the cache logic in the Cloudflare worker")
+2. **First action**: Read `./inouk-sunray-worker-cloudflare/CLAUDE.md`
+3. Follow worker-specific guidelines from that CLAUDE.md
+4. Refer back to this server CLAUDE.md for API contract and server integration details
+
+**Current Workers with CLAUDE.md:**
+- `./inouk-sunray-worker-cloudflare/CLAUDE.md` - Cloudflare Worker implementation
+
+**Example:**
+```bash
+# When user asks to work on worker code, first read:
+Read file: ./inouk-sunray-worker-cloudflare/CLAUDE.md
+
+# Then proceed with the requested changes
+```
+
+**Why This Matters:**
+- Workers have platform-specific constraints (e.g., Cloudflare's 128MB memory limit)
+- Different testing frameworks (Vitest vs Odoo test framework)
+- Different deployment processes (wrangler deploy vs Odoo module updates)
+- Worker-specific code organization and conventions
+
 ## Environment Configuration
 
 **Note**: Sensitive environment-specific information (URLs, API keys, credentials) should be stored in `.claude.local.md` which is not committed to the repository. Create this file locally with your specific environment details.
@@ -112,14 +144,29 @@ Sunray is organized as separate repositories following a server-centric architec
     └── odoo.buildit.cfg       # Generated Odoo config
 ```
 
-### inouk-sunray-worker-cloudflare (separate repository)
+### inouk-sunray-worker-cloudflare (cloned locally)
+
+**Location**: `/opt/muppy/appserver-sunray18/inouk-sunray-worker-cloudflare/`
+
+The worker repository has been cloned locally for development convenience. All worker development commands should be run from this directory.
+
 ```
 inouk-sunray-worker-cloudflare/
 ├── src/                       # Worker source code
 ├── wrangler.toml              # Cloudflare configuration
 ├── package.json               # Node dependencies
 ├── deploy.sh                  # Deployment script
+├── CLAUDE.md                  # Worker-specific documentation
 └── README.md                  # Cloudflare-specific docs
+```
+
+**Working with the cloned worker:**
+```bash
+# Navigate to worker directory
+cd /opt/muppy/appserver-sunray18/inouk-sunray-worker-cloudflare/
+
+# Or use relative path from server root
+cd inouk-sunray-worker-cloudflare/
 ```
 
 ### Future Workers
@@ -309,14 +356,13 @@ After adding tests, they will automatically appear in `--list-tests` output.
 
 ### Worker Development
 
-Workers are now in separate repositories. For Cloudflare Worker:
+The Cloudflare Worker repository is cloned locally at `./inouk-sunray-worker-cloudflare/`. All commands should be run from this directory.
 
 ```bash
-# Clone the worker repository
-git clone https://gitlab.com/cmorisse/inouk-sunray-worker-cloudflare.git
+# Navigate to worker directory
 cd inouk-sunray-worker-cloudflare/
 
-# Install dependencies
+# Install dependencies (if not already done)
 npm install
 
 # Run local development server
@@ -329,6 +375,11 @@ wrangler deploy
 npm test                      # Run all tests
 npm run test:watch           # Run tests in watch mode
 npm run test:coverage        # Run tests with coverage report
+```
+
+**Note**: The worker can also be cloned separately if needed:
+```bash
+git clone https://gitlab.com/cmorisse/inouk-sunray-worker-cloudflare.git
 ```
 
 #### Setup Token Handling

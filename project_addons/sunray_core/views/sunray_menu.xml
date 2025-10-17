@@ -1,74 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Main menu -->
-    <menuitem id="menu_sunray_root" 
-              name="Sunray" 
+    <menuitem id="menu_sunray_root"
+              name="Sunray"
               web_icon="sunray_core,static/description/icon.png"
               sequence="50"/>
-    
-    <!-- Configuration -->
-    <menuitem id="menu_sunray_config" 
-              name="Configuration" 
+
+    <menuitem id="menu_sunray_access"
+              name="User Management"
               parent="menu_sunray_root"
               sequence="10"/>
-              
-    <menuitem id="menu_sunray_users" 
-              name="Users" 
-              parent="menu_sunray_config" 
+
+    <menuitem id="menu_sunray_users"
+              name="Users"
+              parent="menu_sunray_access"
               action="action_sunray_users"
               sequence="10"/>
-              
-    <menuitem id="menu_sunray_passkeys" 
-              name="WebAuthn Passkeys" 
-              parent="menu_sunray_config" 
-              action="action_sunray_passkeys"
-              sequence="15"/>
-              
-    <menuitem id="menu_sunray_hosts" 
-              name="Protected Hosts" 
-              parent="menu_sunray_config" 
-              action="action_sunray_hosts"
-              sequence="20"/>
-    
-    <menuitem id="menu_sunray_access_rules" 
-              name="Access Rules" 
-              parent="menu_sunray_config" 
-              action="sunray_access_rules_action"
-              sequence="25"/>
 
-    <menuitem id="menu_sunray_workers" 
-              name="Workers" 
-              parent="menu_sunray_config" 
-              action="action_sunray_workers"
+    <menuitem id="menu_sunray_setup_tokens"
+              name="Setup Tokens"
+              parent="menu_sunray_access"
+              action="action_sunray_setup_tokens"
+              sequence="20"/>
+
+    <menuitem id="menu_sunray_passkeys"
+              name="Passkeys"
+              parent="menu_sunray_access"
+              action="action_sunray_passkeys"
               sequence="30"/>
-              
-    <menuitem id="menu_sunray_api_keys"
-              name="API Keys"
-              parent="menu_sunray_config"
-              action="action_sunray_api_keys"
-              sequence="35"/>
+
+    <menuitem id="menu_sunray_infrastructure"
+              name="Protected Systems"
+              parent="menu_sunray_root"
+              sequence="20"/>
+
+    <menuitem id="menu_sunray_hosts"
+              name="Protected Hosts"
+              parent="menu_sunray_infrastructure"
+              action="action_sunray_hosts"
+              sequence="10"/>
+
+    <menuitem id="menu_sunray_access_rules"
+              name="Access Rules Library"
+              parent="menu_sunray_infrastructure"
+              action="sunray_access_rules_action"
+              sequence="20"/>
 
     <menuitem id="menu_sunray_webhook_tokens"
               name="Webhook Tokens"
-              parent="menu_sunray_config"
+              parent="menu_sunray_infrastructure"
               action="sunray_webhook_tokens_action"
+              sequence="30"/>
+
+    <menuitem id="menu_sunray_platform"
+              name="Platform"
+              parent="menu_sunray_root"
+              sequence="30"/>
+
+    <menuitem id="menu_sunray_workers"
+              name="Workers"
+              parent="menu_sunray_platform"
+              action="action_sunray_workers"
+              sequence="10"/>
+
+    <menuitem id="menu_sunray_api_keys"
+              name="API Keys"
+              parent="menu_sunray_platform"
+              action="action_sunray_api_keys"
+              sequence="20"/>
+
+    <menuitem id="menu_sunray_monitoring"
+              name="Monitoring"
+              parent="menu_sunray_root"
               sequence="40"/>
 
-    <!-- Monitoring -->
-    <menuitem id="menu_sunray_monitoring" 
-              name="Monitoring" 
-              parent="menu_sunray_root"
-              sequence="20"/>
-              
-    <menuitem id="menu_sunray_sessions" 
-              name="Active Sessions" 
-              parent="menu_sunray_monitoring" 
+    <menuitem id="menu_sunray_sessions"
+              name="Active Sessions"
+              parent="menu_sunray_monitoring"
               action="action_sunray_sessions"
               sequence="10"/>
-              
-    <menuitem id="menu_sunray_audit" 
-              name="Audit Logs" 
-              parent="menu_sunray_monitoring" 
+
+    <menuitem id="menu_sunray_audit"
+              name="Audit Logs"
+              parent="menu_sunray_monitoring"
               action="action_sunray_audit_logs"
               sequence="20"/>
+
+    <!-- Settings menu - will be replaced by Advanced module if installed -->
+    <menuitem id="menu_sunray_settings"
+              name="Settings"
+              parent="menu_sunray_root"
+              sequence="100"
+              groups="sunray_core.group_sunray_admin"/>
 </odoo>

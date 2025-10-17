@@ -14,7 +14,7 @@ class UserSessionsRevokeWizard(models.TransientModel):
     )
     host_id = fields.Many2one(
         'sunray.host',
-        string='Host',
+        string='Protected Host',
         readonly=True
     )
     worker_id = fields.Many2one(

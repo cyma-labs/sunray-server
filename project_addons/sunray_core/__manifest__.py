@@ -58,6 +58,7 @@ Technical Components:
         'views/sunray_user_views.xml',
         'views/sunray_host_views.xml',
         'views/sunray_passkey_views.xml',
+        'views/sunray_setup_token_views.xml',
         'views/sunray_access_rule_views.xml',
         'views/sunray_session_views.xml',
         'views/sunray_audit_log_views.xml',

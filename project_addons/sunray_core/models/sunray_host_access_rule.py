@@ -11,7 +11,7 @@ class SunrayHostAccessRule(models.Model):
 
     host_id = fields.Many2one(
         'sunray.host',
-        string='Host',
+        string='Protected Host',
         required=True,
         ondelete='cascade',
         index=True,

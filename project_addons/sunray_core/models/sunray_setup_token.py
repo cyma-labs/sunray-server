@@ -25,7 +25,7 @@ class SunraySetupToken(models.Model):
         'sunray.host',
         required=True,
         ondelete='cascade',
-        string='Host',
+        string='Protected Host',
         help='The host this token is valid for'
     )
     token_hash = fields.Char(
@@ -34,8 +34,8 @@ class SunraySetupToken(models.Model):
         help='SHA-512 hash of the setup token'
     )
     device_name = fields.Char(
-        string='Device Name',
-        help='Intended device for this token'
+        string='Token Name',
+        help='Intended name for this token'
     )
     expires_at = fields.Datetime(
         string='Expiration', 
@@ -68,7 +68,18 @@ class SunraySetupToken(models.Model):
         help='Number of times this token has been used'
     )
     
-    # Note: create_uid automatically tracks who generated the token
+    # UI display helper field
+    show_full_token = fields.Boolean(
+        string='Show Full Token',
+        default=False,
+        store=False,
+        help='Toggle to show/hide full token hash in form view',
+        inverse='_inverse_show_full_token'
+    )
+    def _inverse_show_full_token(self):
+        for record in self:
+            pass
+            #record.show_full_token = record.show_full_token
     
     @api.model
     def cleanup_expired(self):

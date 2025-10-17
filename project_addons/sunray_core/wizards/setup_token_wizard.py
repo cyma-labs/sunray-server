@@ -15,7 +15,7 @@ class SetupTokenWizard(models.TransientModel):
     host_id = fields.Many2one(
         'sunray.host',
         required=True,
-        string='Host',
+        string='Protected Host',
         help='The host this token will grant access to'
     )
     device_name = fields.Char(

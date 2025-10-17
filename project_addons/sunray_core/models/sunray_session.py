@@ -24,7 +24,7 @@ class SunraySession(models.Model):
     host_id = fields.Many2one(
         'sunray.host', 
         required=True,
-        string='Host'
+        string='Protected Host'
     )
     
     # Session metadata

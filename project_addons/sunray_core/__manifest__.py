@@ -79,9 +79,9 @@ Technical Components:
         'python': ['pyotp', 'qrcode', 'python-jose', 'PyYAML'],
     },
     'assets': {
-        'web.assets_backend': [
-            'sunray_core/static/src/js/user_menu.js',
-        ],
+        # 'web.assets_backend': [
+        #     'sunray_core/static/src/js/user_menu.js',
+        # ],
     },
     'cli': {
         'sunray_core.cli.sunray_cli': ['sunray'],

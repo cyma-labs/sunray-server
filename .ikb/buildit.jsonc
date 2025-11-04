@@ -18,7 +18,10 @@
         "py3x": {
             "plugin": "ikb.virtualenv",
             "name": "py3x",
-            "interpreter": "python3"
+            "interpreter": "python3",
+            "eggs": {
+                "wheel": "0.45.1"
+            }            
         },
         "odoo": {
             "plugin": "ikb.odoo",

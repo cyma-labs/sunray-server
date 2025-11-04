@@ -47,6 +47,9 @@ log_step "Installing sunray_core module"
 # - MPY_USERINIT_WEBSITE: Website URL for company (default: https://gitlab.com/cmorisse/inouk-sunray-server)
 # - MPY_USERINIT_PARTNER_ROOT_NAME: Partner root name (default: SunrayBot)
 
+# Use APP_LOADBALANCER_URL if available, otherwise fall back to APP_PRIMARY_URL
+APP_EFFECTIVE_URL="${APP_LOADBALANCER_URL:-$APP_PRIMARY_URL}"
+
 log_step "Setting up company configuration"
 log_step "  Company: $MPY_USERINIT_USER_COMPANY"
 log_step "  Email: $IKB_SMTP_USER"

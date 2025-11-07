@@ -108,6 +108,7 @@ class SunrayAuditLog(models.Model):
         ('security.host_id_mismatch', 'Host ID Mismatch'),
         ('security.unmanaged_host_access', 'Unmanaged Host Access'),
         ('security.protection_disabled_host_access', 'Protection Disabled Host Access'),
+        ('security.blocked_host_access', 'Protection Disabled Host Access'),
         ('security.worker_direct_access', 'Worker Direct Access'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
         ('SESSION_IP_CHANGED', 'Session IP Changed'),

@@ -34,11 +34,17 @@ class SunrayHost(models.Model):
         help='Worker that protects this host. A host can be protected by only one worker, but a worker can protect several hosts.'
     )
     is_active = fields.Boolean(
-        string='Protection Enabled',
+        string='Active',
         default=True,
         help='Controls whether Sunray protection is active for this host. '
              'When disabled, the Worker will block all traffic with 503 Service Unavailable. '
              'Use Access Rules to configure public access instead of disabling protection.'
+    )
+
+    block_all_traffic = fields.Boolean(
+        string="Block all traffic",
+        default=False,
+        help="When true, sunray controls traffic else traffic is blocked"
     )
     
     # Access Rules (via association model for reusability)
@@ -443,7 +449,7 @@ class SunrayHost(models.Model):
             config = {
                 'id': host_obj.id,
                 'domain': host_obj.domain,
-                'is_active': host_obj.is_active,  # NEW: Critical for worker blocking logic
+                'block_traffic': host_obj.block_all_traffic,
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
@@ -509,15 +515,15 @@ class SunrayHost(models.Model):
                 )
                 
             # Log protection status changes (is_active)
-            if 'is_active' in vals and vals['is_active'] != record.is_active:
-                event_type = 'config.host.protection_enabled' if vals['is_active'] else 'config.host.protection_disabled'
+            if 'block_traffic' in vals and vals['block_traffic'] != record.block_traffic:
+                event_type = 'config.host.protection_enabled' if vals['block_traffic'] else 'config.host.protection_disabled'
                 self.env['sunray.audit.log'].create_admin_event(
                     event_type=event_type,
                     severity='warning',
                     details={
                         'host': record.domain,
-                        'previous_state': record.is_active,
-                        'new_state': vals['is_active'],
+                        'previous_state': record.block_traffic,
+                        'new_state': vals['block_traffic'],
                         'active_sessions': len(record.active_session_ids),
                         'host_id': record.id
                     },

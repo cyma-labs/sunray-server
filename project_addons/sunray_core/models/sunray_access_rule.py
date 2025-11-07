@@ -84,6 +84,16 @@ class SunrayAccessRule(models.Model):
         help='Archive this rule to prevent it from being used on any host. '
              'Inactive rules cannot be attached to hosts.'
     )
+    
+    is_default_rule = fields.Boolean(
+        string="Default Rule",
+        help="If checked, this rule will be automatically added to all newly created hosts."
+    )
+    default_priority  = fields.Integer(
+        default=1,
+        help='Priority assigned when auto-adding this rule to new hosts (lower = higher priority). '
+             'Only used if "Default Rule" is enabled.'
+    )
 
     # Usage tracking
     host_association_ids = fields.One2many(

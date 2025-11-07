@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sunray Configuration Form -->
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.sunray_core</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Sunray" name="sunray_settings" logo="/sunray_core/static/description/icon.svg" groups="sunray_core.group_sunray_admin">
+                    <block title="Setup Token" id="sunray_setup_token_defaults">
+                        <setting string="Device Name" help="Default device name when generating setup tokens">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <field name="sunray_token_device_name" class="oe_inline col-6" placeholder="e.g., Mobile Phone, Laptop, Desktop"/>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting string="Validity" help="Default validity period for setup tokens in hours">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <field name="sunray_token_valid_hours" class="oe_inline col-2"/>
+                                    <span class="oe_inline ml-2">hours</span>
+                                </div>
+                            </div>
+                        </setting>
+                        <setting string="Maximum Uses" help="Default maximum number of times a token can be used">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <field name="sunray_token_maximum_use" class="oe_inline col-2"/>
+                                    <span class="oe_inline ml-2">uses</span>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

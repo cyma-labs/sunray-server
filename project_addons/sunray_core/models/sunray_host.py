@@ -457,7 +457,31 @@ class SunrayHost(models.Model):
             }
             result.append(config)    
         return result
-    
+
+    @api.model
+    def default_get(self, fields_list):
+        """Override to add default access rules to new hosts"""
+        defaults = super().default_get(fields_list)
+
+        if 'access_rule_rel_ids' in fields_list:
+            default_rules = self.env['sunray.access.rule'].search([
+                ('is_default_rule', '=', True),
+                ('is_active', '=', True)
+            ], order='default_priority, id')
+
+            rule_associations = []
+            for rule in default_rules:
+                rule_associations.append((0, 0, {
+                    'rule_id': rule.id,
+                    'priority': rule.default_priority,
+                    'is_active': True
+                }))
+
+            if rule_associations:
+                defaults['access_rule_rel_ids'] = rule_associations
+
+        return defaults
+
     def write(self, vals):
         """Override to update config_version on any change and audit timing changes"""
         # Track timing field changes for audit logging

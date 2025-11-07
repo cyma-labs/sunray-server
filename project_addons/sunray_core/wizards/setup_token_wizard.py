@@ -19,13 +19,12 @@ class SetupTokenWizard(models.TransientModel):
         help='The host this token will grant access to'
     )
     device_name = fields.Char(
-        string='Device Name', 
+        string='Device Name',
         required=True,
         help='Name to identify the device this token is for'
     )
     validity_hours = fields.Integer(
-        string='Valid for (hours)', 
-        default=24,
+        string='Valid for (hours)',
         help='How long the token remains valid'
     )
     allowed_cidrs = fields.Text(
@@ -34,7 +33,6 @@ class SetupTokenWizard(models.TransientModel):
     )
     max_uses = fields.Integer(
         string='Maximum Uses',
-        default=1,
         help='Number of times this token can be used'
     )
     
@@ -47,7 +45,36 @@ class SetupTokenWizard(models.TransientModel):
         string='Setup Instructions',
         readonly=True
     )
-    
+
+    @api.model
+    def default_get(self, fields_list):
+        """Load default values from system parameters"""
+        defaults = super().default_get(fields_list)
+
+        # Load defaults from settings
+        if 'device_name' in fields_list:
+            device_name = self.env['ir.config_parameter'].sudo().get_param(
+                'sunray.default_token_device_name',
+                'Device'
+            )
+            defaults['device_name'] = device_name
+
+        if 'validity_hours' in fields_list:
+            validity_hours = self.env['ir.config_parameter'].sudo().get_param(
+                'sunray.default_token_valid_hours',
+                '48'
+            )
+            defaults['validity_hours'] = int(validity_hours)
+
+        if 'max_uses' in fields_list:
+            max_uses = self.env['ir.config_parameter'].sudo().get_param(
+                'sunray.default_token_maximum_use',
+                '1'
+            )
+            defaults['max_uses'] = int(max_uses)
+
+        return defaults
+
     def generate_token(self):
         """Generate and display setup token"""
         self.ensure_one()

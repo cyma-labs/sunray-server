@@ -23,6 +23,9 @@ class SunrayAuditLog(models.Model):
         ('auth.success', 'Authentication Success'),
         ('auth.failure', 'Authentication Failure'),
         ('auth.logout', 'Authentication Logout'),
+        # Host Events
+        ('host.activated', 'Authentication Success'),
+        ('host.deactivated', 'Authentication Failure'),
         # Token Management Events
         ('token.generated', 'Token Generated'),
         ('token.consumed', 'Token Consumed'),
@@ -63,6 +66,7 @@ class SunrayAuditLog(models.Model):
         ('session.created', 'Session Created'),
         ('session.revoked', 'Session Revoked'),
         ('session.expired', 'Session Expired'),
+        ('session.creation_failed', 'Session Creation failed'),
         ('session.bulk_revocation', 'Bulk Session Revocation'),
         ('sessions.bulk_revoked', 'Sessions Bulk Revoked'),
         # Webhook Events

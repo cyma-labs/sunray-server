@@ -295,7 +295,7 @@ class SunrayPasskey(models.Model):
         
         # Host active status check (not covered by token validation)
         if not host_obj.is_active:
-            _logger.warning(f"Inactive host domain: {host_domain}")
+            _logger.warning(f"Blocked attempt to register passkey on inactive host '{host_domain}'.")
             # AUDIT: Log inactive host
             self.env['sunray.audit.log'].sudo().create_audit_event(
                 event_type='security.passkey.host_inactive',

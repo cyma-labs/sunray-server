@@ -315,7 +315,7 @@ class SunrayRESTController(http.Controller):
         if not api_key_obj:
             return self._error_response('Unauthorized', 401)
         
-        # Build configuration 
+        # Build configuration
         config = {
             'version': 4,  # Incremented for Access Rules support
             'generated_at': fields.Datetime.now().isoformat(),
@@ -894,7 +894,23 @@ class SunrayRESTController(http.Controller):
         host_obj = request.env['sunray.host'].sudo().search([
             ('domain', '=', host_domain)
         ])
-        
+        if not host_obj or not host_obj.is_active:
+            # add log event: try to create session on unknown host
+            # This should not occurs or only due to a worker having
+            # not refresh his cache. 
+            context_data = self._setup_request_context(request)
+            request.env['sunray.audit.log'].sudo().create_user_event(
+                event_type='session.creation_failed',
+                severity='critical',
+                details={
+                    'host_domain': host_domain,
+                    'reason': "Internal Error: Host not found." if not host_obj else "Internal Error: Host archived (is_active=False)",
+                },
+                sunray_worker=context_data['worker_id'],
+                username=data.get('username')  # Keep for compatibility
+            )
+            # RETURN error (stop execution)
+            return self._error_response(f'Host "{host_domain}" not found or not active', 404)        
         # Get credential_id and counter from request (worker managed)
         credential_id = data.get('credential_id')
         auth_counter = data.get('counter')  # Counter managed by worker, required for debugging

@@ -7,11 +7,12 @@
         <field name="arch" type="xml">
             <list>
                 <field name="domain"/>
+                <field name="is_active" string="Active" widget="boolean_toggle"/>
+                <field name="block_all_traffic" string="Block Traffic" widget="boolean_toggle"/>
                 <field name="sunray_worker_id" string="Worker" optional="show"/>
                 <field name="pending_worker_name" string="Pending Worker" optional="show"/>
                 <field name="migration_pending_duration" string="Migration Pending" optional="show"/>
                 <field name="backend_url" optional="show"/>
-                <field name="block_all_traffic" string="Block all traffic" widget="boolean_toggle"/>
                 <field name="last_migration_ts" string="Last Migration" optional="show"/>
                 <field name="create_date" optional="show"/>
                 <field name="config_version" optional="show"/>
@@ -30,8 +31,12 @@
                 <field name="sunray_worker_id"/>
                 <field name="pending_worker_name"/>
                 <separator/>
-                <filter name="traffic_blocked" string="Traffic blocked" domain="[('block_all_traffic', '=', True)]"/>
-                <filter name="traffic_not_blocked" string="Traffic not blocked" domain="[('block_all_traffic', '=', False)]"/>
+                <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
+                <filter name="archived" string="Archived" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="traffic_blocked" string="Traffic Blocked" domain="[('block_all_traffic', '=', True)]"/>
+                <filter name="traffic_normal" string="Traffic Normal" domain="[('block_all_traffic', '=', False)]"/>
+                <separator/>
                 <filter name="bound" string="Worker Bound" domain="[('sunray_worker_id', '!=', False)]"/>
                 <filter name="unbound" string="Unbound" domain="[('sunray_worker_id', '=', False)]"/>
                 <filter name="pending_migration" string="Pending Migration" domain="[('pending_worker_name', '!=', False)]"/>
@@ -79,6 +84,7 @@
                             <field name="backend_url" widget="url"/>
                         </group>
                         <group>
+                            <field name="is_active" widget="boolean_toggle"/>
                             <field name="block_all_traffic" widget="boolean_toggle"/>
                             <field name="create_date" readonly="1"/>
                             <field name="config_version" readonly="1"/>
@@ -86,13 +92,15 @@
                     </group>
                     
                     <!-- Traffic Blocking Warning -->
-                    <group string="Protection Status" invisible="not block_all_traffic" name="protection_status">
+                    <group string="Security Status" invisible="not block_all_traffic" name="protection_status">
                         <div class="alert alert-danger" role="alert">
-                            <strong>⚠️ All traffic blocked:</strong> This host is currently blocking all traffic with 503 Service Unavailable.
-                            <br/>To allow access:
-                            <ul class="mb-0 mt-2">
-                                <li>Uncheck "Block All Traffic" to restore normal authentication</li>
+                            <strong>🔒 Security Lockdown Active:</strong> This host is blocking all traffic with 403 Forbidden.
+                            <br/>This is typically used when:
+                            <ul class="mb-0 mt-1">
+                                <li>Host is suspected to be compromised</li>
+                                <li>Immediate security incident response is needed</li>
                             </ul>
+                            <br/><strong>To restore access:</strong> Uncheck "Block Traffic" after resolving the security issue.
                         </div>
                     </group>
                     

@@ -36,15 +36,15 @@ class SunrayHost(models.Model):
     is_active = fields.Boolean(
         string='Active',
         default=True,
-        help='Controls whether Sunray protection is active for this host. '
-             'When disabled, the Worker will block all traffic with 503 Service Unavailable. '
-             'Use Access Rules to configure public access instead of disabling protection.'
+        help="Host lifecycle status. When false, host is archived and invisible to workers."
     )
 
     block_all_traffic = fields.Boolean(
-        string="Block all traffic",
+        string='Block Traffic',
         default=False,
-        help="When true, sunray controls traffic else traffic is blocked"
+        help='Security lockdown - block all traffic with 403 Forbidden. '
+             'Use for security incidents or suspected compromise. '
+             'When enabled, all requests return 403 regardless of authentication.'
     )
     
     # Access Rules (via association model for reusability)
@@ -444,23 +444,28 @@ class SunrayHost(models.Model):
     
     def get_config_data(self):
         """Generate configuration data for API endpoints
-        
+
         This method consolidates host configuration data generation used by
         multiple API endpoints (/config, /config/register, /config/<hostname>).
-        
+
         Returns: List of host configuration dicts or []
-            
-        The returned data is the union of all endpoint needs and includes
-        the is_active flag for worker decision making.
+
+        Archived hosts (is_active=False) are completely invisible to the API.
         """
         if not self:
             return []
-        
+
+        # Filter out archived hosts - they're invisible to workers
+        active_hosts = self.filtered('is_active')
+        if not active_hosts:
+            return []
+
         result = []
-        for host_obj in self:
+        for host_obj in active_hosts:
             config = {
                 'id': host_obj.id,
                 'domain': host_obj.domain,
+                'is_active': host_obj.is_active,
                 'block_traffic': host_obj.block_all_traffic,
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
@@ -473,7 +478,7 @@ class SunrayHost(models.Model):
                 'worker_id': host_obj.sunray_worker_id.id if host_obj.sunray_worker_id else None,
                 'worker_name': host_obj.sunray_worker_id.name if host_obj.sunray_worker_id else None,
             }
-            result.append(config)    
+            result.append(config)
         return result
 
     @api.model
@@ -526,16 +531,43 @@ class SunrayHost(models.Model):
                     admin_user_id=self.env.user.id
                 )
                 
-            # Log protection status changes (is_active)
-            if 'block_traffic' in vals and vals['block_traffic'] != record.block_traffic:
-                event_type = 'config.host.protection_enabled' if vals['block_traffic'] else 'config.host.protection_disabled'
+            # Log lifecycle changes (is_active)
+            if 'is_active' in vals and vals['is_active'] != record.is_active:
+                if vals['is_active']:
+                    event_type = 'host.activated'
+                    severity = 'info'
+                else:
+                    event_type = 'host.deactivated'
+                    severity = 'warning'
                 self.env['sunray.audit.log'].create_admin_event(
                     event_type=event_type,
-                    severity='warning',
+                    severity=severity,
                     details={
                         'host': record.domain,
-                        'previous_state': record.block_traffic,
-                        'new_state': vals['block_traffic'],
+                        'previous_state': 'is_active=True' if record.is_active else 'is_active=False',
+                        'new_state': 'is_active=True' if vals['is_active'] else 'is_active=False',
+                        'active_sessions': len(record.active_session_ids),
+                        'authorized_users': len(record.user_ids),
+                        'host_id': record.id
+                    },
+                    admin_user_id=self.env.user.id
+                )
+
+            # Log security lockdown changes (block_all_traffic)
+            if 'block_all_traffic' in vals and vals['block_all_traffic'] != record.block_all_traffic:
+                if vals['block_all_traffic']:
+                    event_type = 'host.lockdown.activated'
+                    severity = 'critical'
+                else:
+                    event_type = 'host.lockdown.cleared'
+                    severity = 'warning'
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type=event_type,
+                    severity=severity,
+                    details={
+                        'host': record.domain,
+                        'previous_state': 'locked' if record.block_all_traffic else 'normal',
+                        'new_state': 'locked' if vals['block_all_traffic'] else 'normal',
                         'active_sessions': len(record.active_session_ids),
                         'host_id': record.id
                     },

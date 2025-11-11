@@ -661,12 +661,13 @@ class SunrayRESTController(http.Controller):
         if not user_obj:
             return self._error_response('User not found', 404)
         
-        # Get authorized hosts data
+        # Get authorized hosts data (include all hosts, even inactive ones)
         authorized_hosts = []
-        for host in user_obj.host_ids.filtered('is_active'):
+        for host in user_obj.host_ids:
             authorized_hosts.append({
                 'domain': host.domain,
-                'name': host.domain
+                'name': host.domain,
+                'is_active': host.is_active  # Include flag for worker decision-making
             })
         
         # Get passkeys data
@@ -894,23 +895,29 @@ class SunrayRESTController(http.Controller):
         host_obj = request.env['sunray.host'].sudo().search([
             ('domain', '=', host_domain)
         ])
+        # Session creation NOT allowed on inactive hosts (per design decision)
+        # Inactive hosts should return 503 at worker level, not create sessions
         if not host_obj or not host_obj.is_active:
-            # add log event: try to create session on unknown host
-            # This should not occurs or only due to a worker having
-            # not refresh his cache. 
             context_data = self._setup_request_context(request)
+
+            if not host_obj:
+                reason = "Host not found in database"
+                severity = 'error'
+            else:
+                reason = "Host is inactive/archived (is_active=False) - sessions not allowed"
+                severity = 'warning'  # Expected behavior for deactivated hosts
+
             request.env['sunray.audit.log'].sudo().create_user_event(
                 event_type='session.creation_failed',
-                severity='critical',
+                severity=severity,
                 details={
                     'host_domain': host_domain,
-                    'reason': "Internal Error: Host not found." if not host_obj else "Internal Error: Host archived (is_active=False)",
+                    'reason': reason,
                 },
                 sunray_worker=context_data['worker_id'],
-                username=data.get('username')  # Keep for compatibility
+                username=data.get('username')
             )
-            # RETURN error (stop execution)
-            return self._error_response(f'Host "{host_domain}" not found or not active', 404)        
+            return self._error_response(f'Host "{host_domain}" not available for sessions', 503)        
         # Get credential_id and counter from request (worker managed)
         credential_id = data.get('credential_id')
         auth_counter = data.get('counter')  # Counter managed by worker, required for debugging

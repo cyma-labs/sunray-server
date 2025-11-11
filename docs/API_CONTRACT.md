@@ -90,20 +90,25 @@ Hosts in Sunray use two orthogonal fields for status management:
    - `True`: Security lockdown, return 403 Forbidden
    - `False`: Normal operation with authentication
 
+**Field Name Mapping**: The server model uses `block_all_traffic` internally (more explicit) but exposes it as `block_traffic` (more concise) in API responses for consistency with this contract. Workers should always use the `block_traffic` field name.
+
 ### Host States and API Behavior
 
 | is_active | block_traffic | API Response | Worker Behavior | Use Case |
 |-----------|---------------|--------------|-----------------|----------|
-| `False` | * | Empty/404 | Host doesn't exist | Archived/decommissioned |
-| `True` | `False` | Full config | Normal auth flow | Standard operation |
-| `True` | `True` | Config with block_traffic=true | Return 403 Forbidden | Security incident |
+| `False` | `False` | Full config with both flags | Return 503 Service Unavailable | Archived/maintenance |
+| `False` | `True` | Full config with both flags | Return 403 Forbidden (lockdown priority) | Archived + locked |
+| `True` | `False` | Full config with both flags | Normal auth flow | Standard operation |
+| `True` | `True` | Full config with both flags | Return 403 Forbidden | Security incident |
 
 ### Worker Behavior
 
-#### Archived Hosts (`is_active=False`)
-- API returns **empty response** or 404
-- Worker treats as unconfigured host
-- Audit logging signals attempts to use them.
+#### Archived/Inactive Hosts (`is_active=False`)
+- API returns **full configuration** with `is_active=false`
+- Worker should return **503 Service Unavailable** with appropriate message
+- Worker should log access attempts for monitoring
+- Allows admins to re-activate without re-configuration
+- Sessions cannot be created on inactive hosts (blocked server-side)
 
 #### Security Lockdown (`block_traffic=True`)
 When a host has `block_traffic=True`, the worker MUST:
@@ -130,12 +135,13 @@ Content-Type: text/html
 
 ### Configuration API Response
 
-Active hosts receive configuration including the `block_traffic` flag:
+All hosts (including inactive ones) receive full configuration with both status flags:
 
 ```json
 {
-  "domain": "app.example.com",
+  "is_active": true,
   "block_traffic": false,
+  "domain": "app.example.com",
   "backend": "https://backend.example.com",
   "exceptions_tree": [ ... ],
   "websocket_url_prefix": "/ws/",
@@ -143,15 +149,15 @@ Active hosts receive configuration including the `block_traffic` flag:
 }
 ```
 
-**Note**: Archived hosts (`is_active=False`) are completely absent from API responses.
+**Note**: Both `is_active` and `block_traffic` fields are included for all hosts. Workers use these fields to determine appropriate behavior (503 for inactive, 403 for locked, normal auth for active).
 
 ### Audit Events
 
 The server logs these audit events for status changes:
 
 **Lifecycle Events**:
-- `host.archived`: Host archived (`is_active: True → False`)
-- `host.reactivated`: Host reactivated (`is_active: False → True`)
+- `host.deactivated`: Host deactivated/archived (`is_active: True → False`)
+- `host.activated`: Host activated/reactivated (`is_active: False → True`)
 
 **Security Events**:
 - `host.lockdown.activated`: Security lockdown enabled (`block_traffic: False → True`)

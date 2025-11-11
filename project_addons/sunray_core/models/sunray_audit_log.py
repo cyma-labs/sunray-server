@@ -24,8 +24,8 @@ class SunrayAuditLog(models.Model):
         ('auth.failure', 'Authentication Failure'),
         ('auth.logout', 'Authentication Logout'),
         # Host Events
-        ('host.activated', 'Authentication Success'),
-        ('host.deactivated', 'Authentication Failure'),
+        ('host.activated', 'Host Activated'),
+        ('host.deactivated', 'Host Deactivated'),
         # Token Management Events
         ('token.generated', 'Token Generated'),
         ('token.consumed', 'Token Consumed'),

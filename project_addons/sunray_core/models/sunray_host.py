@@ -36,7 +36,9 @@ class SunrayHost(models.Model):
     is_active = fields.Boolean(
         string='Active',
         default=True,
-        help="Host lifecycle status. When false, host is archived and invisible to workers."
+        help="Host lifecycle status. When false, host is deactivated/archived. "
+             "Workers receive this flag and should return 503 Service Unavailable. "
+             "Use for maintenance, decommissioning, or temporary host suspension."
     )
 
     block_all_traffic = fields.Boolean(
@@ -448,20 +450,19 @@ class SunrayHost(models.Model):
         This method consolidates host configuration data generation used by
         multiple API endpoints (/config, /config/register, /config/<hostname>).
 
-        Returns: List of host configuration dicts or []
+        Returns: List of host configuration dicts for all hosts (including inactive)
 
-        Archived hosts (is_active=False) are completely invisible to the API.
+        Both is_active and block_traffic fields are included in all responses.
+        Workers use these fields to decide how to handle requests:
+        - is_active=False: Worker should return 503 Service Unavailable
+        - block_traffic=True: Worker should return 403 Forbidden
         """
         if not self:
             return []
 
-        # Filter out archived hosts - they're invisible to workers
-        active_hosts = self.filtered('is_active')
-        if not active_hosts:
-            return []
-
+        # Return ALL hosts - workers need both is_active and block_traffic flags
         result = []
-        for host_obj in active_hosts:
+        for host_obj in self:
             config = {
                 'id': host_obj.id,
                 'domain': host_obj.domain,

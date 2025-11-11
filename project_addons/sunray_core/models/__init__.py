@@ -9,4 +9,5 @@ from . import sunray_webhook_token
 from . import sunray_api_key
 from . import sunray_worker
 from . import sunray_audit_log
+from . import sunray_protected_host_user_list_report
 from . import res_config_settings

@@ -686,3 +686,15 @@ class SunraySetupToken(models.Model):
                 'error_message': 'Internal validation error'
             })
             return result
+
+    def init(self):
+        """Create database indexes for optimal query performance
+
+        Creates composite index for user+host lookups, which is used by:
+        - sunray.protected_host_user_list_report view (setup_token_count subselect)
+        - Any other queries filtering by user and host
+        """
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sunray_setup_token_user_host
+            ON sunray_setup_token(user_id, host_id)
+        """)

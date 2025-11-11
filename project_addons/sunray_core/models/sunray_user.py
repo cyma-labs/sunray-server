@@ -67,14 +67,6 @@ class SunrayUser(models.Model):
         string='Passkey Count',
         store=True
     )
-    passkey_host_count = fields.Integer(
-        compute='_compute_host_values',
-        string="Passkey Count (Host)"
-    )
-    setup_token_host_count = fields.Integer(
-        compute="_compute_host_values",
-        string="Setup Token Count (Host)"
-    )
     last_login = fields.Datetime(
         compute='_compute_last_login',
         string='Last Login'
@@ -108,21 +100,6 @@ class SunrayUser(models.Model):
     def _compute_passkey_count(self):
         for user in self:
             user.passkey_count = len(user.passkey_ids)
-    
-    def _compute_host_values(self):
-        for user_obj in self:
-            if self.env.context.get('params', {}).get('resId'):
-                host_obj = self.env['sunray.host'].browse(self.env.context['params']['resId'])
-                if host_obj:
-                    user_obj.passkey_host_count = len(user_obj.passkey_ids.filtered(
-                        lambda p: p.host_domain == host_obj.domain
-                    ))
-                    user_obj.setup_token_host_count = len(user_obj.setup_token_ids.filtered(
-                        lambda t: t.host_id.id == host_obj.id
-                    ))
-                    continue
-            user_obj.passkey_host_count = 0
-            user_obj.setup_token_host_count = 0
 
     @api.depends('session_ids.is_active', 'session_ids.created_at')
     def _compute_last_login(self):

@@ -7,11 +7,12 @@
         <field name="arch" type="xml">
             <list>
                 <field name="domain"/>
+                <field name="is_active" string="Active" widget="boolean_toggle"/>
+                <field name="block_all_traffic" string="Block Traffic" widget="boolean_toggle"/>
                 <field name="sunray_worker_id" string="Worker" optional="show"/>
                 <field name="pending_worker_name" string="Pending Worker" optional="show"/>
                 <field name="migration_pending_duration" string="Migration Pending" optional="show"/>
                 <field name="backend_url" optional="show"/>
-                <field name="is_active" string="Protection" widget="boolean_toggle"/>
                 <field name="last_migration_ts" string="Last Migration" optional="show"/>
                 <field name="create_date" optional="show"/>
                 <field name="config_version" optional="show"/>
@@ -31,12 +32,16 @@
                 <field name="pending_worker_name"/>
                 <separator/>
                 <filter name="active" string="Active" domain="[('is_active', '=', True)]"/>
-                <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
+                <filter name="archived" string="Archived" domain="[('is_active', '=', False)]"/>
+                <separator/>
+                <filter name="traffic_blocked" string="Traffic Blocked" domain="[('block_all_traffic', '=', True)]"/>
+                <filter name="traffic_normal" string="Traffic Normal" domain="[('block_all_traffic', '=', False)]"/>
+                <separator/>
                 <filter name="bound" string="Worker Bound" domain="[('sunray_worker_id', '!=', False)]"/>
                 <filter name="unbound" string="Unbound" domain="[('sunray_worker_id', '=', False)]"/>
                 <filter name="pending_migration" string="Pending Migration" domain="[('pending_worker_name', '!=', False)]"/>
                 <group expand="0" string="Group By">
-                    <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
+                    <!-- <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/> -->
                     <filter string="Worker" name="group_by_worker" context="{'group_by': 'sunray_worker_id'}"/>
                     <filter string="Migration Status" name="group_by_migration" context="{'group_by': 'pending_worker_name'}"/>
                 </group>
@@ -80,16 +85,22 @@
                         </group>
                         <group>
                             <field name="is_active" widget="boolean_toggle"/>
+                            <field name="block_all_traffic" widget="boolean_toggle"/>
                             <field name="create_date" readonly="1"/>
                             <field name="config_version" readonly="1"/>
                         </group>
                     </group>
                     
-                    <!-- Protection Disabled Warning -->
-                    <group string="Protection Status" invisible="is_active" name="protection_status">
+                    <!-- Traffic Blocking Warning -->
+                    <group string="Security Status" invisible="not block_all_traffic" name="protection_status">
                         <div class="alert alert-danger" role="alert">
-                            <strong>⚠️ Protection Disabled:</strong> All traffic to this host is currently blocked with 503 Service Unavailable.
-                            <br/>To allow public access, enable protection and create Public Access Rules instead.
+                            <strong>🔒 Security Lockdown Active:</strong> This host is blocking all traffic with 403 Forbidden.
+                            <br/>This is typically used when:
+                            <ul class="mb-0 mt-1">
+                                <li>Host is suspected to be compromised</li>
+                                <li>Immediate security incident response is needed</li>
+                            </ul>
+                            <br/><strong>To restore access:</strong> Uncheck "Block Traffic" after resolving the security issue.
                         </div>
                     </group>
                     
@@ -112,10 +123,17 @@
                     
                     <notebook>
                         <page string="Access Rules">
+                            <div class="alert alert-success" role="status">
+                                <p class="mb-0">
+                                    <strong>Default Protection:</strong> In the absence of access rules, passkey-based authentication protection applies to all requests.
+                                    Access rules below define exceptions to this default behavior.
+                                </p>
+                            </div>
+
                             <div class="alert alert-info" role="status">
                                 <h3>Reusable Access Rule Library</h3>
                                 <p>
-                                    Access rules are now reusable! Select rules from the library and set their priority for this host.
+                                    Select rules from the library and set their priority for this host.
                                     The same rule can be used on multiple hosts with different priorities.
                                 </p>
                                 <p><strong>How to manage rules:</strong></p>
@@ -163,14 +181,15 @@
                         </page>
                                                 
                         <page string="Authorized Users">
-                            <field name="user_ids" nolabel="1">
+                            <field name="user_stat_ids" nolabel="1" readonly="1">
                                 <list>
-                                    <field name="username"/>
+                                    <field name="id" optional="hide"/>
+                                    <field name="user_id"/>
                                     <field name="email" optional="show"/>
-                                    <field name="is_active" widget="boolean_toggle"/>
-                                    <field name="passkey_host_count" string="Passkeys"/>
-                                    <field name="setup_token_host_count" string="Setup Tokens"/>
-                                    <field name="active_session_count" string="Active Sessions"/>
+                                    <field name="is_active" optional="show"/>
+                                    <field name="passkey_count" string="Passkeys" optional="show"/>
+                                    <field name="setup_token_count" string="Setup Tokens" optional="show" />
+                                    <field name="active_session_count" string="Active Sessions" optional="show" />
                                     <field name="last_login" optional="show"/>
                                 </list>
                             </field>

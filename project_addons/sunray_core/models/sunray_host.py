@@ -34,11 +34,19 @@ class SunrayHost(models.Model):
         help='Worker that protects this host. A host can be protected by only one worker, but a worker can protect several hosts.'
     )
     is_active = fields.Boolean(
-        string='Protection Enabled',
+        string='Active',
         default=True,
-        help='Controls whether Sunray protection is active for this host. '
-             'When disabled, the Worker will block all traffic with 503 Service Unavailable. '
-             'Use Access Rules to configure public access instead of disabling protection.'
+        help="Host lifecycle status. When false, host is deactivated/archived. "
+             "Workers receive this flag and should return 503 Service Unavailable. "
+             "Use for maintenance, decommissioning, or temporary host suspension."
+    )
+
+    block_all_traffic = fields.Boolean(
+        string='Block Traffic',
+        default=False,
+        help='Security lockdown - block all traffic with 403 Forbidden. '
+             'Use for security incidents or suspected compromise. '
+             'When enabled, all requests return 403 regardless of authentication.'
     )
     
     # Access Rules (via association model for reusability)
@@ -65,6 +73,14 @@ class SunrayHost(models.Model):
         'host_id',
         'user_id',
         string='Authorized Users'
+    )
+
+    # User statistics report (auto-synced with user_ids)
+    user_stat_ids = fields.One2many(
+        'sunray.protected_host_user_list_report',
+        'host_id',
+        string='User Statistics',
+        help='Statistics for each authorized user. Auto-synced when user_ids changes.'
     )
     
     # Session overrides
@@ -186,7 +202,8 @@ class SunrayHost(models.Model):
                 raise ValidationError("WAF bypass revalidation period must be at least 60 seconds (1 minute)")
             if record.waf_bypass_revalidation_s > max_revalidation:
                 raise ValidationError(f"WAF bypass revalidation period cannot exceed {max_revalidation} seconds (cf. System Parameter 'sunray.max_waf_bypass_revalidation_s').")
-    
+
+
     @api.depends('migration_requested_at')
     def _compute_migration_pending_duration(self):
         """Compute human-readable duration for pending migrations"""
@@ -258,7 +275,10 @@ class SunrayHost(models.Model):
             record.worker_curl_helper = f'''curl -X GET "https://{record.domain}/sunray-wrkr/v1/health" \\
     -H "Authorization: Bearer {api_key}" \\
     -H "Content-Type: application/json"'''
-    
+
+    def btn_refresh(self):
+        pass
+
     def set_pending_worker(self, worker_name):
         """Set pending worker for migration
         
@@ -426,24 +446,28 @@ class SunrayHost(models.Model):
     
     def get_config_data(self):
         """Generate configuration data for API endpoints
-        
+
         This method consolidates host configuration data generation used by
         multiple API endpoints (/config, /config/register, /config/<hostname>).
-        
-        Returns: List of host configuration dicts or []
-            
-        The returned data is the union of all endpoint needs and includes
-        the is_active flag for worker decision making.
+
+        Returns: List of host configuration dicts for all hosts (including inactive)
+
+        Both is_active and block_traffic fields are included in all responses.
+        Workers use these fields to decide how to handle requests:
+        - is_active=False: Worker should return 503 Service Unavailable
+        - block_traffic=True: Worker should return 403 Forbidden
         """
         if not self:
             return []
-        
+
+        # Return ALL hosts - workers need both is_active and block_traffic flags
         result = []
         for host_obj in self:
             config = {
                 'id': host_obj.id,
                 'domain': host_obj.domain,
-                'is_active': host_obj.is_active,  # NEW: Critical for worker blocking logic
+                'is_active': host_obj.is_active,
+                'block_traffic': host_obj.block_all_traffic,
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
@@ -455,7 +479,7 @@ class SunrayHost(models.Model):
                 'worker_id': host_obj.sunray_worker_id.id if host_obj.sunray_worker_id else None,
                 'worker_name': host_obj.sunray_worker_id.name if host_obj.sunray_worker_id else None,
             }
-            result.append(config)    
+            result.append(config)
         return result
 
     @api.model
@@ -508,16 +532,43 @@ class SunrayHost(models.Model):
                     admin_user_id=self.env.user.id
                 )
                 
-            # Log protection status changes (is_active)
+            # Log lifecycle changes (is_active)
             if 'is_active' in vals and vals['is_active'] != record.is_active:
-                event_type = 'config.host.protection_enabled' if vals['is_active'] else 'config.host.protection_disabled'
+                if vals['is_active']:
+                    event_type = 'host.activated'
+                    severity = 'info'
+                else:
+                    event_type = 'host.deactivated'
+                    severity = 'warning'
                 self.env['sunray.audit.log'].create_admin_event(
                     event_type=event_type,
-                    severity='warning',
+                    severity=severity,
                     details={
                         'host': record.domain,
-                        'previous_state': record.is_active,
-                        'new_state': vals['is_active'],
+                        'previous_state': 'is_active=True' if record.is_active else 'is_active=False',
+                        'new_state': 'is_active=True' if vals['is_active'] else 'is_active=False',
+                        'active_sessions': len(record.active_session_ids),
+                        'authorized_users': len(record.user_ids),
+                        'host_id': record.id
+                    },
+                    admin_user_id=self.env.user.id
+                )
+
+            # Log security lockdown changes (block_all_traffic)
+            if 'block_all_traffic' in vals and vals['block_all_traffic'] != record.block_all_traffic:
+                if vals['block_all_traffic']:
+                    event_type = 'host.lockdown.activated'
+                    severity = 'critical'
+                else:
+                    event_type = 'host.lockdown.cleared'
+                    severity = 'warning'
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type=event_type,
+                    severity=severity,
+                    details={
+                        'host': record.domain,
+                        'previous_state': 'locked' if record.block_all_traffic else 'normal',
+                        'new_state': 'locked' if vals['block_all_traffic'] else 'normal',
                         'active_sessions': len(record.active_session_ids),
                         'host_id': record.id
                     },
@@ -708,8 +759,6 @@ class SunrayHost(models.Model):
             
             raise UserError(f"Failed to clear worker cache: {str(e)}")
     
-    def btn_refresh(self):
-        pass
     
     def action_view_active_users(self):
         """Open list of active users authorized for this host"""

@@ -76,65 +76,92 @@ Health status affects:
 - Audit alerting thresholds
 - Cache invalidation strategies
 
-## Host Active Status Handling
+## Host Status and Traffic Control
 
-### Protection States
+### Dual-Field Semantics
 
-Hosts in Sunray have three distinct protection states:
+Hosts in Sunray use two orthogonal fields for status management:
 
-1. **Active** (`is_active=True`): Host is protected, access rules enforced
-2. **Inactive** (`is_active=False`): Host protection disabled, all traffic blocked with 503
-3. **Unconfigured**: Host not found in server, worker should handle appropriately
+1. **`is_active`** - Lifecycle Management
+   - `True`: Host is actively managed by Sunray
+   - `False`: Host is archived/decommissioned (workers ignores them)
 
-### Worker Behavior for Inactive Hosts
+2. **`block_traffic`** - Security Control
+   - `True`: Security lockdown, return 403 Forbidden
+   - `False`: Normal operation with authentication
 
-When a host has `is_active=False`, the worker MUST:
+**Field Name Mapping**: The server model uses `block_all_traffic` internally (more explicit) but exposes it as `block_traffic` (more concise) in API responses for consistency with this contract. Workers should always use the `block_traffic` field name.
 
-1. **Block ALL traffic** with HTTP 503 Service Unavailable
-2. **No exceptions** - access rules, sessions, and tokens are ignored
-3. **Audit logging** - log blocked requests to inactive hosts
-4. **Cache inactive status** - workers may cache the inactive state
+### Host States and API Behavior
+
+| is_active | block_traffic | API Response | Worker Behavior | Use Case |
+|-----------|---------------|--------------|-----------------|----------|
+| `False` | `False` | Full config with both flags | Return 503 Service Unavailable | Archived/maintenance |
+| `False` | `True` | Full config with both flags | Return 403 Forbidden (lockdown priority) | Archived + locked |
+| `True` | `False` | Full config with both flags | Normal auth flow | Standard operation |
+| `True` | `True` | Full config with both flags | Return 403 Forbidden | Security incident |
+
+### Worker Behavior
+
+#### Archived/Inactive Hosts (`is_active=False`)
+- API returns **full configuration** with `is_active=false`
+- Worker should return **503 Service Unavailable** with appropriate message
+- Worker should log access attempts for monitoring
+- Allows admins to re-activate without re-configuration
+- Sessions cannot be created on inactive hosts (blocked server-side)
+
+#### Security Lockdown (`block_traffic=True`)
+When a host has `block_traffic=True`, the worker MUST:
+
+1. **Block ALL traffic** with HTTP 403 Forbidden
+2. **No exceptions** - all requests denied regardless of auth
+3. **Audit logging** - log security lockdown blocks
+4. **Clear message** - indicate access is intentionally denied
 
 **Example Response**:
 ```http
-HTTP/1.1 503 Service Unavailable
+HTTP/1.1 403 Forbidden
 Content-Type: text/html
 
 <!DOCTYPE html>
 <html>
-<head><title>Service Temporarily Unavailable</title></head>
+<head><title>Access Denied</title></head>
 <body>
-<h1>Service Temporarily Unavailable</h1>
-<p>This service is currently undergoing maintenance.</p>
+<h1>403 Forbidden</h1>
+<p>Access to this resource has been denied by security policy.</p>
 </body>
 </html>
 ```
 
-### Configuration API Changes
+### Configuration API Response
 
-All configuration endpoints now include the `is_active` flag in host configurations:
+All hosts (including inactive ones) receive full configuration with both status flags:
 
 ```json
 {
+  "is_active": true,
+  "block_traffic": false,
   "domain": "app.example.com",
-  "is_active": false,
   "backend": "https://backend.example.com",
-  "exceptions_tree": { ... },
-  "websocket_urls": [ ... ]
+  "exceptions_tree": [ ... ],
+  "websocket_url_prefix": "/ws/",
+  "session_duration_s": 3600
 }
 ```
 
-This allows workers to distinguish between:
-- **Inactive hosts**: Known to server but protection disabled
-- **Unknown hosts**: Not configured in server at all
+**Note**: Both `is_active` and `block_traffic` fields are included for all hosts. Workers use these fields to determine appropriate behavior (503 for inactive, 403 for locked, normal auth for active).
 
 ### Audit Events
 
-The server logs these audit events for protection state changes:
+The server logs these audit events for status changes:
 
-- `config.host.protection_enabled`: Host reactivated (`is_active: False → True`)
-- `config.host.protection_disabled`: Host deactivated (`is_active: True → False`)
-- `worker.registered_inactive_host`: Worker registered to inactive host (warning)
+**Lifecycle Events**:
+- `host.deactivated`: Host deactivated/archived (`is_active: True → False`)
+- `host.activated`: Host activated/reactivated (`is_active: False → True`)
+
+**Security Events**:
+- `host.lockdown.activated`: Security lockdown enabled (`block_traffic: False → True`)
+- `host.lockdown.cleared`: Security lockdown cleared (`block_traffic: True → False`)
 
 ### Backward Compatibility
 

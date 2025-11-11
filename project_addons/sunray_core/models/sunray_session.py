@@ -219,3 +219,26 @@ class SunraySession(models.Model):
     
     def btn_refresh(self):
         pass
+
+    def init(self):
+        """Create database indexes for optimal query performance
+
+        Creates two composite indexes for session lookups:
+        1. user+host+is_active: For counting active sessions
+        2. user+host+created_at: For finding last login times
+
+        These indexes are used by:
+        - sunray.protected_host_user_list_report view (active_session_count and last_login subselects)
+        - Any other queries filtering by user, host, and session state
+        """
+        # Index for active session counts
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sunray_session_user_host_active
+            ON sunray_session(user_id, host_id, is_active)
+        """)
+
+        # Index for last login queries (DESC for MAX optimization)
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sunray_session_user_host_created
+            ON sunray_session(user_id, host_id, created_at DESC)
+        """)

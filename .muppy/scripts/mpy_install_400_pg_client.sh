@@ -4,10 +4,10 @@ set -euo pipefail
 # SCRIPT: mpy_install_400_pg_client.sh
 # LAYER: 4 - PostgreSQL Client
 # PURPOSE: Install PostgreSQL client from official APT repository
-# USAGE: [sudo] ./mpy_install_400_pg_client.sh
+# USAGE: ./mpy_install_400_pg_client.sh (uses sudo internally - DO NOT run with sudo)
 # ENV VARS:
 #   - PG_VERSION: PostgreSQL major version (default: 16)
-# REQUIREMENTS: Ubuntu 24.04 LTS or later
+# REQUIREMENTS: Ubuntu 24.04 LTS or later, passwordless sudo
 # EXIT CODES:
 #   0 - Success (installed or already present)
 #   1 - Missing dependencies or installation failed
@@ -41,18 +41,12 @@ if command -v psql &> /dev/null; then
   fi
 fi
 
-# Check root/sudo privileges
-if [[ $EUID -ne 0 ]]; then
-  echo "[ERROR] This script requires sudo/root privileges"
-  exit 1
-fi
-
 echo "[INFO] Installing PostgreSQL client ${PG_VERSION}..."
 
 # Install prerequisites
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends gnupg ca-certificates wget
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends gnupg ca-certificates wget
 
 # Add PostgreSQL APT repository (only if not already configured)
 if [ -f /etc/apt/sources.list.d/pgdg.sources ] || [ -f /etc/apt/sources.list.d/pgdg.list ]; then
@@ -61,17 +55,17 @@ else
   echo "[INFO] Adding PostgreSQL APT repository..."
 
   # Create directory for GPG keys
-  mkdir -p /usr/share/postgresql-common/pgdg
+  sudo mkdir -p /usr/share/postgresql-common/pgdg
 
   # Download and install PostgreSQL GPG key
   wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | \
-    gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+    gpg --dearmor | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg > /dev/null
 
   # Determine Ubuntu codename (noble for 24.04)
   UBUNTU_CODENAME=$(lsb_release -cs)
 
   # Create DEB822 format source file
-  cat > /etc/apt/sources.list.d/pgdg.sources << EOF
+  sudo tee /etc/apt/sources.list.d/pgdg.sources > /dev/null << EOF
 Types: deb
 URIs: https://apt.postgresql.org/pub/repos/apt
 Suites: ${UBUNTU_CODENAME}-pgdg
@@ -83,8 +77,8 @@ EOF
 fi
 
 # Install PostgreSQL client
-apt-get update -y
-apt-get install -y --no-install-recommends postgresql-client-${PG_VERSION} libpq-dev libjson-perl
+sudo apt-get update -y
+sudo apt-get install -y --no-install-recommends postgresql-client-${PG_VERSION} libpq-dev libjson-perl
 
 # Verify installation
 if command -v psql &> /dev/null; then
@@ -98,8 +92,8 @@ fi
 # Cleanup (only in Docker context to reduce image size)
 if [[ "${CONTEXT}" == "docker" ]]; then
   echo "[INFO] Cleaning up apt cache (Docker context)..."
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
+  sudo apt-get clean
+  sudo rm -rf /var/lib/apt/lists/*
 fi
 
 echo "[INFO] PostgreSQL client installation complete!"

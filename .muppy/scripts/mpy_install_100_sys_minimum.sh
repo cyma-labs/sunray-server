@@ -4,9 +4,9 @@ set -euo pipefail
 # SCRIPT: mpy_install_100_sys_minimum.sh
 # LAYER: 1 - System Minimum
 # PURPOSE: Install system utilities for remote development and administration
-# USAGE: [sudo] ./mpy_install_100_sys_minimum.sh
+# USAGE: ./mpy_install_100_sys_minimum.sh (uses sudo internally - DO NOT run with sudo)
 # ENV VARS: None
-# REQUIREMENTS: Ubuntu 24.04 LTS or later
+# REQUIREMENTS: Ubuntu 24.04 LTS or later, passwordless sudo
 # EXIT CODES:
 #   0 - Success (installed or already present)
 #   1 - Missing dependencies or installation failed
@@ -58,24 +58,18 @@ if [[ "$ALL_INSTALLED" == "true" ]]; then
   echo "[INFO] Key system packages already installed, checking for updates..."
 fi
 
-# Check root/sudo privileges
-if [[ $EUID -ne 0 ]]; then
-  echo "[ERROR] This script requires sudo/root privileges"
-  exit 1
-fi
-
 echo "[INFO] Installing system packages..."
 
 # Install packages
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y --no-install-recommends "${SYSTEM_PACKAGES[@]}"
+sudo apt-get update -qq
+sudo apt-get install -y --no-install-recommends "${SYSTEM_PACKAGES[@]}"
 
 # Configure locale (en_US.UTF-8)
 echo "[INFO] Configuring locale (en_US.UTF-8)..."
 if ! locale -a | grep -q "en_US.utf8"; then
-  locale-gen en_US.UTF-8
-  update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+  sudo locale-gen en_US.UTF-8
+  sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
   echo "[SUCCESS] Locale configured: en_US.UTF-8"
 else
   echo "[INFO] Locale en_US.UTF-8 already configured"
@@ -105,8 +99,8 @@ echo "  - htop: $(htop --version | head -n1)"
 # Cleanup (only in Docker context to reduce image size)
 if [[ "${CONTEXT}" == "docker" ]]; then
   echo "[INFO] Cleaning up apt cache (Docker context)..."
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
+  sudo apt-get clean
+  sudo rm -rf /var/lib/apt/lists/*
 fi
 
 echo "[INFO] System minimum installation complete!"

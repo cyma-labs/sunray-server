@@ -30,6 +30,7 @@ Scripts use a numbered naming convention to enforce installation order and allow
 **Current Scripts:**
 - `mpy_install_100_sys_minimum.sh` - Layer 1: System utilities
 - `mpy_install_300_nodejs_dev.sh` - Layer 3: Node.js development
+- `mpy_install_350_docker.sh` - Layer 3: Docker CE and Docker Compose
 - `mpy_install_400_pg_client.sh` - Layer 4: PostgreSQL client
 - `mpy_install_500_odoo18_deps.sh` - Layer 5: Odoo 18 system dependencies
 - `mpy_install_510_ikb.sh` - Layer 5: ikb (inouk buildit) installation
@@ -105,6 +106,40 @@ sudo NODE_VERSION=18 ./.muppy/scripts/mpy_install_300_nodejs_dev.sh
 
 **Environment variables:**
 - `NODE_VERSION` - Node.js major version (default: 20)
+
+### mpy_install_350_docker.sh
+
+**Layer 3 - Docker Development Environment**
+
+Installs Docker CE and Docker Compose from official Docker repository. Only installs on bare metal VMs (skips in Docker/LXC contexts).
+
+**Components installed:**
+- Docker CE (Docker Engine)
+- Docker CE CLI
+- containerd.io
+- Docker Buildx plugin
+- Docker Compose plugin (v2)
+
+**Important:** This script detects the execution context and only installs Docker on bare metal systems. In Docker or LXC containers, the script will log a message and exit gracefully without installing.
+
+**Usage:**
+```bash
+# Install with defaults (uses sudo internally - DO NOT run with sudo)
+./.muppy/scripts/mpy_install_350_docker.sh
+
+# Specify user to add to docker group
+MPY_USERNAME=myuser ./.muppy/scripts/mpy_install_350_docker.sh
+```
+
+**Important:** This script uses `sudo` internally and requires passwordless sudo. DO NOT run the script with `sudo` - run it as a regular user.
+
+**Post-installation:**
+- User must log out and back in for group changes to take effect
+- Or run `newgrp docker` in current session
+- Verify with: `docker run hello-world`
+
+**Environment variables:**
+- `MPY_USERNAME` - System username to add to docker group (default: $USER)
 
 ### mpy_install_500_odoo18_deps.sh
 
@@ -248,8 +283,9 @@ cd /opt/muppy/workspace-sunray/appserver-sunray18
 
 # Run scripts in order (with sudo)
 sudo ./.muppy/scripts/mpy_install_100_sys_minimum.sh
-sudo ./.muppy/scripts/mpy_install_400_pg_client.sh
 sudo ./.muppy/scripts/mpy_install_300_nodejs_dev.sh
+./.muppy/scripts/mpy_install_350_docker.sh  # Uses sudo internally
+sudo ./.muppy/scripts/mpy_install_400_pg_client.sh
 sudo ./.muppy/scripts/mpy_install_500_odoo18_deps.sh
 
 # Install ikb (WITHOUT sudo, as regular user)
@@ -259,9 +295,11 @@ sudo ./.muppy/scripts/mpy_install_500_odoo18_deps.sh
 psql --version
 node --version
 npm --version
+docker --version
+docker compose version
 uv --version
 ikb 2>&1 | head -3
-which curl vim tmux uv ikb
+which curl vim tmux docker uv ikb
 locale
 ```
 
@@ -312,7 +350,9 @@ These scripts follow the **Manganese Development Layer Architecture**:
 - **Layer 0** (000-099): Base System / Ubuntu LTS (reserved for OS configuration)
 - **Layer 1** (100-199): System Minimum (this directory: [mpy_install_100_sys_minimum.sh](mpy_install_100_sys_minimum.sh))
 - **Layer 2** (200-299): Development Minimum (future: build tools, Python, compilers)
-- **Layer 3** (300-399): Platform-Specific Dev Tools (this directory: [mpy_install_300_nodejs_dev.sh](mpy_install_300_nodejs_dev.sh))
+- **Layer 3** (300-399): Platform-Specific Dev Tools
+  - [mpy_install_300_nodejs_dev.sh](mpy_install_300_nodejs_dev.sh) - Node.js development
+  - [mpy_install_350_docker.sh](mpy_install_350_docker.sh) - Docker CE and Docker Compose
 - **Layer 4** (400-499): Database Clients (this directory: [mpy_install_400_pg_client.sh](mpy_install_400_pg_client.sh))
 - **Layer 5** (500-599): Application-Specific
   - [mpy_install_500_odoo18_deps.sh](mpy_install_500_odoo18_deps.sh) - System dependencies (requires sudo)
@@ -328,6 +368,11 @@ The numbering scheme follows the **Manganese Development Layer Architecture**:
 
 ## Version History
 
+- **v1.4** - Docker development environment (2025-11)
+  - Added mpy_install_350_docker.sh (Layer 3)
+  - Docker CE and Docker Compose from official repos
+  - Context-aware: only installs on bare metal VMs
+  - User added to docker group for non-root access
 - **v1.3** - Separated ikb installation (2025-11)
   - Split ikb installation into separate script (mpy_install_510_ikb.sh)
   - Two-script approach: system deps (sudo) vs user tools (no sudo)

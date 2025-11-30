@@ -4,14 +4,14 @@ set -euo pipefail
 # SCRIPT: mpy_install_500_odoo18_deps.sh
 # LAYER: 5 - Application-Specific (Odoo 18 Dependencies)
 # PURPOSE: Install Odoo 18 development dependencies (Python libs, wkhtmltopdf, uv, Python, ikb)
-# USAGE: [sudo] ./mpy_install_500_odoo18_deps.sh
+# USAGE: ./mpy_install_500_odoo18_deps.sh (uses sudo internally - DO NOT run with sudo)
 # ENV VARS:
 #   - MPY_USERNAME: System username (default: $USER)
 #   - MPY_APP_BASE_DIR: Base directory (default: /opt/muppy)
 #   - IKB_PYTHON_VERSION: Python version (default: cpython@3.12.8)
 #   - IKB_ODOO_VERSION: Odoo major version (default: 18)
 #   - IKB_DEV_MODE: Install ikb in dev mode (default: False)
-# REQUIREMENTS: Ubuntu 24.04 LTS or later
+# REQUIREMENTS: Ubuntu 24.04 LTS or later, passwordless sudo
 # EXIT CODES:
 #   0 - Success (installed or already present)
 #   1 - Missing dependencies or installation failed
@@ -51,12 +51,6 @@ if command -v uv &> /dev/null && command -v wkhtmltopdf &> /dev/null; then
   exit 0
 fi
 
-# Check root/sudo privileges
-if [[ $EUID -ne 0 ]]; then
-  echo "[ERROR] This script requires sudo/root privileges"
-  exit 1
-fi
-
 echo "[INFO] Installing Odoo 18 dependencies..."
 
 #
@@ -64,8 +58,8 @@ echo "[INFO] Installing Odoo 18 dependencies..."
 #
 echo "[INFO] Installing Python development libraries..."
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y --no-install-recommends \
+sudo apt-get update -qq
+sudo apt-get install -y --no-install-recommends \
   python-dev-is-python3 python3-dev python3-venv \
   libffi-dev liblzma-dev zlib1g-dev libbz2-dev \
   libncurses5-dev libncursesw5-dev xz-utils tk-dev \
@@ -79,7 +73,7 @@ apt-get install -y --no-install-recommends \
 # 2. Install font packages
 #
 echo "[INFO] Installing font packages..."
-apt-get install -y --no-install-recommends \
+sudo apt-get install -y --no-install-recommends \
   fontconfig fontconfig-config fonts-dejavu-core \
   libfontconfig1 libfontenc1 libxrender1 \
   x11-common xfonts-75dpi xfonts-base \
@@ -95,7 +89,7 @@ WKHTMLTOPDF_URL="https://github.com/wkhtmltopdf/packaging/releases/download/${WK
 if ! command -v wkhtmltopdf &> /dev/null; then
   echo "[INFO] Installing wkhtmltopdf ${WKHTMLTOPDF_VERSION}..."
   wget -q $WKHTMLTOPDF_URL
-  dpkg -i $WKHTMLTOPDF_DEB 2>/dev/null || true
+  sudo dpkg -i $WKHTMLTOPDF_DEB 2>/dev/null || true
   rm $WKHTMLTOPDF_DEB
 else
   echo "[INFO] wkhtmltopdf already installed, skipping..."
@@ -105,13 +99,13 @@ fi
 # 4. Create directory structure
 #
 echo "[INFO] Creating /opt/muppy directory structure..."
-mkdir -p "$MPY_APP_BASE_DIR" "$TOOLS_DIR" "$SRC_DIR"
+sudo mkdir -p "$MPY_APP_BASE_DIR" "$TOOLS_DIR" "$SRC_DIR"
 
-# Set ownership if running as root but installing for specific user
+# Set ownership if installing for specific user
 if [[ "$MPY_USERNAME" != "root" ]] && id -u "$MPY_USERNAME" &>/dev/null; then
-  chown -R $MPY_USERNAME:$MPY_USERNAME "$MPY_APP_BASE_DIR"
+  sudo chown -R $MPY_USERNAME:$MPY_USERNAME "$MPY_APP_BASE_DIR"
 fi
-chmod 755 "$MPY_APP_BASE_DIR" "$TOOLS_DIR" "$SRC_DIR"
+sudo chmod 755 "$MPY_APP_BASE_DIR" "$TOOLS_DIR" "$SRC_DIR"
 
 #
 # 5. Install uv (in /opt/muppy/tools with system-wide symlink)
@@ -126,7 +120,7 @@ if ! command -v uv &> /dev/null; then
 
   # Create symlink for system-wide access
   echo "[INFO] Creating system-wide symlink for uv..."
-  ln -sf ${TOOLS_DIR}/uv /usr/local/bin/uv
+  sudo ln -sf ${TOOLS_DIR}/uv /usr/local/bin/uv
 else
   echo "[INFO] uv already installed and accessible system-wide, skipping..."
 fi
@@ -181,8 +175,8 @@ fi
 #
 if [[ "${CONTEXT}" == "docker" ]]; then
   echo "[INFO] Cleaning up apt cache (Docker context)..."
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
+  sudo apt-get clean
+  sudo rm -rf /var/lib/apt/lists/*
 fi
 
 echo "[INFO] Odoo 18 dependencies installation complete!"

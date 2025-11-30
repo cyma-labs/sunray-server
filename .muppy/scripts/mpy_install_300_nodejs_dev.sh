@@ -4,10 +4,10 @@ set -euo pipefail
 # SCRIPT: mpy_install_300_nodejs_dev.sh
 # LAYER: 3 - Node.js Development Environment
 # PURPOSE: Install Node.js LTS 20.x and npm from NodeSource
-# USAGE: [sudo] ./mpy_install_300_nodejs_dev.sh
+# USAGE: ./mpy_install_300_nodejs_dev.sh (uses sudo internally - DO NOT run with sudo)
 # ENV VARS:
 #   - NODE_VERSION: Node.js major version (default: 20)
-# REQUIREMENTS: Ubuntu 24.04 LTS or later
+# REQUIREMENTS: Ubuntu 24.04 LTS or later, passwordless sudo
 # EXIT CODES:
 #   0 - Success (installed or already present)
 #   1 - Missing dependencies or installation failed
@@ -43,24 +43,18 @@ if command -v node &> /dev/null; then
   fi
 fi
 
-# Check root/sudo privileges
-if [[ $EUID -ne 0 ]]; then
-  echo "[ERROR] This script requires sudo/root privileges"
-  exit 1
-fi
-
 echo "[INFO] Installing Node.js ${NODE_VERSION}.x LTS from NodeSource..."
 
 # Install prerequisites
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl gnupg
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg
 
 # Add NodeSource repository
-curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo bash -
 
 # Install Node.js (npm is included)
-apt-get install -y nodejs
+sudo apt-get install -y nodejs
 
 # Verify installation
 if command -v node &> /dev/null && command -v npm &> /dev/null; then
@@ -76,8 +70,8 @@ fi
 # Cleanup (only in Docker context to reduce image size)
 if [[ "${CONTEXT}" == "docker" ]]; then
   echo "[INFO] Cleaning up apt cache (Docker context)..."
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
+  sudo apt-get clean
+  sudo rm -rf /var/lib/apt/lists/*
 fi
 
 echo "[INFO] Node.js installation complete!"

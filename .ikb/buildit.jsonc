@@ -134,8 +134,17 @@
                     "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },
-                "sunray_advanced": {
+                "project_addons_advanced": {
                     "install": true,
+                    "type": "local",
+                    "root_folder": null,
+                    "path": "./project_addons_advanced"
+                },
+                /*
+                 * Deactivated.  For now, advanced addons are integrated in main repo
+                 */
+                "sunray_advanced": {
+                    "install": false,
                     "type": "git",
                     "repository": "https://sunray:${ENV:MPY_SUNRAY_ADVANCED_GIT_TOKEN}@gitlab.com/cmorisse/sunray-server-advanced.git",
                     "directory": "advanced_addons",

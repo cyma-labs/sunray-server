@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sunray Advanced Configuration - Extends Core Settings -->
+    <record id="res_config_settings_view_form_advanced" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.sunray_advanced</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="sunray_core.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='sunray_setup_token_defaults']" position="inside">
+                <setting string="Send Email by Default" help="Automatically send setup tokens by email using the configured template">
+                    <field name="sunray_setup_token_send_email_default"/>
+                    <div class="content-group" invisible="not sunray_setup_token_send_email_default">
+                        <field name="sunray_setup_token_mail_template_id" class="oe_inline"/>
+                    </div>
+                </setting>
+            </xpath>
+            <xpath expr="//block[@id='sunray_setup_token_defaults']" position="after">
+                <block title="IP Whitelist">
+                    <setting help="Restrict access to the Sunray admin interface by IP address">
+                        <field name="sunray_admin_ip_whitelist"
+                                class="oe_inline"
+                                placeholder="192.168.1.100, 192.168.1.0/24, 10.0.0.0/8"/>
+                        <div class="content-group">
+                            <div class="text-muted mt-2">
+                                Configure which IP addresses or CIDR ranges are allowed to access the Sunray server admin interface.
+                                Separate multiple IPs/CIDRs with commas. When configured, only requests from whitelisted IPs will be able to reach the Odoo interface.
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+                <block title="Host Configuration">
+                    <setting string="Go-Live Period" help="Default number of days for the go-live period when creating new hosts">
+                        <div class="content-group">
+                            <div class="row mt16">
+                                <field name="sunray_golive_period_duration_days" class="oe_inline col-2"/>
+                                <span class="oe_inline ml-2">days</span>
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Sunray Settings Action -->
+    <record id="action_sunray_config" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'sunray_settings', 'bin_size': False}</field>
+    </record>
+</odoo>

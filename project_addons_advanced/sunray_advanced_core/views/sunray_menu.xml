@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Replace the Settings menu from core with one that has an action -->
+    <menuitem id="sunray_core.menu_sunray_settings"
+              name="Settings"
+              parent="sunray_core.menu_sunray_root"
+              action="action_sunray_config"
+              sequence="100"
+              groups="sunray_core.group_sunray_admin"/>
+</odoo>

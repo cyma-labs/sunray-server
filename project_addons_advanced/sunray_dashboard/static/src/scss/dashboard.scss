@@ -1,0 +1,78 @@
+.o_sunray_dashboard{
+    .o_kanban_record
+    {
+        width: 33% !important;
+    }
+    .container
+    {
+        max-width: 100% !important;
+    }
+}
+
+.o_sunray_dashboard_configuration{
+    .o_sunray_dashboard_configuration_message {
+        text-align: center;
+        margin-top: 55px;
+        font-size: 22px;
+        font-weight: bold;
+    }
+    .o_sunray_dashboard_configuration_link {
+        text-align: center;
+    }
+}
+
+/* Styles pour les badges dans les dashboards */
+.o_sunray_dashboard {
+    .badge-pill {
+        display: inline-block;
+        padding: 0.25em 0.6em;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 10rem;
+        text-decoration: none;
+    }
+    
+    .badge-success {
+        color: #fff;
+        background-color: #28a745;
+    }
+    
+    .badge-warning {
+        color: #212529;
+        background-color: #ffc107;
+    }
+    
+    .badge-danger {
+        color: #fff;
+        background-color: #dc3545;
+    }
+    
+    .badge-info {
+        color: #fff;
+        background-color: #17a2b8;
+    }
+    
+    .badge-primary {
+        color: #fff;
+        background-color: #007bff;
+    }
+    
+    .badge-secondary {
+        color: #fff;
+        background-color: #6c757d;
+    }
+}
+
+.o_sunray_dashboard_content {
+    height: 100%; 
+    width: 100%;
+}
+
+.o_sunray_dashboard_content_list {
+    max-height: 240px;
+    overflow: scroll;
+}

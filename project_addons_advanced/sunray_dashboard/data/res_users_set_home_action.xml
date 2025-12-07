@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<openerp>
+    <data noupdate="1">
+
+        <record id="base.user_admin" model="res.users">
+            <field name="action_id" ref="sunray_dashboard.sunray_dashboard_act_window" />
+        </record>
+
+        
+        <record id="base.default_user" model="res.users">
+            <field name="action_id" ref="sunray_dashboard.sunray_dashboard_act_window" />
+
+        </record>
+
+    </data>
+ </openerp>

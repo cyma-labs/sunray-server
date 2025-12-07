@@ -1,0 +1,255 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+  <data noupdate="0">
+    <record id="sunray_protected_host_dashboard" model="sunray.dashboard">
+      <field name="name">Protected Host</field>
+      <field name="sequence">0</field>
+      <field name="description" />
+      <field name="kanban_dashboard_type">list</field>
+      <field name="inline_code">
+# Enter python code below.
+# Available vars:
+#   - self: The dashboard object.
+#   - dash_cr: database cursor.
+#   - relativedelta: method from relativedelta.
+#   - current_date&lt;Datieme&gt;: The current datetime.
+#   - result_dict: A dict which contains data to append.
+#
+# Result:
+#   let result_dict with the result. Eg.
+#   result_dict = {
+#       'result_list': [
+#           {
+#               'headers': ['Header1', 'Header2'], # Headers in list
+#               'rows': [(1, '2022'), (2, '2023'), (1, '2022'), (1, '2022'),] # Tuple data in a list
+#           },
+#       ],
+#       'model_name': 'model.x', # Name of the model of the dashboard
+#       'action_domain: [('state', '=', 'wip')], # A domain that will be passed to the action
+#       'action_context': {'group_by': 'start_date:month'}
+#       'configuration_dict': # Optional var. Used to indicate to the user that configuration is required and redirects the user to a new model form view.
+#       { 
+#           'display': True if len(model_objs) == 0 else False, # A condition for displaying the configuration. Default is False.
+#           'message': "A display message", # A message that will be displayed if configuration is needed. Default is "".
+#           'action_context': {}, # optionnal key
+#           'action_domain': [], # optionnal key
+#           'action_name': 'module.action_id', #optionnal key. If specify, it will open this action instead of the default one,
+#           'model_name': 'model.name' # optionnal key. Allow to specify an other model for the configuration. If not the model_name of the configuration will be the global 'model_name'
+#       }
+#   }
+#
+
+row_result_list = []
+
+dash_cr.execute("""
+    SELECT
+        domain,
+        backend_url,
+        is_active
+    FROM sunray_host;
+"""
+)
+
+query_datas = dash_cr.dictfetchall()
+for query in query_datas:
+    if query['is_active']:
+        span_badge = """&lt;span class="badge-pill badge-success"&gt;Active&lt;/span&gt;"""
+    else:
+        span_badge = """&lt;span class="badge-pill badge-danger"&gt;Inactive&lt;/span&gt;"""
+    row_result_list.append((
+        span_badge,
+        query['domain'],
+        query['backend_url']
+    ))
+
+result_list = []
+if row_result_list:
+    result_list = [
+        {
+         'headers': ['Protection', 'Domain', 'URL'],
+         'rows': row_result_list
+        }
+   ]
+   
+result_dict = {
+    'result_list': result_list,
+    'model_name': 'sunray.host',
+    'action_domain': [],
+    'action_context': {},
+    'configuration_dict': {
+        'display': True,
+        'message': 'No protected host defined',
+        'display_configuration_button': True,
+    }
+}         
+      </field>
+    </record>
+    <record id="sunray_user_dashboard" model="sunray.dashboard">
+      <field name="name">Users</field>
+      <field name="sequence">1</field>
+      <field name="description" />
+      <field name="kanban_dashboard_type">list</field>
+      <field name="inline_code">
+
+# Enter python code below.
+# Available vars:
+#   - self: The dashboard object.
+#   - dash_cr: database cursor.
+#   - relativedelta: method from relativedelta.
+#   - current_date&lt;Datieme&gt;: The current datetime.
+#   - result_dict: A dict which contains data to append.
+#
+# Result:
+#   let result_dict with the result. Eg.
+#   result_dict = {
+#       'result_list': [
+#           {
+#               'headers': ['Header1', 'Header2'], # Headers in list
+#               'rows': [(1, '2022'), (2, '2023'), (1, '2022'), (1, '2022'),] # Tuple data in a list
+#           },
+#       ],
+#       'model_name': 'model.x', # Name of the model of the dashboard
+#       'action_domain: [('state', '=', 'wip')], # A domain that will be passed to the action
+#       'action_context': {'group_by': 'start_date:month'}
+#       'configuration_dict': # Optional var. Used to indicate to the user that configuration is required and redirects the user to a new model form view.
+#       { 
+#           'display': True if len(model_objs) == 0 else False, # A condition for displaying the configuration. Default is False.
+#           'message': "A display message", # A message that will be displayed if configuration is needed. Default is "".
+#           'action_context': {}, # optionnal key
+#           'action_domain': [], # optionnal key
+#           'action_name': 'module.action_id', #optionnal key. If specify, it will open this action instead of the default one,
+#           'model_name': 'model.name' # optionnal key. Allow to specify an other model for the configuration. If not the model_name of the configuration will be the global 'model_name'
+#       }
+#   }
+#
+
+row_result_list = []
+
+dash_cr.execute("""
+    SELECT
+        username,
+        is_active
+    FROM sunray_user;
+"""
+)
+
+query_datas = dash_cr.dictfetchall()
+for query in query_datas:
+    if query['is_active']:
+        span_badge = """&lt;span class="badge-pill badge-success"&gt;Active&lt;/span&gt;"""
+    else:
+        span_badge = """&lt;span class="badge-pill badge-danger"&gt;Inactive&lt;/span&gt;"""
+    row_result_list.append((
+        span_badge,
+        query['username'],
+    ))
+
+result_list = []
+if row_result_list:
+    result_list = [
+        {
+         'headers': ['Status', 'User'],
+         'rows': row_result_list
+        }
+   ]
+   
+result_dict = {
+    'result_list': result_list,
+    'model_name': 'sunray.user',
+    'action_domain': [],
+    'action_context': {},
+    'configuration_dict': {
+        'display': True,
+        'message': 'No user defined'
+    }
+}
+      </field>
+    </record>
+    <record id="sunray_setup_token_dashboard" model="sunray.dashboard">
+      <field name="name">Setup Token</field>
+      <field name="sequence">2</field>
+      <field name="description" />
+      <field name="kanban_dashboard_type">list</field>
+      <field name="inline_code">
+
+# Enter python code below.
+# Available vars:
+#   - self: The dashboard object.
+#   - dash_cr: database cursor.
+#   - relativedelta: method from relativedelta.
+#   - current_date&lt;Datime&gt;: The current datetime.
+#   - result_dict: A dict which contains data to append.
+#
+# Result:
+#   let result_dict with the result. Eg.
+#   result_dict = {
+#       'result_list': [
+#           {
+#               'label': '01-21',
+#               'value': 5,
+#               'type': 'past'
+#           }
+#       ],
+#       'model_name': 'model.x', # Name of the model of the dashboard
+#       'action_domain: [('state', '=', 'wip')], # A domain that will be passed to the action
+#       'action_context': {'group_by': 'start_date:month'},
+#       'configuration_dict': # Optional var. Used to indicate to the user that configuration is required and redirects the user to a new model form view.
+#       { 
+#           'display': True if len(model_objs) == 0 else False, # A condition for displaying the configuration. Default is False.
+#           'message': "A display message", # A message that will be displayed if configuration is needed. Default is "".
+#           'action_context': {}, # optionnal key
+#           'action_domain': [], # optionnal key
+#           'action_name': 'module.action_id', #optionnal key. If specify, it will open this action instead of the default one,
+#           'model_name': 'model.name' # optionnal key. Allow to specify an other model for the configuration. If not the model_name of the configuration will be the global 'model_name'
+#       }
+#   }
+#
+row_result_list = []
+
+dash_cr.execute("""
+    SELECT
+        su.username AS username,
+        sh.domain AS host,
+        sst.consumed
+    FROM sunray_setup_token AS sst
+    LEFT JOIN sunray_user AS su ON sst.user_id = su.id
+    LEFT JOIN sunray_host AS sh ON sst.host_id = sh.id;
+"""
+)
+
+query_datas = dash_cr.dictfetchall()
+for query in query_datas:
+    if query['consumed']:
+        span_badge = """&lt;span class="badge-pill badge-success&gt;&#160;&lt;/span&gt;"""
+    else:
+        span_badge = """&lt;span class="badge-pill badge-danger"&gt;&#160;&lt;/span&gt;"""
+    row_result_list.append((
+        query['username'],
+        query['host'],
+        span_badge,
+    ))
+
+result_list = []
+if row_result_list:
+    result_list = [
+        {
+         'headers': ['User', 'Host', 'Consumed'],
+         'rows': row_result_list
+        }
+   ]
+   
+result_dict = {
+    'result_list': result_list,
+    'model_name': 'sunray.setup.token',
+    'action_domain': [],
+    'action_context': {},
+    'configuration_dict': {
+        'display': True,
+        'message': 'No setup token defined',
+        'display_configuration_button': True
+    }
+}
+      </field>
+    </record>
+  </data>  
+</odoo>

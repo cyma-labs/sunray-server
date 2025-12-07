@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sunray Message Queue -->
+        <record id="imq_queue_sunray" model="imq.queue">
+            <field name="name">sunray</field>
+            <field name="provider">pgsql</field>
+            <field name="q_type">std</field>
+            <field name="active" eval="True"/>
+            <field name="visibility_timeout">300</field>
+            <field name="description">Sunray Advanced Core Message Queue</field>
+        </record>
+    </data>
+</odoo>

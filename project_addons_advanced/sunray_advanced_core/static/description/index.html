@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Sunray Core</title>
+</head>
+<body>
+    <section class="oe_container">
+        <div class="oe_row oe_spaced">
+            <h2 class="oe_slogan">Sunray Core - WebAuthn Authentication System</h2>
+            <h3 class="oe_slogan">Secure, passwordless authentication for Cloudflare Workers</h3>
+        </div>
+    </section>
+
+    <section class="oe_container">
+        <div class="oe_row oe_spaced">
+            <div class="oe_span12">
+                <h2>Features</h2>
+                <ul>
+                    <li>WebAuthn/Passkey authentication</li>
+                    <li>JWT-based session management</li>
+                    <li>Multi-host support</li>
+                    <li>CIDR whitelist bypass</li>
+                    <li>Public URL patterns</li>
+                    <li>Webhook token management</li>
+                    <li>Comprehensive audit logging</li>
+                    <li>Setup token generation with QR codes</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="oe_container">
+        <div class="oe_row oe_spaced">
+            <div class="oe_span12">
+                <h2>Architecture</h2>
+                <p>Sunray consists of two main components:</p>
+                <ul>
+                    <li><strong>Admin Server (this module):</strong> Odoo 18 addon for configuration and management</li>
+                    <li><strong>Cloudflare Worker:</strong> Edge authentication and request handling</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="oe_container">
+        <div class="oe_row oe_spaced">
+            <div class="oe_span12">
+                <h2>Security Model</h2>
+                <ul>
+                    <li>Default locked: All resources protected by default</li>
+                    <li>Whitelist exceptions for trusted IPs and public URLs</li>
+                    <li>WebAuthn/Passkeys for passwordless authentication</li>
+                    <li>JWT signatures with HMAC-SHA256</li>
+                    <li>Device fingerprinting for session binding</li>
+                    <li>CSRF protection with double-submit cookies</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</body>
+</html>

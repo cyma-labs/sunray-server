@@ -1,0 +1,150 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+
+    <record id="sunray_dashboard_form_view" model="ir.ui.view">
+        <field name="name">sunray.dashboard.form</field>
+        <field name="model">sunray.dashboard</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" default_focus="1" />
+                        </h1>
+                        <div class="o_row">
+                            <field name="description" placeholder="Enter description here" />
+                        </div>
+
+                    </div>   
+                    <group>
+                        <group>
+                            <field name="kanban_dashboard_type" />
+                        </group>
+                    </group>
+                    <group string="Params" invisible="kanban_dashboard_type == 'pie'">
+                        <group>
+                            <field name="background_color" widget="color" invisible="kanban_dashboard_type != 'line'" />
+                            <field name="border_color" widget="color" invisible="kanban_dashboard_type != 'line'" />
+                            <field name="bar_color" widget="color" invisible="kanban_dashboard_type != 'bar'" />
+                            <field name="mix_first_label" invisible="kanban_dashboard_type != 'mix'" />
+                            <field name="mix_first_type" invisible="kanban_dashboard_type != 'mix'" />
+                            <field name="mix_first_color" widget="color" invisible="kanban_dashboard_type != 'mix'" />
+                        </group>
+                        <group>
+                            <field name="display_label_x" />
+                            <field name="display_label_y" />
+                            <field name="mix_second_label" invisible="kanban_dashboard_type != 'mix'" />
+                            <field name="mix_second_type" invisible="kanban_dashboard_type != 'mix'" />
+                            <field name="mix_second_color" widget="color" invisible="kanban_dashboard_type != 'mix'" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Inline Code" name="page__code" groups="base.group_system">
+                            <field name="inline_code" widget="ace" mode="python" />
+                        </page>
+                        <page string="Configuration Data" name="page__config_data">
+                            <field name="configuration_data" widget="ace" mode="python" />
+                        </page>
+                        <page string="Advanced" name="page__advanced">
+                            <group>
+                                <field name="id" />
+                                <field name="active" widget="boolean_toggle" />
+                            </group>
+                        </page>
+                    </notebook> 
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="sunray_dashboard_kanban_view" model="ir.ui.view">
+        <field name="name">sunray.dashboard.kanban</field>
+        <field name="model">sunray.dashboard</field>
+        <field name="arch" type="xml">
+            <kanban create="false" class="oe_background_grey o_kanban_dashboard o_sunray_dashboard">
+                <field name="name" />
+                <field name="kanban_dashboard_type" />
+                <field name="kanban_dashboard_graph" />
+                <field name="configuration_data" />
+                <templates>
+                    <t t-name="card">
+                        <t t-value="JSON.parse(record.kanban_dashboard_graph.raw_value)" t-set="dashboard"/>
+                        <t t-value="record.kanban_dashboard_type.raw_value" t-set="dashboard_type"/>
+                        <t t-value="JSON.parse(record.configuration_data.raw_value || '{}')" t-set="configuration_dict" />
+                        <div>
+                            <t t-call="DashboardTop" />
+                            <div t-att-class="'container o_kanban_card_content'">
+                                
+                                <div class="row">
+                                </div>
+                                <t t-call="DashboardBodyGraph" />
+                            </div>
+                        </div>
+                    </t>
+
+                    <t t-name="DashboardTop">
+                        <div t-attf-class="o_kanban_card_header">
+                            <div class="o_kanban_card_header_title">
+                                <t t-if="dashboard_type != 'number'">
+                                    <div class="o_primary">
+                                        <a type="object" name="open_action"><h2><field name="name" /></h2></a>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+
+                    <t t-name="DashboardBodyGraph">
+                        <field name="kanban_dashboard_graph" t-att-graph_type="record.kanban_dashboard_type.raw_value" t-att-configuration_data="record.configuration_data.raw_value" widget="SunrayDashboardGraph" />
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="sunray_dashboard_tree_view" model="ir.ui.view">
+        <field name="name">sunray.dashboard.tree</field>
+        <field name="model">sunray.dashboard</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="active == False">
+                <field name="sequence" widget="handle" />
+                <field name="id" optional="hide" />
+                <field name="name" />
+                <field name="description" />
+                <field name="kanban_dashboard_type" />
+                <field name="active" optional="hide" />
+            </list>
+        </field>
+    </record>
+
+    <record id="sunray_dashboard_filter_view" model="ir.ui.view">
+        <field name="name">sunray.dashboard.filter</field>
+        <field name="model">sunray.dashboard</field>
+        <field name="arch" type="xml">
+                <search>
+                    <field name="name" />
+                    <group expand="0" name="group_filter" string="Filters">
+                        <filter name="is_all" string="All" help="Display all dashboard" domain="['|', ('active', '=', True), ('active', '=', False)]" />
+                        <filter name="is_active" string="Active" help="Display only active dashboard" domain="[('active', '=', True)]" />
+                        <filter name="is_inactive" string="Inactive" help="Display only inactive dashboard" domain="[('active', '=', False)]" />
+                    </group>            
+                </search>
+        </field>
+    </record>
+
+    <record id="sunray_dashboard_act_window" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">sunray.dashboard</field>
+        <!-- <field name="view_mode">list,form</field> -->
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="sunray_dashboard_kanban_view" />
+        <field name="search_view_id" ref="sunray_dashboard.sunray_dashboard_filter_view" />
+        <field name="usage">menu</field>
+        <field name="context" />
+        <field name="domain">[]</field>
+    </record>
+</odoo>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="sunray_dashboard.SunrayDashboardGraph" owl="1">
+        <div class="o_sunray_dashboard" t-on-click="openConfigurationAction">
+            <div t-ref="canvas"></div>
+        </div>
+    </t>
+</templates>

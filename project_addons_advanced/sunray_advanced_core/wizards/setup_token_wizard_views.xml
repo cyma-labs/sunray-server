@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend the wizard form to add email fields -->
+    <record id="view_sunray_setup_token_wizard_form_enterprise" model="ir.ui.view">
+        <field name="name">sunray.setup.token.wizard.form.enterprise</field>
+        <field name="model">sunray.setup.token.wizard</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_setup_token_wizard_form"/>
+        <field name="arch" type="xml">
+            <!-- Add email option before the end of the first group -->
+            <field name="allowed_cidrs" position="after">
+                <field name="send_email"/>
+            </field>
+
+            <!-- Add email status after token display -->
+            <div class="alert alert-success" position="after">
+                <div invisible="not send_email">
+                    <div class="alert alert-success" role="alert" invisible="not email_sent">
+                        <h5><i class="fa fa-check-circle"/> Email Sent Successfully</h5>
+                        <p>The setup token has been sent to <strong><field name="user_id" readonly="1" class="oe_inline" style="display: inline;"/> (<field name="user_id" readonly="1" string="" class="oe_inline" style="display: inline;" options="{'fields': {'email': {}}}"/>)</strong></p>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not email_error">
+                        <h5><i class="fa fa-exclamation-triangle"/> Email Send Failed</h5>
+                        <field name="email_error" readonly="1" nolabel="1"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add hidden fields for state tracking -->
+            <field name="send_email" position="after">
+                <field name="email_sent" invisible="1"/>
+            </field>
+        </field>
+    </record>
+</odoo>

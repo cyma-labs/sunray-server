@@ -32,6 +32,7 @@ Scripts use a numbered naming convention to enforce installation order and allow
 - `mpy_install_300_nodejs_dev.sh` - Layer 3: Node.js development
 - `mpy_install_350_docker.sh` - Layer 3: Docker CE and Docker Compose
 - `mpy_install_400_pg_client.sh` - Layer 4: PostgreSQL client
+- `mpy_install_450_dragonflydb.sh` - Layer 4: DragonflyDB (Redis-compatible cache)
 - `mpy_install_500_odoo18_deps.sh` - Layer 5: Odoo 18 system dependencies
 - `mpy_install_510_ikb.sh` - Layer 5: ikb (inouk buildit) installation
 
@@ -84,6 +85,41 @@ sudo PG_VERSION=15 ./.muppy/scripts/mpy_install_400_pg_client.sh
 
 **Environment variables:**
 - `PG_VERSION` - PostgreSQL major version (default: 16)
+
+### mpy_install_450_dragonflydb.sh
+
+**Layer 4 - Database Services**
+
+Installs redis-tools (redis-cli) and runs DragonflyDB as a Docker daemon for use as a Redis-compatible cache.
+
+**Components installed:**
+- redis-tools (redis-cli) - Always installed in all contexts
+- DragonflyDB container - Only on VMs with Docker available
+
+**Behavior:**
+- **redis-tools**: Always installed (works in Docker, LXC, bare metal)
+- **DragonflyDB**: Only runs on VMs (bare metal or LXC VM) where Docker is available
+- **Graceful skip**: If Docker is not available, redis-tools is still installed and script exits successfully
+
+**Usage:**
+```bash
+# Install with defaults (port 6379) - uses sudo internally
+./.muppy/scripts/mpy_install_450_dragonflydb.sh
+
+# Install with custom port
+DRAGONFLY_PORT=6380 ./.muppy/scripts/mpy_install_450_dragonflydb.sh
+```
+
+**Post-installation:**
+- Connect with: `redis-cli -h 127.0.0.1 -p 6379`
+- Test connection: `redis-cli ping` (returns PONG)
+- Check status: `docker ps --filter name=dragonflydb`
+- View logs: `docker logs dragonflydb`
+- Stop: `docker stop dragonflydb`
+- Remove: `docker rm dragonflydb`
+
+**Environment variables:**
+- `DRAGONFLY_PORT` - Port to expose (default: 6379)
 
 ### mpy_install_300_nodejs_dev.sh
 
@@ -353,7 +389,9 @@ These scripts follow the **Manganese Development Layer Architecture**:
 - **Layer 3** (300-399): Platform-Specific Dev Tools
   - [mpy_install_300_nodejs_dev.sh](mpy_install_300_nodejs_dev.sh) - Node.js development
   - [mpy_install_350_docker.sh](mpy_install_350_docker.sh) - Docker CE and Docker Compose
-- **Layer 4** (400-499): Database Clients (this directory: [mpy_install_400_pg_client.sh](mpy_install_400_pg_client.sh))
+- **Layer 4** (400-499): Database Clients & Services
+  - [mpy_install_400_pg_client.sh](mpy_install_400_pg_client.sh) - PostgreSQL client
+  - [mpy_install_450_dragonflydb.sh](mpy_install_450_dragonflydb.sh) - DragonflyDB (Docker daemon)
 - **Layer 5** (500-599): Application-Specific
   - [mpy_install_500_odoo18_deps.sh](mpy_install_500_odoo18_deps.sh) - System dependencies (requires sudo)
   - [mpy_install_510_ikb.sh](mpy_install_510_ikb.sh) - User tools (run WITHOUT sudo)
@@ -368,6 +406,11 @@ The numbering scheme follows the **Manganese Development Layer Architecture**:
 
 ## Version History
 
+- **v1.5** - DragonflyDB cache service (2025-12)
+  - Added mpy_install_450_dragonflydb.sh (Layer 4)
+  - DragonflyDB as Docker daemon for Redis-compatible caching
+  - Cache-only mode (no persistence)
+  - Requires Docker (mpy_install_350_docker.sh)
 - **v1.4** - Docker development environment (2025-11)
   - Added mpy_install_350_docker.sh (Layer 3)
   - Docker CE and Docker Compose from official repos

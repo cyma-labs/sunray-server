@@ -617,6 +617,7 @@ The `/config/register` endpoint handles all migration logic:
       "public_key_format": "cbor_cose",
       "name": "Chrome - Dec 28, 2024",
       "counter": 42,
+      "host_domain": "app.example.com",
       "created_at": "2024-12-28T10:00:00Z",
       "last_used_at": "2024-12-28T15:30:00Z"
     }
@@ -633,6 +634,7 @@ The `/config/register` endpoint handles all migration logic:
 - `counter`: WebAuthn authentication counter for replay attack prevention (must be greater than last used value)
 - `created_at`: When the passkey was registered (ISO 8601 format)
 - `last_used_at`: When the passkey was last used for authentication (null if never used)
+- `host_domain`: The domain (WebAuthn rpId) this passkey is registered to. Used for credential isolation per WebAuthn spec. May be null for legacy passkeys that need re-registration.
 
 **Error Responses**:
 - `401 Unauthorized`: Invalid or missing API key

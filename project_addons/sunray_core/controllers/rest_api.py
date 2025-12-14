@@ -680,7 +680,8 @@ class SunrayRESTController(http.Controller):
                 'name': passkey.name,
                 'counter': passkey.counter or 0,
                 'created_at': passkey.create_date.isoformat(),
-                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None
+                'last_used_at': passkey.last_used.isoformat() if passkey.last_used else None,
+                'host_domain': passkey.host_domain or None
             })
         
         # Build response data

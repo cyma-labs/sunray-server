@@ -113,13 +113,15 @@ class UserValidationController(SunrayRESTController):
                 'remote_login_allowed': False
             })
 
-        # Check passkey status
-        has_passkey = user_obj.passkey_count > 0
+        # Check passkey status - only count passkeys registered for this host
+        host_passkeys = user_obj.passkey_ids.filtered(lambda p: p.host_domain == host_domain)
+        has_passkey = len(host_passkeys) > 0
 
-        # Check for valid setup token
+        # Check for valid setup token - only for this specific host
         today = fields.Date.today()
         valid_token_obj = request.env['sunray.setup.token'].sudo().search([
             ('user_id', '=', user_obj.id),
+            ('host_id', '=', host_obj.id),
             ('consumed', '=', False),
             ('expires_at', '>=', today)
         ], limit=1)

@@ -641,11 +641,64 @@ The `/config/register` endpoint handles all migration logic:
 - `404 Not Found`: User not found
 - `400 Bad Request`: Invalid username parameter
 
-**Usage**: 
+**Usage**:
 - Check user existence (404 = doesn't exist, 200 = exists)
 - Retrieve user details for administrative purposes
 - Get user configuration version for cache invalidation
 - Access passkey information for authentication and security monitoring
+
+### POST /sunray-srvr/v1/users/validate
+
+**Purpose**: Validates a user for a specific host and returns available authentication methods. All predicates are host-scoped.
+
+**Authentication**: API key required
+
+**Request Headers**:
+- `Authorization: Bearer {api_key}` - Required API key for authentication
+- `X-Worker-ID: {worker_id}` - Required worker identifier for tracking
+- `Content-Type: application/json` - Required
+
+**Request Body**:
+```json
+{
+  "username": "john.doe@example.com",
+  "host": "app.example.com"
+}
+```
+
+**Response** (User found and authorized - 200 OK):
+```json
+{
+  "user_exists": true,
+  "has_passkey": true,
+  "has_valid_token": false,
+  "remote_login_allowed": false
+}
+```
+
+**Response** (User not found or not authorized - 200 OK):
+```json
+{
+  "user_exists": false,
+  "has_passkey": false,
+  "has_valid_token": false,
+  "remote_login_allowed": false
+}
+```
+
+**Response Fields**:
+- `user_exists` (boolean): True if user exists, is active, AND is authorized for the specified host
+- `has_passkey` (boolean): True if user has at least one passkey registered for THIS specific host
+- `has_valid_token` (boolean): True if user has an unexpired, unconsumed setup token for THIS specific host
+- `remote_login_allowed` (boolean): True if the host is in deployment mode (allows passwordless access)
+
+**Usage**:
+- Workers use this to determine which UI elements to display on the login page
+- `has_passkey: true` → Show "Sign in with Passkey" button
+- `has_valid_token: true` → Show "Setup Passkey" enrollment link
+- `remote_login_allowed: true` → Show "Continue without Passkey" option (deployment mode)
+
+**Important**: All predicates are host-scoped. A user may have passkeys for host A but not host B - this endpoint returns the correct values for the specified host.
 
 ## Setup Token Management
 

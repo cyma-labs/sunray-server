@@ -597,6 +597,7 @@ The `/config/register` endpoint handles all migration logic:
 **Response** (User found):
 ```json
 {
+  "user_id": 42,
   "username": "user@example.com",
   "email": "user@example.com",
   "display_name": "user@example.com",
@@ -625,6 +626,9 @@ The `/config/register` endpoint handles all migration logic:
   "config_version": "2024-01-15T09:00:00Z"
 }
 ```
+
+**User Fields**:
+- `user_id`: Server-side user ID (integer). Used by workers when creating sessions.
 
 **Passkey Fields**:
 - `credential_id`: Base64URL encoded credential ID to match against credential.id in authentication assertion

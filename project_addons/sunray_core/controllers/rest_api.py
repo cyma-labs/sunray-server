@@ -691,6 +691,7 @@ class SunrayRESTController(http.Controller):
         
         # Build response data
         user_data = {
+            'user_id': user_obj.id,  # Needed by worker for session creation
             'username': user_obj.username,
             'email': user_obj.email,
             'display_name': user_obj.email,  # Using email as display name for now

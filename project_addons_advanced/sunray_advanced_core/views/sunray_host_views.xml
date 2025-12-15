@@ -87,12 +87,13 @@
                            widget="badge"/>
                 </xpath>
                 <xpath expr="//field[@name='sunray_worker_id']" position="after">
-                    <field name="golive_date" optional="show"/>
-                    <field name="days_until_golive" optional="show"/>
+                    <field name="golive_date" optional="hide"/>
+                    <field name="days_until_golive" optional="hide"/>
                 </xpath>
 
                 <!-- Add remote auth enabled column -->
                 <xpath expr="//field[@name='block_all_traffic']" position="after">
+                    <field name="deployment_mode" string="Deployment" optional="show" widget="boolean_toggle"/>
                     <field name="remote_auth_enabled"
                            widget="boolean_toggle"
                            string="Remote Auth"

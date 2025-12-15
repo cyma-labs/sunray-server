@@ -6,14 +6,15 @@
         <field name="model">sunray.host</field>
         <field name="arch" type="xml">
             <list>
-                <field name="domain"/>
+                <field name="id" optional="hide"/>
+                <field name="domain" optional="hide"/>
+                <field name="backend_url" optional="show" widget="url"/>
                 <field name="is_active" string="Active" widget="boolean_toggle"/>
                 <field name="block_all_traffic" string="Block Traffic" widget="boolean_toggle"/>
                 <field name="sunray_worker_id" string="Worker" optional="show"/>
-                <field name="pending_worker_name" string="Pending Worker" optional="show"/>
-                <field name="migration_pending_duration" string="Migration Pending" optional="show"/>
-                <field name="backend_url" optional="show"/>
-                <field name="last_migration_ts" string="Last Migration" optional="show"/>
+                <field name="pending_worker_name" string="Pending Worker" optional="hide"/>
+                <field name="migration_pending_duration" string="Migration Pending" optional="hide"/>
+                <field name="last_migration_ts" string="Last Migration" optional="hide"/>
                 <field name="create_date" optional="show"/>
                 <field name="config_version" optional="show"/>
             </list>

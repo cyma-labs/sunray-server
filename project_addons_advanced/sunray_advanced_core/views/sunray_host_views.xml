@@ -18,7 +18,7 @@
                             <field name="deployment_mode" widget="boolean_toggle"/>
                             <field name="golive_date" invisible="not deployment_mode"/>
                         </group>
-                        <group invisible="not deployment_mode">
+                        <group invisible="not deployment_mode" class="ik_lw320">
                             <field name="days_until_golive"/>
                             <field name="deployment_session_ttl"
                                 widget="integer"
@@ -28,9 +28,9 @@
                 </xpath>
 
                 <!-- Add Remote Authentication section after configuration tab -->
-                <group name="waf_integration_group" position="after">
+                <group name="session_setting_group" position="after">
                     <group string="Remote Authentication Settings" name="remote_auth_settings_group">
-                        <group>
+                        <group class="ik_lw260">
                             <field name="remote_auth_enabled"/>
                             <field name="remote_auth_session_ttl"
                                     invisible="not remote_auth_enabled"
@@ -41,12 +41,6 @@
                         </group>
                         <group>
                             <div class="alert alert-info" role="alert" invisible="not remote_auth_enabled" colspan="2">
-                                <p><strong>Remote Authentication Configuration:</strong></p>
-                                <ul>
-                                    <li>Default Session Duration: <field name="remote_auth_session_ttl" readonly="1"/> seconds</li>
-                                    <li>Maximum Session Duration: <field name="remote_auth_max_session_ttl" readonly="1"/> seconds</li>
-                                    <li>Session Management Access: <field name="session_mgmt_ttl" readonly="1"/> seconds</li>
-                                </ul>
                                 <p class="mb-0">
                                     <i class="fa fa-info-circle"/> Remote authentication allows users to authenticate
                                     using their mobile device while accessing from a different computer.
@@ -56,10 +50,10 @@
                     </group>
 
                     <group string="Session Management" name="session_management_group">
-                        <group>
+                        <group class="ik_lw220">
                             <field name="session_mgmt_enabled"/>
                         </group>
-                        <group>
+                        <group class="ik_lw280">
                             <field name="session_mgmt_ttl"
                                     invisible="not session_mgmt_enabled"
                                     required="session_mgmt_enabled"/>

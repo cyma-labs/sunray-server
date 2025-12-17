@@ -83,8 +83,12 @@
                             <field name="domain"/>
                             <field name="sunray_worker_id" readonly="1" help="Worker is automatically assigned when it first contacts the server"/>
                             <field name="backend_url" widget="url"/>
+                            <separator string="Worker Migration Control"/>
+                            <field name="pending_worker_name" placeholder="Enter worker ID to migrate to"/>
+                            <field name="last_migration_ts" readonly="1" invisible="not last_migration_ts"/>
                         </group>
-                        <group>
+
+                        <group class="ik_lw160">
                             <field name="is_active" widget="boolean_toggle"/>
                             <field name="block_all_traffic" widget="boolean_toggle"/>
                             <field name="create_date" readonly="1"/>
@@ -117,10 +121,6 @@
                         </group>
                     </group>
                     
-                    <group string="Worker Migration Control">
-                        <field name="pending_worker_name" placeholder="Enter worker ID to migrate to"/>
-                        <field name="last_migration_ts" readonly="1" invisible="not last_migration_ts"/>
-                    </group>
                     
                     <notebook>
                         <page string="Access Rules">
@@ -267,22 +267,19 @@
                         </page>
 
                         <page string="Configuration" name="page_configuration">
-                            <group string="Session Settings">
+                            <group string="Session Settings" name="session_setting_group" class="ik_lw200">
                                 <field name="session_duration_s"/>
                             </group>
-                            
-                            <group string="WebSocket Configuration">
-                                <field name="websocket_url_prefix" placeholder="/ws/"/>
-                            </group>
-                            
-                            <group string="WAF Integration" name="waf_integration_group">
-                                <group>
-                                    <field name="bypass_waf_for_authenticated"/>
+                            <group string="Cloudflare Worker Configuration">
+                                <group class="ik_lw200">
+                                    <field name="websocket_url_prefix" placeholder="/ws/"/>
                                 </group>
-                                <group>
+                                <group class="ik_lw340">
+                                    <field name="bypass_waf_for_authenticated"/>
                                     <field name="waf_bypass_revalidation_s" invisible="not bypass_waf_for_authenticated"/>
                                 </group>
                             </group>
+                            
                         </page>
                         
                         <page string="Helpers">

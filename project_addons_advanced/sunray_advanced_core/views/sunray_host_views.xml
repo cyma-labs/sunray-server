@@ -30,22 +30,20 @@
                 <!-- Add Remote Authentication section after configuration tab -->
                 <group name="session_setting_group" position="after">
                     <group string="Remote Authentication Settings" name="remote_auth_settings_group">
+                        <div class="alert alert-info" role="alert" invisible="not remote_auth_enabled" colspan="2">
+                            <i class="fa fa-info-circle"/> Remote authentication allows users to authenticate
+                            using their mobile device while accessing from a different computer.
+                        </div>
                         <group class="ik_lw260">
                             <field name="remote_auth_enabled"/>
+                        </group>
+                        <group  class="ik_lw280">
                             <field name="remote_auth_session_ttl"
                                     invisible="not remote_auth_enabled"
                                     required="remote_auth_enabled"/>
                             <field name="remote_auth_max_session_ttl"
                                     invisible="not remote_auth_enabled"
                                     required="remote_auth_enabled"/>
-                        </group>
-                        <group>
-                            <div class="alert alert-info" role="alert" invisible="not remote_auth_enabled" colspan="2">
-                                <p class="mb-0">
-                                    <i class="fa fa-info-circle"/> Remote authentication allows users to authenticate
-                                    using their mobile device while accessing from a different computer.
-                                </p>
-                            </div>
                         </group>
                     </group>
 

@@ -271,6 +271,10 @@
                                 <field name="session_duration_s"/>
                             </group>
                             <group string="Cloudflare Worker Configuration">
+                                <div class="alert alert-info" role="alert" colspan="2">
+                                    <i class="fa fa-info-circle"/> These settings only applies to the Cloudflare Worker.
+                                </div>
+
                                 <group class="ik_lw200">
                                     <field name="websocket_url_prefix" placeholder="/ws/"/>
                                 </group>

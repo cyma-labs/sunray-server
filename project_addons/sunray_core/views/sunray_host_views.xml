@@ -79,7 +79,7 @@
                                 name="btn_refresh" />
                     </div>
                     <group>
-                        <group>
+                        <group class="ik_lw160">
                             <field name="domain"/>
                             <field name="sunray_worker_id" readonly="1" help="Worker is automatically assigned when it first contacts the server"/>
                             <field name="backend_url" widget="url"/>
@@ -180,6 +180,20 @@
                                 </p>
                             </div>
                         </page>
+
+                        <page string="Login" name="page_login">
+                            <group string="Passkey Authentication" name="passkey_auth_group">
+                                <group class="ik_lw200">
+                                    <field name="passkey_enabled" widget="boolean_toggle"/>
+                                    <field name="session_duration_s" string="Session Duration (Passkey)"
+                                           invisible="not passkey_enabled"/>
+                                </group>
+                                <group name="remote_passkey_placeholder" class="ik_lw260">
+                                    <!-- Placeholder for advanced addon to inject Remote Passkey Login -->
+                                </group>
+                            </group>
+                            <!-- Placeholder for advanced addon to inject Deployment Mode -->
+                        </page>
                                                 
                         <page string="Authorized Users">
                             <field name="user_stat_ids" nolabel="1" readonly="1">
@@ -267,9 +281,6 @@
                         </page>
 
                         <page string="Configuration" name="page_configuration">
-                            <group string="Session Settings" name="session_setting_group" class="ik_lw200">
-                                <field name="session_duration_s"/>
-                            </group>
                             <group string="Cloudflare Worker Configuration">
                                 <div class="alert alert-info" role="alert" colspan="2">
                                     <i class="fa fa-info-circle"/> These settings only applies to the Cloudflare Worker.

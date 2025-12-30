@@ -1,64 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Extend sunray.host form view to add Remote Authentication fields -->
+        <!-- Extend sunray.host form view to add Remote Authentication and Deployment Mode fields -->
         <record id="sunray_host_form_advanced" model="ir.ui.view">
             <field name="name">sunray.host.form.advanced</field>
             <field name="model">sunray.host</field>
             <field name="inherit_id" ref="sunray_core.view_sunray_host_form"/>
             <field name="arch" type="xml">
+                <!-- Add statusbar before sheet -->
                 <xpath expr="//sheet" position="before">
                     <header>
                         <field name="state" widget="statusbar" statusbar_visible="unprotected,locked,deployment,protected"/>
                     </header>
                 </xpath>
-                <xpath expr="//group[@name='protection_status']" position="before">
-                    <group string="Deployment Mode" name="deployment_mode">
-                        <group>
+
+                <!-- Show days_until_golive in header when in deployment mode -->
+                <xpath expr="//field[@name='backend_url']" position="after">
+                    <label for="days_until_golive" string="⏱️ Days Until Go-Live"
+                           invisible="state != 'deployment'"/>
+                    <field name="days_until_golive" readonly="1" nolabel="1"
+                           style="color: #e65100; font-weight: bold; font-size: 1.1em;"
+                           invisible="state != 'deployment'"/>
+                </xpath>
+
+                <!-- Add Remote Passkey Login to Login tab (inside Passkey Authentication group) -->
+                <xpath expr="//page[@name='page_login']//group[@name='remote_passkey_placeholder']" position="inside">
+                        <field name="remote_auth_enabled" string="Remote Passkey Login"
+                               widget="boolean_toggle"
+                               invisible="not passkey_enabled"/>
+                        <field name="remote_auth_session_ttl" 
+                               invisible="not passkey_enabled or not remote_auth_enabled"
+                               required="remote_auth_enabled"/>
+                        <field name="remote_auth_max_session_ttl" 
+                               invisible="not passkey_enabled or not remote_auth_enabled"
+                               required="remote_auth_enabled"/>
+                </xpath>
+
+                <!-- Add Deployment Mode section to Login tab (after Passkey Authentication group) -->
+                <xpath expr="//page[@name='page_login']//group[@name='passkey_auth_group']" position="after">
+                    <group string="Deployment Mode" name="deployment_mode_group">
+                        <group class="ik_lw200">
                             <field name="deployment_mode" widget="boolean_toggle"/>
                             <field name="golive_date" invisible="not deployment_mode"/>
+                            <field name="days_until_golive" invisible="not deployment_mode"/>
                         </group>
-                        <group invisible="not deployment_mode" class="ik_lw320">
-                            <field name="days_until_golive"/>
+                        <group class="ik_lw260">
                             <field name="deployment_session_ttl"
-                                widget="integer"
-                                help="Session duration in seconds (default: 7200 = 2 hours)"/>
+                                   invisible="not deployment_mode"
+                                   widget="integer"
+                                   help="Session duration in seconds (default: 7200 = 2 hours)"/>
                         </group>
                     </group>
                 </xpath>
 
-                <!-- Add Remote Authentication section after configuration tab -->
-                <group name="session_setting_group" position="after">
-                    <group string="Remote Authentication Settings" name="remote_auth_settings_group">
-                        <div class="alert alert-info" role="alert" invisible="not remote_auth_enabled" colspan="2">
-                            <i class="fa fa-info-circle"/> Remote authentication allows users to authenticate
-                            using their mobile device while accessing from a different computer.
+                <!-- Add Session Management to top of Configuration tab (for future use) -->
+                <xpath expr="//page[@name='page_configuration']/group[1]" position="before">
+                    <group string="Session Management" name="session_management_group"
+                           invisible="not passkey_enabled or not remote_auth_enabled">
+                        <div class="alert alert-info mb16" colspan="2" role="status">
+                            <i class="fa fa-clock-o"/> These fields are NOT used yet. They will be used for a future
+                             "Session Management" feature allowing users to view/kill sessions
+                             opened via Remote Passkey Login.
                         </div>
-                        <group class="ik_lw260">
-                            <field name="remote_auth_enabled"/>
-                        </group>
-                        <group  class="ik_lw280">
-                            <field name="remote_auth_session_ttl"
-                                    invisible="not remote_auth_enabled"
-                                    required="remote_auth_enabled"/>
-                            <field name="remote_auth_max_session_ttl"
-                                    invisible="not remote_auth_enabled"
-                                    required="remote_auth_enabled"/>
-                        </group>
-                    </group>
-
-                    <group string="Session Management" name="session_management_group">
                         <group class="ik_lw220">
-                            <field name="session_mgmt_enabled"/>
+                            <field name="session_mgmt_enabled" widget="boolean_toggle"/>
                         </group>
                         <group class="ik_lw280">
                             <field name="session_mgmt_ttl"
-                                    invisible="not session_mgmt_enabled"
-                                    required="session_mgmt_enabled"/>
+                                   invisible="not session_mgmt_enabled"
+                                   required="session_mgmt_enabled"/>
                         </group>
-
                     </group>
-                </group>
+                </xpath>
 
             </field>
         </record>
@@ -103,6 +116,9 @@
                 <!-- Add filter for remote auth enabled hosts -->
                 <xpath expr="//filter[@name='pending_migration']" position="after">
                     <separator/>
+                    <filter string="Passkey Enabled"
+                            name="passkey_enabled"
+                            domain="[('passkey_enabled', '=', True)]"/>
                     <filter string="Remote Auth Enabled"
                             name="remote_auth_enabled"
                             domain="[('remote_auth_enabled', '=', True)]"/>
@@ -119,6 +135,9 @@
                 </xpath>
                 <!-- Add group by option -->
                 <xpath expr="//group" position="inside">
+                    <filter string="Passkey Status"
+                            name="group_passkey"
+                            context="{'group_by': 'passkey_enabled'}"/>
                     <filter string="Remote Auth Status"
                             name="group_remote_auth"
                             context="{'group_by': 'remote_auth_enabled'}"/>

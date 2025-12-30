@@ -54,9 +54,9 @@ class SunrayHost(models.Model):
     )
 
     deployment_session_ttl = fields.Integer(
-        string="Deployment Mode Session Duration (seconds)",
+        string="Deployment Mode Session Duration",
         default=7200,  # 2 hours
-        help="Duration of unverified sessions created during deployment mode. "
+        help="Duration in seconds of unverified sessions created during deployment mode. "
              "Shorter sessions encourage users to enroll passkeys quickly."
     )
 
@@ -76,13 +76,13 @@ class SunrayHost(models.Model):
     )
 
     remote_auth_session_ttl = fields.Integer(
-        string='Default Remote Session Duration',
+        string="Remote Login Session Duration",
         default=3600,  # 1 hour
         help='Default duration for remote authentication sessions (in seconds)'
     )
 
     remote_auth_max_session_ttl = fields.Integer(
-        string='Maximum Remote Session Duration',
+        string='Max. Remote Login Session Duration',
         default=7200,  # 2 hours
         help='Maximum duration users can select for remote sessions (in seconds)'
     )
@@ -292,7 +292,8 @@ class SunrayHost(models.Model):
                     )
 
             host_config_dict['remote_auth'] = {
-                'enabled': host_obj.remote_auth_enabled,
+                # Force enabled=False when passkey_enabled=False (remote auth requires passkeys)
+                'enabled': host_obj.remote_auth_enabled and host_obj.passkey_enabled,
                 'session_ttl': host_obj.remote_auth_session_ttl,
                 'max_session_ttl': host_obj.remote_auth_max_session_ttl,
                 'session_mgmt_enabled': host_obj.session_mgmt_enabled,

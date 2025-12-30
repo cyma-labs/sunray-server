@@ -95,7 +95,15 @@ class SunrayHost(models.Model):
              '- 24h = 86400\n'
              'Min: 60s, Max: configured by system parameter'
     )
-    
+
+    # Passkey authentication
+    passkey_enabled = fields.Boolean(
+        string='Passkey Authentication',
+        default=True,
+        help='Allow users to authenticate using WebAuthn passkeys. '
+             'When disabled, only deployment mode or access rules can grant access.'
+    )
+
     # WAF integration
     bypass_waf_for_authenticated = fields.Boolean(
         string='Bypass Cloudflare WAF for Authenticated Users',
@@ -471,6 +479,7 @@ class SunrayHost(models.Model):
                 'backend': host_obj.backend_url,
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
+                'passkey_enabled': host_obj.passkey_enabled,
                 'websocket_url_prefix': host_obj.websocket_url_prefix,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,

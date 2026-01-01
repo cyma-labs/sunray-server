@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Email Login: Default OTP Template (stores XML ID) -->
+        <record id="config_email_otp_template" model="ir.config_parameter">
+            <field name="key">sunray.email_otp_template_id</field>
+            <field name="value">sunray_core.mail_template_email_otp_default</field>
+        </record>
+    </data>
+</odoo>

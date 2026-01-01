@@ -11,6 +11,10 @@ access_sunray_setup_token_user,sunray.setup.token user,model_sunray_setup_token,
 access_sunray_setup_token_manager,sunray.setup.token manager,model_sunray_setup_token,group_sunray_manager,1,1,1,0
 access_sunray_setup_token_admin,sunray.setup.token admin,model_sunray_setup_token,group_sunray_admin,1,1,1,1
 
+access_sunray_email_otp_user,sunray.email.otp user,model_sunray_email_otp,group_sunray_user,1,0,0,0
+access_sunray_email_otp_manager,sunray.email.otp manager,model_sunray_email_otp,group_sunray_manager,1,1,1,0
+access_sunray_email_otp_admin,sunray.email.otp admin,model_sunray_email_otp,group_sunray_admin,1,1,1,1
+
 access_sunray_host_user,sunray.host user,model_sunray_host,group_sunray_user,1,0,0,0
 access_sunray_host_manager,sunray.host manager,model_sunray_host,group_sunray_manager,1,1,1,0
 access_sunray_host_admin,sunray.host admin,model_sunray_host,group_sunray_admin,1,1,1,1

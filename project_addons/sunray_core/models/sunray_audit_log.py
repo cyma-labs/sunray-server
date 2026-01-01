@@ -23,6 +23,15 @@ class SunrayAuditLog(models.Model):
         ('auth.success', 'Authentication Success'),
         ('auth.failure', 'Authentication Failure'),
         ('auth.logout', 'Authentication Logout'),
+        # Email OTP Events
+        ('auth.email_otp_requested', 'Email OTP Requested'),
+        ('auth.email_otp_requested_unknown', 'Email OTP Requested (Unknown Email)'),
+        ('auth.email_otp_validated', 'Email OTP Validated'),
+        ('auth.email_otp_failed', 'Email OTP Failed'),
+        ('auth.email_otp_expired', 'Email OTP Expired'),
+        ('auth.email_otp_cleanup', 'Email OTP Cleanup'),
+        ('security.email_otp_lockout', 'Email OTP Lockout'),
+        ('security.email_otp_browser_mismatch', 'Email OTP Browser Mismatch'),
         # Host Events
         ('host.activated', 'Host Activated'),
         ('host.deactivated', 'Host Deactivated'),

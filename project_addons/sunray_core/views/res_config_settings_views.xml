@@ -33,6 +33,15 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Email Login" id="sunray_email_login_settings">
+                        <setting string="Default OTP Template" help="Default email template for OTP codes">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <field name="sunray_email_otp_template_id" class="oe_inline col-6"/>
+                                </div>
+                            </div>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

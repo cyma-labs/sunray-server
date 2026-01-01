@@ -31,3 +31,13 @@ class ResConfigSettings(models.TransientModel):
              'Set to 1 for single-use tokens, or higher for reusable tokens. '
              'Use 0 for unlimited uses (not recommended for security).'
     )
+
+    # Email Login Configuration
+    sunray_email_otp_template_id = fields.Many2one(
+        'mail.template',
+        string='Default Email OTP Template',
+        config_parameter='sunray.email_otp_template_id',
+        domain="[('model_id.model', '=', 'sunray.host')]",
+        help='Default email template for sending OTP codes. '
+             'Hosts can override this with their own template.'
+    )

@@ -104,6 +104,46 @@ class SunrayHost(models.Model):
              'When disabled, only deployment mode or access rules can grant access.'
     )
 
+    # Email OTP authentication
+    enable_email_login = fields.Boolean(
+        string='Email Login',
+        default=False,
+        help='Allow users to authenticate using email OTP codes. '
+             'When enabled, users can receive a one-time code via email to sign in.'
+    )
+    email_login_session_duration_s = fields.Integer(
+        string='Email Login Session Duration (seconds)',
+        default=3600,
+        help='Session duration for email-authenticated sessions. Default: 1 hour (3600s).\n'
+             'Set to 0 to use the standard session duration.\n'
+             'Typically shorter than passkey sessions for security.'
+    )
+    email_otp_validity_s = fields.Integer(
+        string='Email OTP Validity (seconds)',
+        default=300,
+        help='How long the OTP code remains valid. Default: 5 minutes (300s).\n'
+             'Shorter is more secure but may frustrate slow users.'
+    )
+    email_otp_resend_cooldown_s = fields.Integer(
+        string='Email OTP Resend Cooldown (seconds)',
+        default=60,
+        help='Minimum delay between OTP resend requests. Default: 60 seconds.\n'
+             'Prevents abuse of email sending.'
+    )
+    email_otp_max_attempts = fields.Integer(
+        string='Email OTP Max Attempts',
+        default=5,
+        help='Maximum failed validation attempts before lockout. Default: 5.\n'
+             'After this many failures, the OTP is invalidated.'
+    )
+    email_otp_template_id = fields.Many2one(
+        'mail.template',
+        string='Email OTP Template',
+        domain="[('model_id.model', '=', 'sunray.host')]",
+        help='Email template used for sending OTP codes. '
+             'If not set, uses the default Sunray template.'
+    )
+
     # WAF integration
     bypass_waf_for_authenticated = fields.Boolean(
         string='Bypass Cloudflare WAF for Authenticated Users',
@@ -480,6 +520,13 @@ class SunrayHost(models.Model):
                 'nb_authorized_users': len(host_obj.user_ids.filtered(lambda u: u.is_active)),
                 'session_duration_s': host_obj.session_duration_s,
                 'passkey_enabled': host_obj.passkey_enabled,
+                'email_login': {
+                    'enabled': host_obj.enable_email_login,
+                    'session_duration_s': host_obj.email_login_session_duration_s or host_obj.session_duration_s,
+                    'otp_validity_s': host_obj.email_otp_validity_s,
+                    'resend_cooldown_s': host_obj.email_otp_resend_cooldown_s,
+                    'max_attempts': host_obj.email_otp_max_attempts,
+                },
                 'websocket_url_prefix': host_obj.websocket_url_prefix,
                 'exceptions_tree': host_obj.get_exceptions_tree(),
                 'bypass_waf_for_authenticated': host_obj.bypass_waf_for_authenticated,

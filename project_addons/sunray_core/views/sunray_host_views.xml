@@ -182,6 +182,18 @@
                         </page>
 
                         <page string="Login" name="page_login">
+                            <group string="Email Login" name="email_login_group">
+                                <group class="ik_lw200">
+                                    <field name="enable_email_login" widget="boolean_toggle"/>
+                                </group>
+                                <group class="ik_lw200">
+                                    <field name="email_login_session_duration_s"
+                                           string="Session Duration (Email)"
+                                           invisible="not enable_email_login"/>
+                                    <!-- Empty for layout balance -->
+                                </group>
+                            </group>
+
                             <group string="Passkey Authentication" name="passkey_auth_group">
                                 <group class="ik_lw200">
                                     <field name="passkey_enabled" widget="boolean_toggle"/>
@@ -281,6 +293,17 @@
                         </page>
 
                         <page string="Configuration" name="page_configuration">
+                            <group string="Email OTP Settings" class="ik_lw200" invisible="not enable_email_login">
+                                <group class="ik_lw280">
+                                    <field name="email_otp_validity_s"/>
+                                    <field name="email_otp_resend_cooldown_s"/>
+                                </group>
+                                <group class="ik_lw180">
+                                    <field name="email_otp_max_attempts"/>
+                                    <field name="email_otp_template_id" placeholder="Default template"/>
+                                </group>
+                            </group>
+
                             <group string="Cloudflare Worker Configuration">
                                 <div class="alert alert-info" role="alert" colspan="2">
                                     <i class="fa fa-info-circle"/> These settings only applies to the Cloudflare Worker.
@@ -294,7 +317,7 @@
                                     <field name="waf_bypass_revalidation_s" invisible="not bypass_waf_for_authenticated"/>
                                 </group>
                             </group>
-                            
+
                         </page>
                         
                         <page string="Helpers">

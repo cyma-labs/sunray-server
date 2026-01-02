@@ -94,17 +94,29 @@
                     </div>
 
                     <group string="URL Pattern Configuration" colspan="2">
-                        <field name="url_patterns" widget="text"
-                               placeholder="Regex patterns for URLs (one per line, # for comments)&#10;Examples:&#10;^/*  # Allow all requests&#10;^/api/webhook.*&#10;^/public/.*&#10;^/health$&#10;For WebSocket rules: patterns match WebSocket upgrade request path&#10;^/ws/chat/.*  # WebSocket path"/>
+                        <div class="alert alert-info" role="status">
+                            <p class="mb-1"><strong>URL Patterns:</strong> Regex patterns (one per line, <code>#</code> for comments)</p>
+                            <pre class="mb-1" style="background: transparent; border: none; padding: 0; margin: 0; font-size: 0.85em;">^/.*           # Allow all requests
+^/api/webhook.*
+^/public/.*
+^/health$</pre>
+                            <p class="mb-0"><strong>WebSocket:</strong> Patterns match the upgrade request path (e.g., <code>^/ws/chat/.*</code>)</p>
+                        </div>
+                        <field name="url_patterns" widget="inouk_ace" options="{'mode': 'python', 'theme': 'xcode'}"/>
                     </group>
 
-                    <group string="IP/CIDR Configuration" invisible="access_type != 'cidr'">
+                    <group string="IP/CIDR Configuration" invisible="access_type != 'cidr'" colspan="2">
+                        <div class="alert alert-info" role="status" colspan="2">
+                            <p class="mb-1"><strong>CIDR/IP:</strong> IP addresses or CIDR blocks (one per line, <code>#</code> for comments)</p>
+                            <pre class="mb-0" style="background: transparent; border: none; padding: 0; margin: 0; font-size: 0.85em;">192.168.1.0/24  # Office network
+234.170.10.5
+234.170.10.5/32  # Same as above</pre>
+                        </div>
                         <group>
-                            <field name="allowed_cidrs" widget="text"
-                                placeholder="CIDR blocks or IP for IP-based access (one per line, # for comments)&#10;Examples:&#10;192.168.1.0/24  # Office network&#10;234.170.10.5&#10;234.170.10.5/32  # Same as above"/>
+                            <field name="allowed_cidrs" widget="inouk_ace" options="{'mode': 'python', 'theme': 'xcode'}"/>
                         </group>
                         <group>
-                                <field name="parsed_allowed_cidrs" groups="base.group_no_one"/>
+                            <field name="parsed_allowed_cidrs" groups="base.group_no_one"/>
                         </group>
                     </group>
 

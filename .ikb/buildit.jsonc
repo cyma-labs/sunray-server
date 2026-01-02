@@ -81,7 +81,7 @@
                     "type": "git",
                     "repository": "https://github.com/cmorisse/inouk_api_auth.git",
                     "directory": "inouk_api_auth",
-                    "refspec": "13.0",
+                    "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },
                 "inouk_session_store": {
@@ -131,6 +131,14 @@
                     "type": "git",
                     "repository": "https://gitlab.com/cmorisse/inouk_odoo_cli.git",
                     "directory": "inouk_odoo_cli",
+                    "refspec": "18.0",
+                    "group": "parts/inouk_addons"
+                },
+                "inouk_ace_editor": {
+                    "install": true,
+                    "type": "git",
+                    "repository": "https://gitlab.com/cmorisse/inouk_ace_editor.git",
+                    "directory": "inouk_ace_editor",
                     "refspec": "18.0",
                     "group": "parts/inouk_addons"
                 },

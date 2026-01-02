@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <record id="access_rule_anthropic_claude" model="sunray.access.rule">
+            <field name="name">Anthropic - Claude.ai</field>
+            <field name="description">Allow Claude Desktop to call mcp</field>
+            <field name="access_type">cidr</field>
+            <field name="is_active" eval="True"/>
+            <field name="is_default_rule" eval="False"/>
+            <field name="url_patterns"><![CDATA[^/\.well-known/oauth-protected-resource$     # Resource Metadata (RFC 9728)
+^/\.well-known/oauth-authorization-server$   # Authorization Server Metadata (RFC 8414)
+^/oauth/authorize$                           # Authorization endpoint (user redirect)
+^/oauth/token$                               # Token endpoint (code → token exchange)
+^/oauth/register$                            # Dynamic Client Registration (RFC 7591)
+^/oauth/device/code$                         # Device Authorization Grant
+^/mcp$                                       # MCP endpoint principal]]></field>
+            <field name="allowed_cidrs">34.162.46.92/32
+34.162.102.82/32
+34.162.136.91/32
+34.162.142.92/32
+34.162.183.95/32</field>
+        </record>
+    </data>
+</odoo>

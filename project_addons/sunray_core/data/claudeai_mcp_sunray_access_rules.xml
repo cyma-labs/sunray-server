@@ -8,6 +8,7 @@
             <field name="access_type">cidr</field>
             <field name="is_active" eval="True"/>
             <field name="is_default_rule" eval="False"/>
+            <field name="is_system" eval="True"/>
             <field name="url_patterns"><![CDATA[^/\.well-known/oauth-protected-resource$     # Resource Metadata (RFC 9728)
 ^/\.well-known/oauth-authorization-server$   # Authorization Server Metadata (RFC 8414)
 ^/oauth/authorize$                           # Authorization endpoint (user redirect)
@@ -15,7 +16,11 @@
 ^/oauth/register$                            # Dynamic Client Registration (RFC 7591)
 ^/oauth/device/code$                         # Device Authorization Grant
 ^/mcp$                                       # MCP endpoint principal]]></field>
-            <field name="allowed_cidrs">34.162.46.92/32
+            <field name="allowed_cidrs"># https://platform.claude.com/docs/en/api/ip-addresses
+160.79.104.0/21
+
+# next will be phased out on 2026/01/15            
+34.162.46.92/32
 34.162.102.82/32
 34.162.136.91/32
 34.162.142.92/32

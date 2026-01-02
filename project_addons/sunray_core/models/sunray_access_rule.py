@@ -95,6 +95,13 @@ class SunrayAccessRule(models.Model):
              'Only used if "Default Rule" is enabled.'
     )
 
+    is_system = fields.Boolean(
+        string="System Rule",
+        default=False,
+        help="System rules are delivered with Sunray and should not be modified. "
+             "Clone them to create customized versions."
+    )
+
     # Usage tracking
     host_association_ids = fields.One2many(
         'sunray.host.access.rule',

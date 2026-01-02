@@ -13,6 +13,7 @@
                        decoration-warning="access_type == 'token'"/>
                 <field name="host_count" string="Used By"/>
                 <field name="is_active" widget="boolean_toggle"/>
+                <field name="is_system" optional="show"/>
                 <field name="create_date" optional="show"/>
                 <field name="write_date" optional="show"/>
             </list>
@@ -38,6 +39,9 @@
                 <separator/>
                 <filter name="used" string="In Use" domain="[('host_count', '>', 0)]"/>
                 <filter name="unused" string="Not Used" domain="[('host_count', '=', 0)]"/>
+                <separator/>
+                <filter name="system" string="System Rules" domain="[('is_system', '=', True)]"/>
+                <filter name="custom" string="Custom Rules" domain="[('is_system', '=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Access Type" name="group_by_access_type" context="{'group_by': 'access_type'}"/>
                     <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>
@@ -80,6 +84,7 @@
                         <group name="basic_info_right">
                             <field name="is_default_rule" />
                             <field name="default_priority" invisible="not is_default_rule"/>
+                            <field name="is_system" readonly="1"/>
                         </group>
                     </group>
 
@@ -116,7 +121,7 @@
                             <field name="allowed_cidrs" widget="inouk_ace" options="{'mode': 'python', 'theme': 'xcode'}"/>
                         </group>
                         <group>
-                            <field name="parsed_allowed_cidrs" groups="base.group_no_one"/>
+                            <field name="parsed_allowed_cidrs" widget="inouk_ace" options="{'mode': 'python', 'theme': 'xcode'}" groups="base.group_no_one"/>
                         </group>
                     </group>
 

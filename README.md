@@ -1,4 +1,4 @@
-# Sunray
+# Sunray Web Zero Trust
 
 **Sunray** is a comprehensive and affordable Web/HTTP Zero Trust access solution that combines enterprise-grade security with unprecedented deployment flexibility and ease of use. 
 

@@ -97,12 +97,16 @@
                 </xpath>
 
                 <!-- Add remote auth enabled column -->
-                <xpath expr="//field[@name='block_all_traffic']" position="after">
-                    <field name="deployment_mode" string="Deployment" optional="show" widget="boolean_toggle"/>
+                <xpath expr="//field[@name='passkey_enabled']" position="after">
                     <field name="remote_auth_enabled"
                            widget="boolean_toggle"
                            string="Remote Auth"
+                           readonly="1"
                            optional="show"/>
+                    <field name="deployment_mode"
+                           string="Deployment" 
+                           readonly="1"
+                           optional="show" widget="boolean_toggle"/>
                 </xpath>
             </field>
         </record>

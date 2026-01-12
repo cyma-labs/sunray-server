@@ -1,15 +1,38 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class SetupTokenWizard(models.TransientModel):
     _name = 'sunray.setup.token.wizard'
-    _description = 'Generate Setup Token'
-    
+    _description = 'Authorize User Wizard'
+
+    # Authorization mode selection
+    authorization_mode = fields.Selection(
+        selection=[
+            ('passkey', 'Passkey Authentication (Setup Token)'),
+            ('email', 'Email Login (No setup required)'),
+        ],
+        string='Authorization Mode',
+        help='Select how this user will authenticate to this host'
+    )
+
+    # Computed fields to track available modes (for view visibility)
+    passkey_mode_available = fields.Boolean(
+        compute='_compute_available_modes',
+        string='Passkey Mode Available'
+    )
+    email_mode_available = fields.Boolean(
+        compute='_compute_available_modes',
+        string='Email Mode Available'
+    )
+
+    # Passkey mode: single user
     user_id = fields.Many2one(
-        'sunray.user', 
-        required=True,
+        'sunray.user',
         string='User'
     )
     host_id = fields.Many2one(
@@ -20,7 +43,6 @@ class SetupTokenWizard(models.TransientModel):
     )
     device_name = fields.Char(
         string='Device Name',
-        required=True,
         help='Name to identify the device this token is for'
     )
     validity_hours = fields.Integer(
@@ -36,7 +58,7 @@ class SetupTokenWizard(models.TransientModel):
         help='Number of times this token can be used'
     )
     
-    # Display fields
+    # Passkey mode: display fields
     generated_token = fields.Char(
         string='Generated Token',
         readonly=True
@@ -46,10 +68,76 @@ class SetupTokenWizard(models.TransientModel):
         readonly=True
     )
 
+    # Email mode: multiple users selection
+    email_user_ids = fields.Many2many(
+        'sunray.user',
+        'sunray_authorize_wizard_user_rel',
+        'wizard_id',
+        'user_id',
+        string='Users to Authorize',
+        help='Select users to authorize for email login on this host'
+    )
+
+    # Email mode: send welcome email flag
+    send_welcome_email = fields.Boolean(
+        string='Send Welcome Email',
+        default=True,
+        help='Send an email notification to newly authorized users'
+    )
+
+    # Email mode: display fields
+    email_authorization_success = fields.Boolean(
+        string='Authorization Complete',
+        default=False
+    )
+    email_authorization_result = fields.Text(
+        string='Authorization Result',
+        readonly=True
+    )
+
+    # Error state
+    no_login_methods_error = fields.Boolean(
+        compute='_compute_no_login_methods_error',
+        string='No Login Methods Available'
+    )
+
+    @api.depends('host_id')
+    def _compute_available_modes(self):
+        for record in self:
+            if record.host_id:
+                record.passkey_mode_available = record.host_id.passkey_enabled
+                record.email_mode_available = record.host_id.enable_email_login
+            else:
+                record.passkey_mode_available = False
+                record.email_mode_available = False
+
+    @api.depends('host_id')
+    def _compute_no_login_methods_error(self):
+        for record in self:
+            if record.host_id:
+                record.no_login_methods_error = (
+                    not record.host_id.passkey_enabled and
+                    not record.host_id.enable_email_login
+                )
+            else:
+                record.no_login_methods_error = False
+
     @api.model
     def default_get(self, fields_list):
-        """Load default values from system parameters"""
+        """Load default values from system parameters and set authorization mode"""
         defaults = super().default_get(fields_list)
+
+        # Set default authorization mode based on host config
+        if 'authorization_mode' in fields_list:
+            host_id = self.env.context.get('default_host_id')
+            if host_id:
+                host_obj = self.env['sunray.host'].browse(host_id)
+                if host_obj.exists():
+                    # Default to passkey if enabled, otherwise email
+                    if host_obj.passkey_enabled:
+                        defaults['authorization_mode'] = 'passkey'
+                    elif host_obj.enable_email_login:
+                        defaults['authorization_mode'] = 'email'
 
         # Load defaults from settings
         if 'device_name' in fields_list:
@@ -138,3 +226,91 @@ class SetupTokenWizard(models.TransientModel):
             'target': 'new',
             'context': self.env.context,
         }
+
+    def action_authorize_email_users(self):
+        """Authorize users for email login without setup token"""
+        self.ensure_one()
+
+        if not self.email_user_ids:
+            raise UserError('Please select at least one user to authorize.')
+
+        host_obj = self.host_id
+        authorized_users = []
+        already_authorized = []
+
+        for user_obj in self.email_user_ids:
+            if user_obj in host_obj.user_ids:
+                already_authorized.append(user_obj.username)
+            else:
+                # Add user to host's authorized users
+                host_obj.write({
+                    'user_ids': [(4, user_obj.id)]
+                })
+                authorized_users.append(user_obj)
+
+                # Log audit event
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type='host.user_authorized',
+                    details={
+                        'username': user_obj.username,
+                        'email': user_obj.email,
+                        'host': host_obj.domain,
+                        'authorization_mode': 'email',
+                    },
+                    sunray_user_id=user_obj.id,
+                    username=user_obj.username
+                )
+
+        # Send welcome email notifications if enabled
+        if authorized_users and self.send_welcome_email:
+            self._send_welcome_emails(authorized_users, host_obj)
+
+        # Prepare notification message
+        message_parts = []
+        if authorized_users:
+            usernames = [u.username for u in authorized_users]
+            message_parts.append(
+                f"Successfully authorized {len(authorized_users)} user(s): {', '.join(usernames)}"
+            )
+        if already_authorized:
+            message_parts.append(f"Already authorized: {', '.join(already_authorized)}")
+
+        # Commit to ensure changes are visible
+        self.env.cr.commit()
+
+        # Close wizard and show notification
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Users Authorized',
+                'message': '\n'.join(message_parts),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+    def _send_welcome_emails(self, authorized_users, host_obj):
+        """Send welcome email to newly authorized users"""
+        template = self.env.ref(
+            'sunray_core.mail_template_user_welcome',
+            raise_if_not_found=False
+        )
+        if not template:
+            _logger.info("Welcome email template not found, skipping email notifications")
+            return
+
+        for user_obj in authorized_users:
+            if user_obj.email:
+                try:
+                    template.with_context(
+                        recipient_email=user_obj.email,
+                        recipient_name=user_obj.username,
+                    ).send_mail(
+                        host_obj.id,
+                        email_values={'email_to': user_obj.email},
+                        force_send=True
+                    )
+                    _logger.info(f"Welcome email sent to {user_obj.email} for host {host_obj.domain}")
+                except Exception as e:
+                    _logger.warning(f"Failed to send welcome email to {user_obj.email}: {e}")

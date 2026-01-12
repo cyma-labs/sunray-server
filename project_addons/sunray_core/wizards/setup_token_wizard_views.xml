@@ -6,19 +6,66 @@
         <field name="model">sunray.setup.token.wizard</field>
         <field name="arch" type="xml">
             <form>
-                <!-- Show input fields when no token is generated yet -->
-                <group invisible="generated_token">
-                    <field name="user_id" options="{'no_create': True}"/>
-                    <field name="host_id" options="{'no_create': True}"/>
-                    <field name="device_name" placeholder="e.g., John's Laptop, iPhone 15"/>
+                <!-- Error banner: No login methods enabled -->
+                <div class="alert alert-danger" role="alert"
+                     invisible="not no_login_methods_error">
+                    <h4><i class="fa fa-exclamation-triangle"/> No Login Methods Enabled</h4>
+                    <p>This protected host has no login methods enabled.</p>
+                    <p>Please enable <strong>Passkey Authentication</strong> or <strong>Email Login</strong>
+                       in the host's Login configuration tab before authorizing users.</p>
+                </div>
+
+                <!-- Main wizard content (hidden when error or showing results) -->
+                <group invisible="no_login_methods_error or generated_token or email_authorization_success">
+                    <!-- Hidden computed fields for availability -->
+                    <field name="passkey_mode_available" invisible="1"/>
+                    <field name="email_mode_available" invisible="1"/>
+
+                    <!-- Host display and authorization mode selection -->
+                    <group>
+                        <field name="host_id" options="{'no_create': True}" readonly="0"/>
+                        <field name="authorization_mode" widget="radio" required="1"/>
+                    </group>
+                </group>
+
+                <!-- Passkey mode fields -->
+                <group string="Passkey Setup Token"
+                       invisible="authorization_mode != 'passkey'"
+                       class="ik_lw180" >
+
+                    <field name="user_id"
+                            options="{'no_create': True}"
+                            domain="[('is_active', '=', True)]"
+                            required="authorization_mode == 'passkey'"/>
+                    <field name="device_name"
+                            placeholder="e.g., John's Laptop, iPhone 15"
+                            required="authorization_mode == 'passkey'"/>
                     <field name="validity_hours"/>
                     <field name="max_uses"/>
-                    <field name="allowed_cidrs" widget="text" placeholder="Optional: IP addresses or CIDR ranges per line&#10;Examples:&#10;192.168.1.100&#10;192.168.1.100/32&#10;10.0.0.0/8"/>
+                    <field name="allowed_cidrs" widget="text"
+                            placeholder="Optional: IP addresses or CIDR ranges per line&#10;Examples:&#10;192.168.1.100&#10;192.168.1.100/32&#10;10.0.0.0/8"/>
                 </group>
-                
-                <!-- Show token and instructions when generated -->
+
+                <!-- Email mode fields -->
+                <group string="Email Login Authorization"
+                       invisible="authorization_mode != 'email'"
+                       class="ik_lw180" >
+                    <div class="alert alert-info" role="alert" colspan="2">
+                        <p><strong>Email Login Authorization</strong> <br/>
+                        Users selected below will be authorized to log in to this host using their email address.<br/>
+                        They will receive an OTP code by email each time they log in.<br/>
+                        No setup token is required for email-based authentication.</p>
+                    </div>
+                    <field name="email_user_ids"
+                            widget="many2many_tags"
+                            options="{'no_create': True}"
+                            domain="[('is_active', '=', True)]"
+                            placeholder="Select users to authorize..."/>
+                    <field name="send_welcome_email"/>
+                </group>
+
+                <!-- Passkey mode: Token generated result -->
                 <div invisible="not generated_token">
-                    <!-- Token display with monospace font for readability -->
                     <div class="alert alert-info" role="alert">
                         <h5><i class="fa fa-key"/> Setup Token</h5>
                         <div style="font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; letter-spacing: 1px; background: #f8f9fa; padding: 10px; border: 1px dashed #6c757d; border-radius: 4px; text-align: center; margin: 10px 0;">
@@ -26,28 +73,44 @@
                         </div>
                         <small class="text-muted"><i class="fa fa-info-circle"/> Click to select, then copy (Ctrl+C)</small>
                     </div>
-                    
-                    <!-- Instructions -->
+
                     <div class="alert alert-success" role="alert">
                         <field name="token_display" readonly="1" widget="text" nolabel="1"/>
                     </div>
                 </div>
-                
-                <!-- Hidden field to track state -->
+
+                <!-- Hidden tracking fields -->
                 <field name="generated_token" invisible="1"/>
-                
+                <field name="no_login_methods_error" invisible="1"/>
+
                 <footer>
-                    <button name="generate_token" string="Generate Token" type="object" class="btn-primary" invisible="generated_token"/>
-                    <button string="Close" class="btn-primary" special="cancel" invisible="not generated_token"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel" invisible="generated_token"/>
+                    <!-- Passkey mode button -->
+                    <button name="generate_token"
+                            string="Authorize User"
+                            type="object"
+                            class="btn-primary"
+                            invisible="generated_token or no_login_methods_error or authorization_mode != 'passkey'"/>
+
+                    <!-- Email mode button (closes wizard after authorization) -->
+                    <button name="action_authorize_email_users"
+                            string="Authorize and Close"
+                            type="object"
+                            class="btn-primary"
+                            invisible="generated_token or no_login_methods_error or authorization_mode != 'email'"/>
+
+                    <!-- Close/Cancel buttons -->
+                    <button string="Close" class="btn-primary" special="cancel"
+                            invisible="not generated_token"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            invisible="generated_token"/>
                 </footer>
             </form>
         </field>
     </record>
-    
+
     <!-- Wizard Action -->
     <record id="action_sunray_setup_token_wizard" model="ir.actions.act_window">
-        <field name="name">Generate Setup Token</field>
+        <field name="name">Authorize User</field>
         <field name="res_model">sunray.setup.token.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>

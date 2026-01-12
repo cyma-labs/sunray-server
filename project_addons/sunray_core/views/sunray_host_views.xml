@@ -7,11 +7,13 @@
         <field name="arch" type="xml">
             <list>
                 <field name="id" optional="hide"/>
-                <field name="domain" optional="hide"/>
-                <field name="backend_url" optional="show" widget="url"/>
-                <field name="is_active" string="Active" widget="boolean_toggle"/>
-                <field name="block_all_traffic" string="Block Traffic" widget="boolean_toggle"/>
-                <field name="sunray_worker_id" string="Worker" optional="show"/>
+                <field name="domain" optional="show"/>
+                <field name="backend_url" optional="hide" widget="url"/>
+                <field name="is_active" string="Active" readonly="1" widget="boolean_toggle"/>
+                <field name="sunray_worker_id" string="Sunray Worker" optional="show"/>
+                <field name="block_all_traffic" string="Block Traffic" readonly="1" widget="boolean_toggle"/>
+                <field name="enable_email_login" string="Email login?" widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="passkey_enabled" string="Passkeys?" widget="boolean_toggle" readonly="1" optional="show"/>
                 <field name="pending_worker_name" string="Pending Worker" optional="hide"/>
                 <field name="migration_pending_duration" string="Migration Pending" optional="hide"/>
                 <field name="last_migration_ts" string="Last Migration" optional="hide"/>
@@ -57,9 +59,9 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="%(action_sunray_setup_token_wizard)d" string="Generate Setup Token" icon="fa-key" type="action" class="btn-warning"
+                    <button name="%(action_sunray_setup_token_wizard)d" string="Authorize User" icon="fa-user-plus" type="action" class="btn-warning"
                             context="{'default_host_id': id}"
-                            help="Generate a new setup token for a user to register their device for this host"/>
+                            help="Authorize a user for passkey or email login on this host"/>
                     <button name="force_cache_refresh" string="Force Config Refresh" icon="fa-refresh" type="object" class="btn-warning"
                             help="Forces the worker to immediately refresh its cached configuration for this host. Use this after making changes to access rules, webhook tokens, or other host settings that need to take effect immediately. This does not affect user sessions - users remain logged in."
                             confirm="This will immediately invalidate cached configuration for this host. Continue?"/>

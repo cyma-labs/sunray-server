@@ -36,10 +36,13 @@ class SunrayAuditLog(models.Model):
         # Host Events
         ('host.activated', 'Host Activated'),
         ('host.deactivated', 'Host Deactivated'),
-        
+
         ('host.lockdown.activated', 'Security lockdown enabled'),
         ('host.lockdown.deactivated', 'Security lockdown disabled'),
-        
+
+        # User Authorization Events
+        ('host.user_authorized', 'User Authorized for Host'),
+
         # Token Management Events
         ('token.generated', 'Token Generated'),
         ('token.consumed', 'Token Consumed'),

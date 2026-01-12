@@ -797,14 +797,61 @@ sunray_core/
   # DON'T DO THIS - Odoo provides these automatically:
   # created_by = fields.Many2one('res.users')  # Use create_uid instead
   # created_date = fields.Datetime()           # Use create_date instead
-  # modified_by = fields.Many2one('res.users') # Use write_uid instead  
+  # modified_by = fields.Many2one('res.users') # Use write_uid instead
   # modified_date = fields.Datetime()          # Use write_date instead
-  
+
   # These fields are automatically available on all models:
   # - create_uid: User who created the record
   # - create_date: When the record was created
   # - write_uid: User who last modified the record
   # - write_date: When the record was last modified
+  ```
+
+- **XML Record IDs**: Use double underscore (`__`) separator for XML IDs
+  ```xml
+  <!-- View IDs: {{object_name}}__{{view_type}} -->
+  <record id="sunray_host__formview" model="ir.ui.view">
+  <record id="sunray_host__treeview" model="ir.ui.view">
+  <record id="sunray_host__searchview" model="ir.ui.view">
+  <record id="sunray_host__kanbanview" model="ir.ui.view">
+
+  <!-- Action IDs: {{object_name}}__actwindow -->
+  <record id="sunray_host__actwindow" model="ir.actions.act_window">
+
+  <!-- Menu IDs: {{object_name}}__menu OR {{menu_name}}__menu -->
+  <menuitem id="sunray_host__menu" .../>
+
+  <!-- Wizard IDs follow same pattern -->
+  <record id="authorize_users_wizard__formview" model="ir.ui.view">
+  <record id="authorize_users_wizard__actwindow" model="ir.actions.act_window">
+
+  <!-- Embedded views in form/tree don't need separate IDs -->
+  ```
+
+- **Model Technical Names**: Use `sunray.` prefix for all Sunray models
+  ```python
+  # Main models: sunray.{{object_name}}
+  _name = 'sunray.host'
+  _name = 'sunray.user'
+  _name = 'sunray.session'
+
+  # Association models: sunray.{{parent}}.{{child}}
+  _name = 'sunray.host.access.rule'
+
+  # Wizards: sunray.{{wizard_name}}.wizard
+  _name = 'sunray.authorize.users.wizard'
+  ```
+
+- **Selection Widget for Boolean Choices**: Use `selection` field with radio widget for yes/no choices
+  ```python
+  # DON'T DO THIS for user choices:
+  is_enabled = fields.Boolean(string='Enabled')
+
+  # DO THIS instead - clearer UI with radio buttons:
+  auth_mode = fields.Selection([
+      ('passkey', 'Passkey Authentication'),
+      ('email', 'Email Login'),
+  ], string='Authentication Mode')
   ```
 
 ### Field Format Pattern

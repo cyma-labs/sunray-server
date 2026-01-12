@@ -59,7 +59,7 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="%(action_sunray_setup_token_wizard)d" string="Authorize User" icon="fa-user-plus" type="action" class="btn-warning"
+                    <button name="%(authorize_users_wizard__actwindow)d" string="Authorize User" icon="fa-user-plus" type="action" class="btn-warning"
                             context="{'default_host_id': id}"
                             help="Authorize a user for passkey or email login on this host"/>
                     <button name="force_cache_refresh" string="Force Config Refresh" icon="fa-refresh" type="object" class="btn-warning"

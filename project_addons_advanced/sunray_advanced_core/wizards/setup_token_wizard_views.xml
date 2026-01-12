@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Extend the wizard form to add email fields -->
-    <record id="view_sunray_setup_token_wizard_form_enterprise" model="ir.ui.view">
-        <field name="name">sunray.setup.token.wizard.form.enterprise</field>
-        <field name="model">sunray.setup.token.wizard</field>
-        <field name="inherit_id" ref="sunray_core.view_sunray_setup_token_wizard_form"/>
+    <record id="authorize_users_wizard__formview_enterprise" model="ir.ui.view">
+        <field name="name">sunray.authorize.users.wizard.form.enterprise</field>
+        <field name="model">sunray.authorize.users.wizard</field>
+        <field name="inherit_id" ref="sunray_core.authorize_users_wizard__formview"/>
         <field name="arch" type="xml">
             <!-- Add email option before the end of the first group -->
             <field name="allowed_cidrs" position="after">

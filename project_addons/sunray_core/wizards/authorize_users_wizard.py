@@ -6,8 +6,8 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 
-class SetupTokenWizard(models.TransientModel):
-    _name = 'sunray.setup.token.wizard'
+class AuthorizeUsersWizard(models.TransientModel):
+    _name = 'sunray.authorize.users.wizard'
     _description = 'Authorize User Wizard'
 
     # Authorization mode selection
@@ -220,7 +220,7 @@ class SetupTokenWizard(models.TransientModel):
         # Return wizard action to show the token
         return {
             'type': 'ir.actions.act_window',
-            'res_model': 'sunray.setup.token.wizard',
+            'res_model': 'sunray.authorize.users.wizard',
             'view_mode': 'form',
             'res_id': self.id,
             'target': 'new',

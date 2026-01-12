@@ -2,8 +2,8 @@
 from odoo import models, fields, api
 
 
-class SetupTokenWizardEnterprise(models.TransientModel):
-    _inherit = 'sunray.setup.token.wizard'
+class AuthorizeUsersWizardEnterprise(models.TransientModel):
+    _inherit = 'sunray.authorize.users.wizard'
 
     # Email fields
     send_email = fields.Boolean(
@@ -23,7 +23,7 @@ class SetupTokenWizardEnterprise(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         """Set default send_email from system config"""
-        res = super(SetupTokenWizardEnterprise, self).default_get(fields_list)
+        res = super(AuthorizeUsersWizardEnterprise, self).default_get(fields_list)
         if 'send_email' in fields_list:
             send_email_default = self.env['ir.config_parameter'].sudo().get_param(
                 'sunray.setup_token_send_email_default',
@@ -35,7 +35,7 @@ class SetupTokenWizardEnterprise(models.TransientModel):
     def generate_token(self):
         """Override to add email sending"""
         # Call parent to generate token
-        result = super(SetupTokenWizardEnterprise, self).generate_token()
+        result = super(AuthorizeUsersWizardEnterprise, self).generate_token()
 
         # Send email if requested
         if self.send_email and self.generated_token:

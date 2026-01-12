@@ -130,8 +130,8 @@ class SunrayUser(models.Model):
         """Open wizard to generate a new setup token"""
         return {
             'type': 'ir.actions.act_window',
-            'name': 'Generate Setup Token',
-            'res_model': 'sunray.setup.token.wizard',
+            'name': 'Authorize User',
+            'res_model': 'sunray.authorize.users.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {

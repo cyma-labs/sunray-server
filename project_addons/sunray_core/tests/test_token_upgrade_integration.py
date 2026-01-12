@@ -49,7 +49,7 @@ class TestTokenUpgradeIntegration(TransactionCase):
         self.assertEqual(len(token_value), 29)  # 25 chars + 4 dashes
         
         # Phase 2: Wizard Display Test
-        wizard = self.env['sunray.setup.token.wizard'].create({
+        wizard = self.env['sunray.authorize.users.wizard'].create({
             'user_id': self.user_obj.id,
             'host_id': self.host_obj.id,
             'device_name': 'Wizard Test Device',
@@ -63,7 +63,7 @@ class TestTokenUpgradeIntegration(TransactionCase):
         
         # Verify wizard response
         self.assertEqual(result['type'], 'ir.actions.act_window')
-        self.assertEqual(result['res_model'], 'sunray.setup.token.wizard')
+        self.assertEqual(result['res_model'], 'sunray.authorize.users.wizard')
         self.assertTrue(wizard.generated_token)
         self.assertTrue(wizard.token_display)
         
@@ -323,7 +323,7 @@ class TestTokenUpgradeIntegration(TransactionCase):
     def test_07_wizard_integration(self):
         """Test wizard integration with new token format"""
         # Test wizard creation and token generation
-        wizard = self.env['sunray.setup.token.wizard'].create({
+        wizard = self.env['sunray.authorize.users.wizard'].create({
             'user_id': self.user_obj.id,
             'host_id': self.host_obj.id,
             'device_name': 'Wizard Integration Test',

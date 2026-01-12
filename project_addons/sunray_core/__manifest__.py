@@ -53,7 +53,7 @@ Technical Components:
         'data/claudeai_mcp_sunray_access_rules.xml',
         
         # Wizards (must be loaded before views that reference them)
-        'wizards/setup_token_wizard_views.xml',
+        'wizards/authorize_users_wizard_views.xml',
         'wizards/session_revoke_wizard_views.xml',
         'wizards/user_sessions_revoke_wizard_views.xml',
         

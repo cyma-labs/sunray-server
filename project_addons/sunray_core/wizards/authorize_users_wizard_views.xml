@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Wizard Form View -->
-    <record id="view_sunray_setup_token_wizard_form" model="ir.ui.view">
-        <field name="name">sunray.setup.token.wizard.form</field>
-        <field name="model">sunray.setup.token.wizard</field>
+    <record id="authorize_users_wizard__formview" model="ir.ui.view">
+        <field name="name">sunray.authorize.users.wizard.form</field>
+        <field name="model">sunray.authorize.users.wizard</field>
         <field name="arch" type="xml">
             <form>
                 <!-- Error banner: No login methods enabled -->
@@ -109,9 +109,9 @@
     </record>
 
     <!-- Wizard Action -->
-    <record id="action_sunray_setup_token_wizard" model="ir.actions.act_window">
+    <record id="authorize_users_wizard__actwindow" model="ir.actions.act_window">
         <field name="name">Authorize User</field>
-        <field name="res_model">sunray.setup.token.wizard</field>
+        <field name="res_model">sunray.authorize.users.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

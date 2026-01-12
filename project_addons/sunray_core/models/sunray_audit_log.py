@@ -3,6 +3,7 @@ from odoo import models, fields, api
 from datetime import timedelta
 import json
 import uuid
+import yaml
 
 
 class SunrayAuditLog(models.Model):
@@ -201,7 +202,12 @@ class SunrayAuditLog(models.Model):
         string='Details',
         help='JSON field for extra data'
     )
-    
+    details_yaml = fields.Text(
+        string='Details (YAML)',
+        compute='_compute_details_yaml',
+        help='Event details displayed in YAML format'
+    )
+
     # Severity for security events
     severity = fields.Selection([
         ('info', 'Info'),
@@ -235,7 +241,25 @@ class SunrayAuditLog(models.Model):
                 vals['sunray_admin_user_id'] = self.env.context.get('sunray_admin_user_id')
         
         return super().create(vals_list)
-    
+
+    @api.depends('details')
+    def _compute_details_yaml(self):
+        """Convert JSON details to YAML for display."""
+        for record in self:
+            if record.details:
+                try:
+                    data = json.loads(record.details)
+                    record.details_yaml = yaml.dump(
+                        data,
+                        default_flow_style=False,
+                        allow_unicode=True,
+                        sort_keys=False
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    record.details_yaml = record.details
+            else:
+                record.details_yaml = ''
+
     @api.model
     def _get_or_create_request_id(self, request=None):
         """Generate or extract request ID for correlation

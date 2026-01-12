@@ -101,7 +101,8 @@
                     
                     <group string="Event Details">
                         <field name="user_agent" readonly="1"/>
-                        <field name="details" readonly="1" widget="text"/>
+                        <!-- cloud_editor_dark, cobalt, xcode-->
+                        <field name="details_yaml" readonly="1" widget="inouk_ace" options="{'mode': 'yaml', 'theme': 'xcode'}"/>
                     </group>
                 </sheet>
             </form>

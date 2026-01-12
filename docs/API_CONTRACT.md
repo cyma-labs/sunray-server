@@ -1498,8 +1498,7 @@ curl -X DELETE https://sunray.example.com/sunray-srvr/v1/sessions/sess_abc123 \
 **Response**:
 ```json
 {
-  "success": true,
-  "audit_id": 12345
+  "success": true
 }
 ```
 

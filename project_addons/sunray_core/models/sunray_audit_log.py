@@ -88,6 +88,7 @@ class SunrayAuditLog(models.Model):
         ('webhook.used', 'Webhook Token Used'),
         ('webhook.regenerated', 'Webhook Token Regenerated'),
         # API Key Events
+        ('api_key.used', 'API Key Used'),
         ('api_key.created', 'API Key Created'),
         ('api_key.regenerated', 'API Key Regenerated'),
         ('api_key.deleted', 'API Key Deleted'),
@@ -376,7 +377,51 @@ class SunrayAuditLog(models.Model):
             vals['username'] = username
             
         return self.create(vals)
-    
+
+    def _build_audit_sql_params(self, event_type, details, ip_address, event_source, severity):
+        """Build SQL INSERT parameters for audit log (shared by log_event_fast methods)."""
+        return [
+            event_type,
+            json.dumps(details) if isinstance(details, dict) else details,
+            ip_address,
+            event_source,
+            severity,
+            self.env.uid,
+            self.env.uid
+        ]
+
+    @api.model
+    def log_event_fast(self, event_type, details, ip_address=None, event_source='api', severity='info'):
+        """INSERT SQL direct - fire and forget, no ORM overhead, no cache invalidation.
+
+        Use for high-frequency events where we don't need the created record.
+        ~10x faster than create_audit_event().
+        """
+        self.env.cr.execute("""
+            INSERT INTO sunray_audit_log
+            (event_type, timestamp, details, ip_address, event_source, severity,
+             create_date, write_date, create_uid, write_uid)
+            VALUES (%s, NOW() AT TIME ZONE 'UTC', %s, %s, %s, %s,
+                    NOW() AT TIME ZONE 'UTC', NOW() AT TIME ZONE 'UTC', %s, %s)
+        """, self._build_audit_sql_params(event_type, details, ip_address, event_source, severity))
+        # No return - fire and forget
+
+    @api.model
+    def log_event_fast_with_id(self, event_type, details, ip_address=None, event_source='api', severity='info'):
+        """INSERT SQL direct avec retour de l'ID.
+
+        Use when you need the audit record ID but still want to bypass ORM.
+        """
+        self.env.cr.execute("""
+            INSERT INTO sunray_audit_log
+            (event_type, timestamp, details, ip_address, event_source, severity,
+             create_date, write_date, create_uid, write_uid)
+            VALUES (%s, NOW() AT TIME ZONE 'UTC', %s, %s, %s, %s,
+                    NOW() AT TIME ZONE 'UTC', NOW() AT TIME ZONE 'UTC', %s, %s)
+            RETURNING id
+        """, self._build_audit_sql_params(event_type, details, ip_address, event_source, severity))
+        return self.env.cr.fetchone()[0]
+
     @api.model
     def create_security_event(self, event_type, details, severity='warning', 
                             sunray_admin_user_id=None, sunray_user_id=None, 

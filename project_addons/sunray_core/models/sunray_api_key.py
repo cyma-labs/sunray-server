@@ -71,15 +71,18 @@ class SunrayApiKey(models.Model):
         help='Toggle to show full API key'
     )
     
-    # Usage tracking
+    # Usage tracking (computed from audit log)
     last_used = fields.Datetime(
         string='Last Used',
-        help='Last time this API key was used'
+        compute='_compute_usage_stats',
+        store=False,
+        help='Last time this API key was used (computed from audit log)'
     )
     usage_count = fields.Integer(
-        string='Usage Count', 
-        default=0,
-        help='Number of API calls made with this key'
+        string='Usage Count',
+        compute='_compute_usage_stats',
+        store=False,
+        help='Number of API calls made with this key (computed from audit log)'
     )
     
     _sql_constraints = [
@@ -100,7 +103,29 @@ class SunrayApiKey(models.Model):
                     record.key_display = f"{record.key[:8]}...{record.key[-4:]}"
                 else:
                     record.key_display = record.key[:4] + '...' if len(record.key) > 4 else record.key
-    
+
+    def _compute_usage_stats(self):
+        """Batch query avec GROUP BY pour éviter N+1."""
+        if not self:
+            return
+
+        self.env.cr.execute("""
+            SELECT details::jsonb->>'api_key_id' as api_key_id,
+                   MAX(timestamp) as last_used,
+                   COUNT(*) as usage_count
+            FROM sunray_audit_log
+            WHERE event_type = 'api_key.used'
+              AND details::jsonb->>'api_key_id' = ANY(%s)
+            GROUP BY details::jsonb->>'api_key_id'
+        """, [[str(r.id) for r in self]])
+
+        results = {row[0]: (row[1], row[2]) for row in self.env.cr.fetchall()}
+
+        for record in self:
+            data = results.get(str(record.id), (None, 0))
+            record.last_used = data[0]
+            record.usage_count = data[1]
+
     @api.model_create_multi
     def create(self, vals_list):
         """Override create to auto-generate key if not provided"""
@@ -172,34 +197,43 @@ class SunrayApiKey(models.Model):
         }
     
     def track_usage(self, worker_name=None, ip_address=None):
-        """Update usage statistics and auto-register worker if needed
-        
+        """Log usage via SQL INSERT (no ORM, no concurrency issues).
+
+        Usage stats (last_used, usage_count) are computed from audit log.
+
         Args:
             worker_name: Optional worker identifier from X-Worker-ID header
             ip_address: Optional IP address of the requester
         """
-        # Update usage stats
-        self.write({
-            'last_used': fields.Datetime.now(),
-            'usage_count': self.usage_count + 1
-        })
-        
+        # Log usage via fast SQL INSERT
+        self.env['sunray.audit.log'].log_event_fast(
+            event_type='api_key.used',
+            details={
+                'api_key_id': self.id,
+                'api_key_name': self.name,
+                'worker_name': worker_name
+            },
+            ip_address=ip_address,
+            event_source='api'
+        )
+
         # Auto-register worker if worker_name provided and this is a worker key
+        # (called once per worker, not every request)
         if worker_name and self.api_key_type == 'worker':
             worker_obj = self.env['sunray.worker'].auto_register(
                 worker_name=worker_name,
                 api_key_obj=self,
                 ip_address=ip_address
             )
-            
+
             # Link this API key to the worker if not already linked
             if not self.worker_id and worker_obj:
                 self.worker_id = worker_obj
-                
+
                 # Update owner_name if not set
                 if not self.owner_name:
                     self.owner_name = worker_name
-        
+
         return True
     
     def has_scope(self, required_scope):

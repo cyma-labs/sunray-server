@@ -8,6 +8,8 @@ import secrets
 from odoo import models, fields, api
 from datetime import datetime, timedelta
 
+_logger = logging.getLogger(__name__)
+
 
 class SunraySetupToken(models.Model):
     _name = 'sunray.setup.token'
@@ -263,35 +265,43 @@ class SunraySetupToken(models.Model):
     
     def consume(self):
         """
-        Consume this token by incrementing usage count and marking as consumed if max uses reached.
-        
-        This method encapsulates all token consumption logic and should be called after
-        successful passkey registration.
-        
+        Consume this token atomically using SQL UPDATE with RETURNING.
+
+        This avoids read-modify-write race conditions by doing the increment
+        directly in SQL.
+
         Returns:
             dict: {'consumed': bool, 'current_uses': int, 'max_uses': int}
         """
         self.ensure_one()
-        import logging
-        _logger = logging.getLogger(__name__)
-        
         _logger.info(f"Consuming token {self.id}, current uses: {self.current_uses}")
-        new_uses = self.current_uses + 1
-        token_consumed = new_uses >= self.max_uses
-        
-        self.write({
-            'current_uses': new_uses,
-            'consumed': token_consumed,
-            'consumed_date': fields.Datetime.now() if token_consumed else False
-        })
-        
-        _logger.info(f"Token updated: uses={new_uses}/{self.max_uses}, consumed={token_consumed}")
-        
-        return {
-            'consumed': token_consumed,
-            'current_uses': new_uses,
-            'max_uses': self.max_uses
+
+        self.env.cr.execute("""
+            UPDATE sunray_setup_token
+            SET current_uses = current_uses + 1,
+                consumed = (current_uses + 1 >= max_uses),
+                consumed_date = CASE
+                    WHEN (current_uses + 1 >= max_uses) THEN NOW() AT TIME ZONE 'UTC'
+                    ELSE consumed_date
+                END,
+                write_date = NOW() AT TIME ZONE 'UTC',
+                write_uid = %s
+            WHERE id = %s
+            RETURNING current_uses, max_uses, consumed
+        """, [self.env.uid, self.id])
+
+        row = self.env.cr.fetchone()
+
+        # Invalidate ORM cache for this record
+        self.invalidate_recordset(['current_uses', 'consumed', 'consumed_date'])
+
+        _result = {
+            'current_uses': row[0],
+            'max_uses': row[1],
+            'consumed': row[2],
         }
+        _logger.info(f"Token updated: uses={_result['current_uses']}/{_result['max_uses']}, consumed={_result['consumed']}")
+        return _result
     
     @api.model
     def validate_setup_token(self, username, token_hash, host_domain, client_ip=None, user_agent=None, worker_id=None):

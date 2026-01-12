@@ -1096,22 +1096,24 @@ class SunrayRESTController(http.Controller):
                 details['host'] = data.get('host')
             details['api_key_id'] = api_key_obj.id
         
-        # Create unified audit log entry
-        audit_record = request.env['sunray.audit.log'].sudo().create_audit_event(
+        # Add context fields to details for log_event_fast
+        if data.get('username'):
+            details['username'] = data.get('username')
+        if data.get('user_agent'):
+            details['user_agent'] = data.get('user_agent')
+        if context_data.get('worker_id'):
+            details['worker_id'] = context_data['worker_id']
+
+        # Create audit log entry via fast SQL INSERT (no ORM overhead)
+        request.env['sunray.audit.log'].sudo().log_event_fast(
             event_type=event_type,
             details=details,
-            username=data.get('username'),
             ip_address=data.get('ip_address') or request.httprequest.environ.get('REMOTE_ADDR'),
-            user_agent=data.get('user_agent'),
-            severity=data.get('severity', 'info'),
-            sunray_worker=context_data['worker_id'],
-            event_source='worker'
+            event_source='worker',
+            severity=data.get('severity', 'info')
         )
-        
-        return self._json_response({
-            'success': True,
-            'audit_id': audit_record.id
-        })
+
+        return self._json_response({'success': True})
 
     # -------------------------------------------------------------------------
     # Email OTP Authentication Endpoints

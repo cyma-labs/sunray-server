@@ -31,12 +31,15 @@ class SunrayWebhookToken(models.Model):
     )
     last_used = fields.Datetime(
         string='Last Used',
-        help='Last time this token was used'
+        compute='_compute_usage_stats',
+        store=False,
+        help='Last time this token was used (computed from audit log)'
     )
     usage_count = fields.Integer(
-        default=0,
         string='Usage Count',
-        help='Number of times this token has been used'
+        compute='_compute_usage_stats',
+        store=False,
+        help='Number of times this token has been used (computed from audit log)'
     )
 
     # UI display helper field
@@ -51,6 +54,28 @@ class SunrayWebhookToken(models.Model):
         for record in self:
             pass
             #record.show_full_token = record.show_full_token
+
+    def _compute_usage_stats(self):
+        """Batch query avec GROUP BY pour éviter N+1."""
+        if not self:
+            return
+
+        self.env.cr.execute("""
+            SELECT details::jsonb->>'token_id' as token_id,
+                   MAX(timestamp) as last_used,
+                   COUNT(*) as usage_count
+            FROM sunray_audit_log
+            WHERE event_type = 'webhook.used'
+              AND details::jsonb->>'token_id' = ANY(%s)
+            GROUP BY details::jsonb->>'token_id'
+        """, [[str(r.id) for r in self]])
+
+        results = {row[0]: (row[1], row[2]) for row in self.env.cr.fetchall()}
+
+        for record in self:
+            data = results.get(str(record.id), (None, 0))
+            record.last_used = data[0]
+            record.usage_count = data[1]
 
     # Optional restrictions
     allowed_cidrs = fields.Text(
@@ -200,18 +225,14 @@ class SunrayWebhookToken(models.Model):
             raise ValueError(f"Unsupported format: {format}")
     
     def track_usage(self, client_ip=None, host_domain=None):
-        """Update usage statistics
+        """Log usage via SQL INSERT (no ORM, no concurrency issues).
+
+        Usage stats (last_used, usage_count) are computed from audit log.
 
         Args:
             client_ip: IP address of the client using the token
             host_domain: Domain of the host where token was used (optional, for audit context)
         """
-        self.write({
-            'last_used': fields.Datetime.now(),
-            'usage_count': self.usage_count + 1
-        })
-
-        # Log usage
         details = {
             'token_name': self.name,
             'token_id': self.id
@@ -219,7 +240,7 @@ class SunrayWebhookToken(models.Model):
         if host_domain:
             details['host'] = host_domain
 
-        self.env['sunray.audit.log'].create_audit_event(
+        self.env['sunray.audit.log'].log_event_fast(
             event_type='webhook.used',
             details=details,
             ip_address=client_ip,

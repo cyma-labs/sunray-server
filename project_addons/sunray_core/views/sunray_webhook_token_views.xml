@@ -63,8 +63,7 @@
                 <filter name="expired" string="Expired"
                         domain="[('expires_at', '!=', False), ('expires_at', '&lt;', datetime.datetime.now())]"/>
                 <filter name="never_expires" string="Never Expires" domain="[('expires_at', '=', False)]"/>
-                <filter name="used_recently" string="Used Recently (7 days)"
-                        domain="[('last_used', '&gt;=', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
+                <!-- Note: "Used Recently" filter removed - last_used is now a computed field (not searchable) -->
                 <group expand="0" string="Group By">
                     <filter string="Token Source" name="group_by_token_source" context="{'group_by': 'token_source'}"/>
                     <filter string="Status" name="group_by_status" context="{'group_by': 'is_active'}"/>

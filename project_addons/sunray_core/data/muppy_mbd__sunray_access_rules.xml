@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <record id="muppy_mbd__sunray_access_rule" model="sunray.access.rule">
+            <field name="name">Muppy Builtin DNS</field>
+            <field name="description">Allow URL for Muppy builtin DNS (MBD) operations.</field>
+            <field name="access_type">public</field>
+            <field name="is_active" eval="True"/>
+            <field name="is_default_rule" eval="False"/>
+            <field name="is_system" eval="True"/>
+            <field name="url_patterns"><![CDATA[
+^/mpy/dns/v1/lego/*                 # JSON endpoint for Traefik Lego
+^/mpy/dns/v1/lego-http/*            # HTTP endpoint for CertManager K8s
+^/mpy/dns/v1/records$               # Muppy MBD API
+^/inouk/api_auth/v2/token/status$   # Token validation
+]]></field>
+            <field name="allowed_cidrs"></field>
+        </record>
+    </data>
+</odoo>

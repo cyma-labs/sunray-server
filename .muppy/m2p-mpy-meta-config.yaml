@@ -114,15 +114,16 @@ mpy_meta_config:
       scope: qualifier
       type: secret     
       default_values:
+        description: "Create vault object of type 'basic' named 'sunray-signup-smtp' for SMTP credentials"
         cfgmap_use_renderer: true
         cfgmap_type: envfile
         cfgmap_file: |-
           #APP_PRIMARY_URL is set by common ENV vars
           # 
-          IKB_SMTP=@{ vault_model.get('muppy-signup-smtp').server }@
+          IKB_SMTP=@{ vault_model.get('sunray-signup-smtp').server }@
           IKB_SMTP_PORT=587
           IKB_SMTP_SSL=ON
-          IKB_SMTP_USER=@{ vault_model.get('muppy-signup-smtp').user }@
-          IKB_SMTP_PASSWORD=@{ vault_model.get('muppy-signup-smtp').password }@
-          IKB_EMAIL_FROM=@{ vault_model.get('muppy-signup-smtp').user }@
+          IKB_SMTP_USER=@{ vault_model.get('sunray-signup-smtp').user }@
+          IKB_SMTP_PASSWORD=@{ vault_model.get('sunray-signup-smtp').password }@
+          IKB_EMAIL_FROM=@{ vault_model.get('sunray-signup-smtp').user }@
 

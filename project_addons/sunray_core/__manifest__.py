@@ -50,7 +50,10 @@ Technical Components:
         'data/sunray_data.xml',
         'data/sunray_mail_templates.xml',
         'data/sunray_email_login_data.xml',
-        'data/claudeai_mcp_sunray_access_rules.xml',
+
+        # Rules library
+        'data/claudeai_mcp__sunray_access_rules.xml',
+        'data/muppy_mbd__sunray_access_rules.xml',
         
         # Wizards (must be loaded before views that reference them)
         'wizards/authorize_users_wizard_views.xml',

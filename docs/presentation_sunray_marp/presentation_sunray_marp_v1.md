@@ -97,17 +97,17 @@ backgroundImage: url('https://marp.app/assets/hero-background.svg')
 
 ## **Choisissez votre niveau de souveraineté**
 
+#### 🏢 **Sunray Worker FASTAPI**
+- Souveraineté totale des données
+- Déploiement on-premise
+- Intégration native Kubernetes/Traefik
+- Idéal pour : Applications sensibles, conformité RGPD strict
+
 #### 🌍 **Sunray Worker for Cloudflare**
 - Performance globale maximale
 - Protection DDoS incluse (Cloudflare)
 - Latence minimale (150+ PoP mondiaux)
 - Idéal pour : Applications globales, SaaS, sites publics
-
-#### 🏢 **Sunray Worker for Kubernetes** *(En développement)*
-- Souveraineté totale des données
-- Déploiement on-premise
-- Intégration native Kubernetes/Traefik
-- Idéal pour : Applications sensibles, conformité RGPD strict
 
 ---
 
@@ -211,12 +211,12 @@ Internet → [Sunray Worker]     →    Application
 ## **Notre Vision**
 
 ### ✅ **Disponible aujourd'hui**
-- Sunray Worker for Cloudflare, Authentification Passkeys, Multi hosts, API REST
+- Sunray Worker FASTAPI, Sunray Worker for Cloudflare, Authentification Passkeys et Mail, Multi hosts, API REST
 
-### 🚧 **T1 2026**
-- Sunray Worker for Kubernetes, SAML/OIDC bridge, Analytics dashboard
+### 🚧 **T2 2026**
+- Analytics dashboard
 
-### 🔮 **T2-T3 2026**
+### 🔮 **T3-T3 2026**
 - Compliance (SOC2, ISO27001)
 
 ---

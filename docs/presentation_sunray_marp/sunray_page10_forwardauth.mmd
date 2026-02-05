@@ -1,0 +1,8 @@
+%% Sunray - Page 10 (ForwardAuth principal)
+%% Render: mmdc -i sunray_page10_forwardauth.mmd -o sunray_page10_forwardauth.png -b transparent
+flowchart LR
+  C["Client"] -->|HTTPS| RP["Reverse Proxy"]
+  RP -->|"Si oui"| APP["App protégée"]
+  RP -->|"Autorisé ?"| W["Sunray Worker"]
+  W -->|"Oui / Non"| RP
+  W <-->|API| S["Sunray Server<br>(jamais exposé)"]

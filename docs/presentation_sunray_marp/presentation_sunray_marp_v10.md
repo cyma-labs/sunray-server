@@ -250,7 +250,9 @@ Pour les applications à **audience mondiale** ou sans reverse proxy existant.
 
 ## **Le coupe-circuit : Sunray filtre, votre proxy route**
 
-![w:580 center](sunray_page10_forwardauth_v3_drawio.png)
+<div style="display: flex; justify-content: center;">
+<img src="sunray_page10_forwardauth_v4_drawio.png" width="580">
+</div>
 
 - Le worker est un **agent de décision** — il répond autorisé/refusé, c'est tout
 - Le **trafic applicatif ne passe jamais par Sunray** : zéro impact sur les performances
@@ -262,9 +264,11 @@ Pour les applications à **audience mondiale** ou sans reverse proxy existant.
 
 ## **Le proxy edge : Sunray intercepte et transmet tout le trafic**
 
-![w:580 center](sunray_page11_reverseproxy_v2.png)
+<div style="display: flex; justify-content: center;">
+<img src="sunray_page11_serverless_cloudflare_v3.png" width="580">
+</div>
 
-- Le worker **EST** le proxy — il reçoit, authentifie et transmet chaque requête
+- Le worker **EST** intégré dans le pipeline Cloudflare — il reçoit, authentifie et transmet chaque requête
 - Scaling automatique sur 300+ points de présence Cloudflare
 - Protection DDoS native incluse
 - Pour les cas sans reverse proxy ForwardAuth, ou pour des **applications à audience mondiale**

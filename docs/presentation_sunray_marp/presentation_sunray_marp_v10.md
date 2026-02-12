@@ -61,7 +61,7 @@ table {
 
 <!-- _class: lead -->
 
-# **Sunray Zero Trust (sunray-sero-trust.eu)**
+# **Sunray Zero Trust (sunray-zero-trust.eu)**
 ## Solution Européenne et Open Source de Contrôle d'Accès Zero Trust Web
 
 **Protection moderne, souveraine et économique pour vos applications internes et extranets**

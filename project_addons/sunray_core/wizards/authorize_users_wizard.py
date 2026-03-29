@@ -278,17 +278,16 @@ class AuthorizeUsersWizard(models.TransientModel):
         # Commit to ensure changes are visible
         self.env.cr.commit()
 
-        # Close wizard and show notification
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': 'Users Authorized',
-                'message': '\n'.join(message_parts),
-                'type': 'success',
-                'sticky': False,
-            }
-        }
+        # Send toast notification and close wizard
+        self.env.user.ik_notify('success', 'Users Authorized', '\n'.join(message_parts), sticky=False)
+
+        # If welcome emails were sent, notify the admin
+        if authorized_users and self.send_welcome_email:
+            email_recipients = [u.email for u in authorized_users if u.email]
+            if email_recipients:
+                self.env.user.ik_notify('info', 'Emails Sent', f'Welcome emails sent to: {", ".join(email_recipients)}')
+
+        return {'type': 'ir.actions.act_window_close'}
 
     def _send_welcome_emails(self, authorized_users, host_obj):
         """Send welcome email to newly authorized users"""

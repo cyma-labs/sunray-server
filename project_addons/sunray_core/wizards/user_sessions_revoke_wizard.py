@@ -67,17 +67,8 @@ class UserSessionsRevokeWizard(models.TransientModel):
     def action_revoke_sessions(self):
         """Revoke the user sessions based on scope"""
         self.ensure_one()
-        
         if self.scope == 'host' and self.host_id:
-            result = self.user_id.action_revoke_sessions_on_host(self.host_id.id)
+            self.user_id.action_revoke_sessions_on_host(self.host_id.id)
         elif self.scope == 'worker' and self.worker_id:
-            result = self.user_id.action_revoke_sessions_on_worker(self.worker_id.id)
-        else:
-            return {'type': 'ir.actions.act_window_close'}
-        
-        # Close the wizard and show the result notification
-        if result.get('type') == 'ir.actions.client':
-            result['params']['next'] = {'type': 'ir.actions.act_window_close'}
-            return result
-        else:
-            return {'type': 'ir.actions.act_window_close'}
+            self.user_id.action_revoke_sessions_on_worker(self.worker_id.id)
+        return {'type': 'ir.actions.act_window_close'}

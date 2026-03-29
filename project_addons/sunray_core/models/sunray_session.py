@@ -141,15 +141,8 @@ class SunraySession(models.Model):
         self.ensure_one()
         
         if not self.is_active:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Session Already Inactive',
-                    'message': 'This session is already inactive.',
-                    'type': 'warning',
-                }
-            }
+            self.env.user.ik_notify('warning', 'Session Already Inactive', 'This session is already inactive.')
+            return True
         
         # Get the reason from parameter or default
         revoke_reason = reason or 'Admin revocation via UI'
@@ -185,15 +178,8 @@ class SunraySession(models.Model):
                 username=self.user_id.username
             )
         
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': 'Session Revoked',
-                'message': f'Session {self.session_id[:8]}... has been revoked successfully.',
-                'type': 'success',
-            }
-        }
+        self.env.user.ik_notify('success', 'Session Revoked', f'Session {self.session_id[:8]}... has been revoked successfully.')
+        return True
     
     def action_open_revoke_wizard(self):
         """Open the revoke session wizard"""

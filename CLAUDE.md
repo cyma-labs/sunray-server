@@ -854,6 +854,60 @@ sunray_core/
   ], string='Authentication Mode')
   ```
 
+### Toast Notifications (inouk_notifications)
+
+- **Module**: `inouk_notifications` - adds `ik_notify` and `ik_notify_with_link` methods to `res.users`
+- **Use case**: Send instant toast notifications to users (e.g., approval requests, async task completion)
+- **Requires**: Odoo in multiprocessing mode (`--workers=...`)
+
+**ik_notify_with_link** (recommended for notifications with action):
+```python
+self.env.user.ik_notify_with_link(
+    'warning',                    # type: "danger", "warning", "success", "info"
+    'Approval Required',          # title
+    f"Request for {action}...",   # message (HTML supported)
+    model='my.model',             # model to open
+    res_id=record.id,             # record ID
+    button_name='Open Request',   # button label (default: "Open")
+    sticky=True,                  # must be closed manually (default: True)
+)
+```
+
+**ik_notify** (basic notification):
+```python
+self.env.user.ik_notify(
+    'success',                    # type
+    'Task Complete',              # title
+    'Server provisioned.',        # message
+    sticky=False,                 # auto-closes after 4s (default)
+    autoclose_delay=6000,         # optional: custom delay in ms
+)
+```
+
+**Message types**:
+- `success`: Green, positive feedback
+- `info`: Blue, neutral information
+- `warning`: Orange, caution
+- `danger`: Red, error/critical
+
+**Key differences**:
+- `ik_notify_with_link`: Includes action button to open a record, `sticky=True` by default
+- `ik_notify`: Simple notification, `sticky=False` by default
+
+**Example - Notify on permission request creation**:
+```python
+if hasattr(self.requesting_user_id, 'ik_notify_with_link'):
+    self.requesting_user_id.ik_notify_with_link(
+        'warning',
+        'Approval Required',
+        f"Your request to {self.method_name} on {self.record_display} requires approval.",
+        model='ik.mcp_permission_request',
+        res_id=self.id,
+        button_name='Open Request',
+        sticky=True,
+    )
+```
+
 ### Field Format Pattern
 
 For multi-value configuration fields (IPs, CIDRs, URL patterns, etc.):

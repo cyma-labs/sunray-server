@@ -39,15 +39,6 @@ class SessionRevokeWizard(models.TransientModel):
     def action_revoke(self):
         """Revoke the session with provided reason"""
         self.ensure_one()
-        if not self.session_id:
-            return {'type': 'ir.actions.act_window_close'}
-            
-        # Call the session's revoke method with the provided reason
-        result = self.session_id.action_revoke_session(self.reason)
-        
-        # Close the wizard and show the result notification
-        if result.get('type') == 'ir.actions.client':
-            result['params']['next'] = {'type': 'ir.actions.act_window_close'}
-            return result
-        else:
-            return {'type': 'ir.actions.act_window_close'}
+        if self.session_id:
+            self.session_id.action_revoke_session(self.reason)
+        return {'type': 'ir.actions.act_window_close'}

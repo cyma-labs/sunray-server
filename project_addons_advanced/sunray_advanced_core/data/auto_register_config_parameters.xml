@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Auto-register Global Configuration Parameters -->
+
+    <!-- Cache duration when SCP is unreachable, before locking down hosts -->
+    <record id="auto_register_scp_cache_duration_s" model="ir.config_parameter">
+        <field name="key">sunray.auto_register_scp_cache_duration_s</field>
+        <field name="value">43200</field>  <!-- 12 hours -->
+    </record>
+
+    <!-- Polling interval for periodic SCP synchronization -->
+    <record id="auto_register_poll_interval_s" model="ir.config_parameter">
+        <field name="key">sunray.auto_register_poll_interval_s</field>
+        <field name="value">300</field>  <!-- 5 minutes -->
+    </record>
+
+</odoo>

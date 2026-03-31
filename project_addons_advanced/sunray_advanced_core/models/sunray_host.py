@@ -228,7 +228,8 @@ class SunrayHost(models.Model):
         triggers the individual state recomputation and potential transition
         to 'protected'.
         """
-        task_logger = _logger or _imq_logger
+        self = self.sudo()
+        _task_logger = _imq_logger or _logger
 
         today = date.today()
         deployment_host_objs = self.search([
@@ -244,8 +245,9 @@ class SunrayHost(models.Model):
 
     @processor_method('sunray')
     def process_deployment_host(self, _imq_logger=None):
-        """Process state transition for host '{0.name}'"""
-        task_logger = _logger or _imq_logger
+        """Process state transition for host '{0.domain}'"""
+        self = self.sudo()
+        _task_logger = _imq_logger or _logger
 
         self._compute_state()
         

@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<odoo>
+    <data noupdate="0">
+        <!-- Sunray API bot user for IMQ jobs triggered from auth='none' controllers.
+             Minimal rights — only group_sunray_admin for now (needed to create hosts,
+             users, rules, and audit logs during SCP auto-register). -->
+        <record id="partner_sunray_api" model="res.partner">
+            <field name="name">Sunray API Bot</field>
+            <field name="email">sunray-api@noreply.local</field>
+        </record>
+
+        <record id="user_sunray_api" model="res.users">
+            <field name="partner_id" ref="partner_sunray_api"/>
+            <field name="login">sunray-api@noreply.local</field>
+            <field name="groups_id" eval="[
+                (4, ref('sunray_core.group_sunray_admin')),
+                (4, ref('inouk_message_queue.group_user')),
+            ]"/>
+        </record>
+    </data>
+</odoo>

@@ -21,13 +21,19 @@ Advanced features for Sunray Zero Trust Access solution:
     'website': 'https://sunray-zero-trust.app',
     'depends': ['sunray_core', 'mail', 'inouk_message_queue'],
     'data': [
+        'security/sunray_api_user.xml',
         'security/ir.model.access.csv',
         'data/ir_config_parameter.xml',
+        'data/auto_register_config_parameters.xml',
         'data/imq_queue.xml',
         'data/ir_cron_worker.xml',
         'data/ir_cron.xml',
+        'data/auto_register_cron.xml',
         'data/mail_templates.xml',
         'views/sunray_host_views.xml',  # Remote Authentication UI
+        'views/sunray_configuration_proxy_views.xml',  # SCP management UI
+        'views/sunray_worker_autoregister_views.xml',  # Worker auto-register UI
+        'views/sunray_host_scp_views.xml',  # Host SCP sync UI
         'views/res_config_settings_views.xml',
         'wizards/setup_token_wizard_views.xml',
         'wizards/setup_token_bulk_wizard_views.xml',

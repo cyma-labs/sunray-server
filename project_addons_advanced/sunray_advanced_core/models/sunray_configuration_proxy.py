@@ -466,11 +466,16 @@ class SunrayConfigurationProxy(models.Model):
 
             response_hosts = {h['fqdn']: h for h in scp_response.get('protected_hosts', [])}
             response_user_emails = {u['email']: u for u in scp_response.get('users', [])}
+            _task_logger.info(
+                f"SCP {self.name}: Received {len(response_hosts)} host(s), "
+                f"{len(response_user_emails)} user(s) from API"
+            )
 
             # === User Sync Phase ===
             # Capture ALL old SCP user IDs before update (needed for host-level sync)
             old_scp_user_ids = set(self.user_ids.ids)
             new_user_ids = []
+            users_created = 0
 
             # Create or update users from response
             for email in response_user_emails.keys():
@@ -478,28 +483,53 @@ class SunrayConfigurationProxy(models.Model):
                     email, response_user_emails[email].get('username', email)
                 )
                 new_user_ids.append(user_obj.id)
+                if user_obj.id not in old_scp_user_ids:
+                    users_created += 1
 
             # Track globally removed users (no longer in SCP at all)
             removed_user_ids = old_scp_user_ids - set(new_user_ids)
 
             # Update SCP's user_ids to the new set
             self.user_ids = [(6, 0, new_user_ids)]
+            _task_logger.info(
+                f"SCP {self.name}: User sync — {len(new_user_ids)} active, "
+                f"{users_created} newly associated, {len(removed_user_ids)} removed"
+            )
 
             # === Host and Rule Sync Phase ===
+            hosts_synced = 0
+            hosts_skipped = 0
+            hosts_deactivated = 0
+
+            # Detect hosts in SCP response not yet tracked in Sunray
+            tracked_domains = set(self.host_ids.filtered(lambda h: h.scp_sync_enabled).mapped('domain'))
+            new_domains = set(response_hosts.keys()) - tracked_domains
+            if new_domains:
+                _task_logger.info(
+                    f"SCP {self.name}: New host(s) in SCP response (not yet tracked): "
+                    f"{', '.join(sorted(new_domains))}"
+                )
+
             for host_obj in self.host_ids.filtered(lambda h: h.scp_sync_enabled):
                 if host_obj.domain not in response_hosts:
                     # Host no longer in SCP response
+                    deactivated_users = host_obj.user_ids.mapped('email')
                     host_obj.write({
                         'is_active': False,
                         'scp_last_sync_ts': fields.Datetime.now(),
                     })
+                    _task_logger.info(
+                        f"SCP {self.name}: Host {host_obj.domain} deactivated — no longer in SCP response "
+                        f"(had {len(deactivated_users)} user(s): {', '.join(deactivated_users)})"
+                    )
+                    hosts_deactivated += 1
                     continue
 
                 host_data = response_hosts[host_obj.domain]
 
                 # Check hash for change detection
                 if host_obj.scp_hash and host_obj.scp_hash == host_data.get('hash'):
-                    _task_logger.debug(f"SCP {self.name}: Hash unchanged for {host_obj.domain}, skipping")
+                    hosts_skipped += 1
                     continue
 
                 # Sync user access: (current − old_scp_users) ∪ new_allowed
@@ -515,6 +545,18 @@ class SunrayConfigurationProxy(models.Model):
                 synced_user_ids = (current_user_ids - old_scp_user_ids) | set(new_allowed_ids)
                 host_obj.user_ids = [(6, 0, list(synced_user_ids))]
 
+                # Log per-host user changes
+                host_users_added = set(new_allowed_ids) - current_user_ids
+                host_users_removed = (current_user_ids & old_scp_user_ids) - set(new_allowed_ids)
+                if host_users_added or host_users_removed:
+                    added_emails = self.env['sunray.user'].sudo().browse(list(host_users_added)).mapped('email') if host_users_added else []
+                    removed_emails = self.env['sunray.user'].sudo().browse(list(host_users_removed)).mapped('email') if host_users_removed else []
+                    _task_logger.info(
+                        f"SCP {self.name}: Host {host_obj.domain} — "
+                        f"users added: {', '.join(added_emails) or 'none'}, "
+                        f"users removed: {', '.join(removed_emails) or 'none'}"
+                    )
+
                 # Sync rules (delete SCP-managed, recreate from response)
                 self._create_rules_from_scp(host_obj, host_data, host_obj.sunray_worker_id)
 
@@ -523,6 +565,13 @@ class SunrayConfigurationProxy(models.Model):
                     'scp_hash': host_data.get('hash'),
                     'scp_last_sync_ts': fields.Datetime.now(),
                 })
+                hosts_synced += 1
+
+            _task_logger.info(
+                f"SCP {self.name}: Host sync — {hosts_synced + hosts_skipped + hosts_deactivated} tracked, "
+                f"{hosts_synced} updated, {hosts_skipped} unchanged, {hosts_deactivated} deactivated"
+                + (f", {len(new_domains)} new (pending setup)" if new_domains else "")
+            )
 
             # === Removed User Deactivation ===
             for user_id in removed_user_ids:
@@ -545,7 +594,11 @@ class SunrayConfigurationProxy(models.Model):
                 'last_error': False,
             })
 
-            _task_logger.info(f"SCP {self.name}: Sync completed successfully")
+            _task_logger.info(
+                f"SCP {self.name}: Sync completed — "
+                f"Hosts: {hosts_synced} updated, {hosts_skipped} unchanged, {hosts_deactivated} deactivated | "
+                f"Users: {users_created} new, {len(removed_user_ids)} removed"
+            )
 
         except Exception as e:
             error_msg = f"Sync failed: {str(e)}"

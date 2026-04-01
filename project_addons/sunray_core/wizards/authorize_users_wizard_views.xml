@@ -84,6 +84,11 @@
                 <field name="no_login_methods_error" invisible="1"/>
 
                 <footer>
+                    <!-- Close/Cancel buttons -->
+                    <button string="Close" class="btn-primary" special="cancel"
+                            invisible="not generated_token"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            invisible="generated_token"/>
                     <!-- Passkey mode button -->
                     <button name="generate_token"
                             string="Authorize User"
@@ -98,11 +103,6 @@
                             class="btn-primary"
                             invisible="generated_token or no_login_methods_error or authorization_mode != 'email'"/>
 
-                    <!-- Close/Cancel buttons -->
-                    <button string="Close" class="btn-primary" special="cancel"
-                            invisible="not generated_token"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel"
-                            invisible="generated_token"/>
                 </footer>
             </form>
         </field>

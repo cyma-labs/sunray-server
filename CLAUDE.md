@@ -749,6 +749,29 @@ sunray_core/
   - **Severity levels**: 'info', 'warning', 'error', 'critical' (use 'critical' for security events)
   - **Example usage**: `audit_log.create_audit_event(event_type='security.cross_domain_session', details={'original_domain': 'app1.com', 'requested_domain': 'app2.com'}, severity='critical')`
 
+- **IMQ Processor Method Pattern**: Methods decorated with `@processor_method` MUST follow this pattern:
+  - **`self = self.sudo()` as first line**: IMQ captures `uid` from the record's env at enqueue time. When enqueued from `auth='none'` controllers, `uid=False` (public user), causing FK violations on `write_uid` and type errors in SQL queries. Always escalate to SUPERUSER at the start of the method — the method is the one doing privileged operations, so it should own that escalation.
+  - **`_imq_logger` for logging**: The IMQ worker injects `_imq_logger` as a kwarg — it writes to the IMQ message log (visible in `imq-ctl`). When running outside IMQ, `_imq_logger` is None and the method falls back to the module `_logger`.
+  - **Accept `_imq_logger=None`** as the last kwarg, create `_task_logger = _imq_logger or _logger` after the `sudo()` line, use `_task_logger` for all logging inside that method.
+  - **Nested calls**: Pass `_imq_logger` (NOT `_task_logger`) so each callee builds its own `_task_logger` with its own module `_logger` as fallback.
+  - **Variable naming**: Always use `_task_logger` (with leading underscore) to emphasize it's local to the method.
+  - **Example**:
+    ```python
+    @processor_method(queue_name='sunray')
+    def my_async_job(self, some_arg, _imq_logger=None):
+        """IMQ message name derived from this docstring."""
+        self = self.sudo()  # Required — IMQ may run with uid=False
+        _task_logger = _imq_logger or _logger
+        _task_logger.info(f"Starting job for {self.name}")
+        try:
+            # ... business logic (no need for .sudo() on individual calls) ...
+            _task_logger.info("Job completed successfully")
+            return "Success message shown in imq-ctl"  # Return value = message result
+        except Exception as e:
+            _task_logger.error(f"Job failed: {e}")
+            self.last_error = str(e)  # No sudo() needed — self is already sudo'd
+    ```
+
 ### Coding Conventions
 
 - **Odoo 18 View Syntax**: Use new attribute syntax instead of `attrs`
@@ -853,6 +876,60 @@ sunray_core/
       ('email', 'Email Login'),
   ], string='Authentication Mode')
   ```
+
+### Toast Notifications (inouk_notifications)
+
+- **Module**: `inouk_notifications` - adds `ik_notify` and `ik_notify_with_link` methods to `res.users`
+- **Use case**: Send instant toast notifications to users (e.g., approval requests, async task completion)
+- **Requires**: Odoo in multiprocessing mode (`--workers=...`)
+
+**ik_notify_with_link** (recommended for notifications with action):
+```python
+self.env.user.ik_notify_with_link(
+    'warning',                    # type: "danger", "warning", "success", "info"
+    'Approval Required',          # title
+    f"Request for {action}...",   # message (HTML supported)
+    model='my.model',             # model to open
+    res_id=record.id,             # record ID
+    button_name='Open Request',   # button label (default: "Open")
+    sticky=True,                  # must be closed manually (default: True)
+)
+```
+
+**ik_notify** (basic notification):
+```python
+self.env.user.ik_notify(
+    'success',                    # type
+    'Task Complete',              # title
+    'Server provisioned.',        # message
+    sticky=False,                 # auto-closes after 4s (default)
+    autoclose_delay=6000,         # optional: custom delay in ms
+)
+```
+
+**Message types**:
+- `success`: Green, positive feedback
+- `info`: Blue, neutral information
+- `warning`: Orange, caution
+- `danger`: Red, error/critical
+
+**Key differences**:
+- `ik_notify_with_link`: Includes action button to open a record, `sticky=True` by default
+- `ik_notify`: Simple notification, `sticky=False` by default
+
+**Example - Notify on permission request creation**:
+```python
+if hasattr(self.requesting_user_id, 'ik_notify_with_link'):
+    self.requesting_user_id.ik_notify_with_link(
+        'warning',
+        'Approval Required',
+        f"Your request to {self.method_name} on {self.record_display} requires approval.",
+        model='ik.mcp_permission_request',
+        res_id=self.id,
+        button_name='Open Request',
+        sticky=True,
+    )
+```
 
 ### Field Format Pattern
 

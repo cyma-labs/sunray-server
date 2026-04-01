@@ -300,16 +300,9 @@ class SunrayUser(models.Model):
         )
         
         if not affected_sessions:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'No Active Sessions',
-                    'message': f'User {self.username} has no active sessions on hosts protected by worker {worker_obj.name}.',
-                    'type': 'info',
-                }
-            }
-        
+            self.env.user.ik_notify('info', 'No Active Sessions', f'User {self.username} has no active sessions on hosts protected by worker {worker_obj.name}.')
+            return True
+
         try:
             # Use the first host to call the worker (all hosts share the same worker)
             first_host = affected_sessions[0].host_id
@@ -318,7 +311,7 @@ class SunrayUser(models.Model):
                 target={'username': self.username},
                 reason=f'User sessions revoked on worker {worker_obj.name} by {self.env.user.name}'
             )
-            
+
             # Mark local sessions as inactive
             affected_sessions.write({
                 'is_active': False,
@@ -326,16 +319,9 @@ class SunrayUser(models.Model):
                 'revoked_at': fields.Datetime.now(),
                 'revoked_reason': f'Bulk revocation - all sessions on worker {worker_obj.name}'
             })
-            
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Sessions Revoked',
-                    'message': f'Revoked {len(affected_sessions)} session(s) for user {self.username} on worker {worker_obj.name}.',
-                    'type': 'success',
-                }
-            }
+
+            self.env.user.ik_notify('success', 'Sessions Revoked', f'Revoked {len(affected_sessions)} session(s) for user {self.username} on worker {worker_obj.name}.')
+            return True
         except Exception as e:
             _logger.error(f"Failed to revoke sessions for user {self.username} on worker {worker_obj.name}: {str(e)}")
             raise UserError(f"Failed to revoke sessions on worker: {str(e)}")
@@ -354,16 +340,9 @@ class SunrayUser(models.Model):
         )
         
         if not affected_sessions:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'No Active Sessions',
-                    'message': f'User {self.username} has no active sessions on host {host_obj.domain}.',
-                    'type': 'info',
-                }
-            }
-        
+            self.env.user.ik_notify('info', 'No Active Sessions', f'User {self.username} has no active sessions on host {host_obj.domain}.')
+            return True
+
         try:
             # Call worker to clear user sessions on this specific host
             host_obj._call_worker_cache_clear(
@@ -371,7 +350,7 @@ class SunrayUser(models.Model):
                 target={'username': self.username, 'hostname': host_obj.domain},
                 reason=f'User sessions revoked on host {host_obj.domain} by {self.env.user.name}'
             )
-            
+
             # Mark local sessions as inactive
             affected_sessions.write({
                 'is_active': False,
@@ -379,16 +358,9 @@ class SunrayUser(models.Model):
                 'revoked_at': fields.Datetime.now(),
                 'revoked_reason': f'Bulk revocation - all sessions on host {host_obj.domain}'
             })
-            
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Sessions Revoked',
-                    'message': f'Revoked {len(affected_sessions)} session(s) for user {self.username} on host {host_obj.domain}.',
-                    'type': 'success',
-                }
-            }
+
+            self.env.user.ik_notify('success', 'Sessions Revoked', f'Revoked {len(affected_sessions)} session(s) for user {self.username} on host {host_obj.domain}.')
+            return True
         except Exception as e:
             _logger.error(f"Failed to revoke sessions for user {self.username} on host {host_obj.domain}: {str(e)}")
             raise UserError(f"Failed to revoke sessions on host: {str(e)}")

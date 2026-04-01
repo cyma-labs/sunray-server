@@ -24,6 +24,11 @@ class SunrayAuditLogAdvanced(models.Model):
             ('remote_auth.verification_success', 'Remote Auth Verification success'),
             ('remote_auth.mobile_auth_initiated', 'Remote Auth Mobile Auth initiated'),
             ('remote_auth.manual_code_entered', 'Remote Auth Manual Code Entered'),
+            ('remote_auth.session_created', 'Remote Auth Session Created'),
+            ('remote_auth.session_listed', 'Remote Auth Sessions Listed'),
+            ('remote_auth.session_terminated', 'Remote Auth Session Terminated'),
+            # Auto-Register Events
+            ('auto_register.setup_triggered', 'Auto-Register Setup Triggered'),
         ],
         ondelete={
             'token.email.sent': 'cascade',
@@ -40,5 +45,9 @@ class SunrayAuditLogAdvanced(models.Model):
             'remote_auth.verification_success': 'cascade',
             'remote_auth.mobile_auth_initiated': 'cascade',
             'remote_auth.manual_code_entered': 'cascade',
+            'remote_auth.session_created': 'cascade',
+            'remote_auth.session_listed': 'cascade',
+            'remote_auth.session_terminated': 'cascade',
+            'auto_register.setup_triggered': 'cascade',
         }
     )

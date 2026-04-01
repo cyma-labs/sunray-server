@@ -36,7 +36,7 @@
                 <filter name="inactive" string="Inactive" domain="[('is_active', '=', False)]"/>
                 <separator/>
                 <filter name="cloudflare" string="Cloudflare Workers" domain="[('worker_type', '=', 'cloudflare')]"/>
-                <filter name="kubernetes" string="Kubernetes" domain="[('worker_type', '=', 'kubernetes')]"/>
+                <filter name="fastapi" string="FastAPI ForwardAuth" domain="[('worker_type', '=', 'fastapi')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Worker Type" name="group_by_type" context="{'group_by': 'worker_type'}"/>
                     <filter string="Active Status" name="group_by_active" context="{'group_by': 'is_active'}"/>
@@ -51,7 +51,7 @@
         <field name="name">sunray.worker.form</field>
         <field name="model">sunray.worker</field>
         <field name="arch" type="xml">
-            <form create="false" edit="false">
+            <form create="false" edit="true">
                 <header>
                     <button name="action_force_config_refresh_all" 
                             type="object" 
@@ -86,7 +86,7 @@
                     
                     <group>
                         <group name="basic_info" string="Worker Information">
-                            <field name="worker_type" readonly="1"/>
+                            <field name="worker_type"/>
                             <field name="worker_url" readonly="1"/>
                             <field name="api_key_id" readonly="1"/>
                             <field name="version" readonly="1"/>

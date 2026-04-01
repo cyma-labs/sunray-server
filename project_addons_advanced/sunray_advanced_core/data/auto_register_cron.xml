@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Periodic SCP Synchronization Cron Job -->
+
+    <record id="auto_register_sync_cron" model="ir.cron">
+        <field name="name">Auto-Register: Sync all SCPs</field>
+        <field name="model_id" ref="model_sunray_configuration_proxy"/>
+        <field name="state">code</field>
+        <field name="code">model.sync_all_scp()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+        <field name="priority" eval="10"/>
+    </record>
+
+</odoo>

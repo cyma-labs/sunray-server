@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend sunray.worker form with Auto-Register tab -->
+
+    <record id="sunray_worker__formview_autoregister" model="ir.ui.view">
+        <field name="name">sunray.worker.form.autoregister</field>
+        <field name="model">sunray.worker</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_worker_form"/>
+        <field name="arch" type="xml">
+            <!-- Insert Auto Register tab in the notebook -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Auto Register" name="autoregister_tab">
+                    <group>
+                        <group class="ik_lw200">
+                            <field name="auto_register_enabled" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+
+                    <!-- SCP Configuration -->
+                    <group string="Configuration Proxies" name="scp_config">
+                        <div class="alert alert-info mb16" role="status" colspan="2">
+                            SCPs are evaluated in order. The first SCP whose fqdn_regex matches the incoming FQDN is used.
+                            Leave fqdn_regex empty to match all FQDNs.
+                        </div>
+                        <field name="auto_register_scp_ids" nolabel="1" colspan="2"/>
+                    </group>
+
+                    <!-- Login (matches host Login tab layout) -->
+                    <group string="Email Login" name="email_login_group">
+                        <group class="ik_lw200">
+                            <field name="auto_register_enable_email_login" widget="boolean_toggle"/>
+                        </group>
+                        <group class="ik_lw200">
+                            <field name="auto_register_email_login_session_duration_s"
+                                   string="Session Duration (Email)"
+                                   invisible="not auto_register_enable_email_login"/>
+                        </group>
+                    </group>
+
+                    <group string="Passkey Authentication" name="passkey_auth_group">
+                        <group class="ik_lw200">
+                            <field name="auto_register_passkey_enabled" widget="boolean_toggle"/>
+                            <field name="auto_register_session_duration_s"
+                                   string="Session Duration (Passkey)"
+                                   invisible="not auto_register_passkey_enabled"/>
+                        </group>
+                        <group class="ik_lw200"
+                               invisible="not auto_register_passkey_enabled">
+                            <field name="auto_register_remote_auth_enabled"
+                                   string="Remote Passkey Login"
+                                   widget="boolean_toggle"/>
+                            <field name="auto_register_remote_auth_session_ttl"
+                                   string="Session Duration (Remote)"
+                                   invisible="not auto_register_remote_auth_enabled"
+                                   required="auto_register_remote_auth_enabled"/>
+                            <field name="auto_register_remote_auth_max_session_ttl"
+                                   string="Max Session Duration (Remote)"
+                                   invisible="not auto_register_remote_auth_enabled"
+                                   required="auto_register_remote_auth_enabled"/>
+                        </group>
+                    </group>
+
+                    <!-- Deployment Mode (matches host Login tab layout) -->
+                    <group string="Deployment Mode" name="deployment_config">
+                        <group class="ik_lw200">
+                            <field name="auto_register_deployment_mode" widget="boolean_toggle"/>
+                        </group>
+                        <group class="ik_lw260"
+                               invisible="not auto_register_deployment_mode">
+                            <field name="auto_register_deployment_session_ttl"
+                                   string="Session Duration (Deployment)"/>
+                        </group>
+                    </group>
+
+                    <!-- Email OTP Settings (matches host Configuration tab layout) -->
+                    <group string="Email OTP Settings" class="ik_lw200"
+                           invisible="not auto_register_enable_email_login">
+                        <group class="ik_lw280">
+                            <field name="auto_register_email_otp_validity_s"/>
+                            <field name="auto_register_email_otp_resend_cooldown_s"/>
+                        </group>
+                        <group class="ik_lw180">
+                            <field name="auto_register_email_otp_max_attempts"/>
+                        </group>
+                    </group>
+
+                    <!-- Session Management (matches host Configuration tab layout) -->
+                    <group string="Session Management" name="session_management_config"
+                           invisible="not auto_register_passkey_enabled or not auto_register_remote_auth_enabled">
+                        <div class="alert alert-info mb16" colspan="2" role="status">
+                            <i class="fa fa-clock-o"/> These fields are NOT used yet. They will be used for a future
+                             "Session Management" feature allowing users to view/kill sessions
+                             opened via Remote Passkey Login.
+                        </div>
+                        <group class="ik_lw220">
+                            <field name="auto_register_session_mgmt_enabled" widget="boolean_toggle"/>
+                        </group>
+                        <group class="ik_lw280">
+                            <field name="auto_register_session_mgmt_ttl"
+                                   string="Session Mgmt Access Duration"
+                                   invisible="not auto_register_session_mgmt_enabled"
+                                   required="auto_register_session_mgmt_enabled"/>
+                        </group>
+                    </group>
+
+                    <!-- Default Access Rules -->
+                    <group string="Default Access Rules" name="default_rules">
+                        <div class="alert alert-info mb16" role="status" colspan="2">
+                            These rules are prepended to SCP-provided rules on every auto-registered host.
+                            They are always evaluated first (before SCP rules).
+                        </div>
+                        <field name="auto_register_default_rule_ids" nolabel="1"  colspan="2"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

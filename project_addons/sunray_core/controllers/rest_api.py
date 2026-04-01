@@ -103,11 +103,13 @@ class SunrayRESTController(http.Controller):
             # Get worker info from headers
             worker_name = req.httprequest.headers.get('X-Worker-ID')
             worker_version = req.httprequest.headers.get('X-Worker-Version')
+            worker_type = req.httprequest.headers.get('X-Worker-Type')
             ip_address = req.httprequest.environ.get('REMOTE_ADDR')
-            
+
             # Track usage and auto-register worker if needed
             api_key_obj.track_usage(
                 worker_name=worker_name,
+                worker_type=worker_type,
                 ip_address=ip_address
             )
             return api_key_obj

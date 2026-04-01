@@ -18,11 +18,10 @@ class SunrayWorker(models.Model):
     
     worker_type = fields.Selection([
         ('cloudflare', 'Cloudflare Worker'),
-        ('kubernetes', 'Kubernetes ForwardAuth'),
-        ('nginx', 'NGINX auth_request'),
-        ('traefik', 'Traefik ForwardAuth'),
+        ('fastapi', 'FastAPI ForwardAuth'),
+        ('unknown', 'Unknown'),
     ], string='Worker Type',
-        default='cloudflare',
+        default='unknown',
         required=True,
         help='Type of worker implementation'
     )
@@ -146,20 +145,21 @@ class SunrayWorker(models.Model):
                 record.last_seen_ts = audit_log.create_date
     
     @api.model
-    def auto_register(self, worker_name, api_key_obj, worker_type='cloudflare', 
+    def auto_register(self, worker_name, api_key_obj, worker_type=None,
                      version=None, ip_address=None):
         """Auto-register or update a worker when it makes an API call
-        
+
         Args:
             worker_name: Worker identifier from X-Worker-ID header
             api_key_obj: The API key record being used
-            worker_type: Type of worker (default: cloudflare)
+            worker_type: Type of worker from X-Worker-Type header (default: 'unknown')
             version: Worker version from X-Worker-Version header
             ip_address: IP address of the worker
-            
+
         Returns:
             Worker record
         """
+        worker_type = worker_type or 'unknown'
         # Look for existing worker
         worker_obj = self.search([('name', '=', worker_name)], limit=1)
         
@@ -197,10 +197,14 @@ class SunrayWorker(models.Model):
                 'is_active': True
             }
             
+            # Update worker_type if provided and different
+            if worker_type and worker_type != worker_obj.worker_type:
+                update_vals['worker_type'] = worker_type
+
             # Update version if provided and different
             if version and version != worker_obj.version:
                 update_vals['version'] = version
-                
+
             # Update API key if different
             if api_key_obj.id != worker_obj.api_key_id.id:
                 update_vals['api_key_id'] = api_key_obj.id

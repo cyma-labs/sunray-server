@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend sunray.host form with SCP sync configuration -->
+
+    <record id="sunray_host__formview_scp" model="ir.ui.view">
+        <field name="name">sunray.host.form.scp</field>
+        <field name="model">sunray.host</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_host_form"/>
+        <field name="arch" type="xml">
+            <!-- Insert SCP Sync Configuration tab in the notebook -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Sync Configuration" name="scp_sync_tab">
+                    <!-- SCP Assignment -->
+                    <group string="Configuration Proxy" name="scp_assignment">
+                        <field name="scp_id"
+                            help="SCP managing this host configuration. Auto-register sets this automatically; manually assign to enable SCP synchronization for manually-created hosts."/>
+                        <field name="scp_sync_enabled" widget="boolean_toggle"
+                            help="Enable synchronization with the assigned SCP."/>
+                    </group>
+
+                    <!-- Sync Status -->
+                    <group string="Sync Status" name="sync_status" class="oe_read_only">
+                        <field name="scp_last_sync_ts" readonly="1"
+                            help="Timestamp of last successful SCP synchronization"/>
+                        <field name="scp_setup_in_progress" readonly="1" widget="boolean_toggle"
+                            help="True while async auto-register setup is running"/>
+                        <field name="scp_hash" readonly="1"
+                            help="Last hash received from SCP for change detection"/>
+                    </group>
+
+                    <!-- Information Box -->
+                    <div class="alert alert-info" role="alert">
+                        <h4>Enabling SCP Sync for Manually-Created Hosts</h4>
+                        <p>
+                            For hosts created manually in Sunray (not via auto-register), you can enable
+                            synchronization with an SCP to keep users and access rules in sync.
+                        </p>
+                        <strong>Prerequisites:</strong>
+                        <ul>
+                            <li>The host must exist in the SCP's database or configuration</li>
+                            <li>The SCP must return this host's FQDN in its response when called</li>
+                        </ul>
+                        <strong>Setup Steps:</strong>
+                        <ol>
+                            <li>Create the protected host normally in Sunray (name, domain, backend_url, worker)</li>
+                            <li>Go to this <strong>"Sync Configuration"</strong> tab</li>
+                            <li>Select the <strong>SCP</strong> from the scp_id dropdown</li>
+                            <li><strong>Enable</strong> the scp_sync_enabled checkbox</li>
+                            <li><strong>Verify with the SCP admin</strong> that the host FQDN is included in the SCP's response</li>
+                            <li>Save the host</li>
+                            <li>The periodic sync cron (every 5 minutes) will pick up the host and synchronize users and access rules</li>
+                        </ol>
+                        <strong>Result:</strong>
+                        <p>
+                            Users and access rules will be kept in sync with the SCP on every polling cycle.
+                            You can disable sync at any time by unchecking scp_sync_enabled without affecting the host.
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

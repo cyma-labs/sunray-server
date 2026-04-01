@@ -196,13 +196,14 @@ class SunrayApiKey(models.Model):
             }
         }
     
-    def track_usage(self, worker_name=None, ip_address=None):
+    def track_usage(self, worker_name=None, worker_type=None, ip_address=None):
         """Log usage via SQL INSERT (no ORM, no concurrency issues).
 
         Usage stats (last_used, usage_count) are computed from audit log.
 
         Args:
             worker_name: Optional worker identifier from X-Worker-ID header
+            worker_type: Optional worker type from X-Worker-Type header
             ip_address: Optional IP address of the requester
         """
         # Log usage via fast SQL INSERT
@@ -223,6 +224,7 @@ class SunrayApiKey(models.Model):
             worker_obj = self.env['sunray.worker'].auto_register(
                 worker_name=worker_name,
                 api_key_obj=self,
+                worker_type=worker_type,
                 ip_address=ip_address
             )
 

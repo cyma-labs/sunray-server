@@ -413,10 +413,14 @@ class AdvancedRestController(SunrayRESTController):
         ], limit=1)
 
         if not pending:
-            # Create stub host to mark setup as in-progress
-            stub_values = {
-                'domain': hostname,
-                'backend_url': f'https://{hostname}/',  # Placeholder until SCP provides real URL
+            # Check if an archived host already exists (e.g., previously deleted from SCP)
+            existing_archived = request.env['sunray.host'].sudo().search([
+                ('domain', '=', hostname),
+                ('is_active', '=', False),
+            ], limit=1)
+
+            # Common values for both reactivation and fresh creation
+            host_values = {
                 'scp_id': matching_scp.id,
                 'scp_setup_in_progress': True,
                 'is_active': True,
@@ -439,7 +443,15 @@ class AdvancedRestController(SunrayRESTController):
                 'deployment_mode': worker_obj.auto_register_deployment_mode,
                 'deployment_session_ttl': worker_obj.auto_register_deployment_session_ttl,
             }
-            request.env['sunray.host'].sudo().create(stub_values)
+
+            if existing_archived:
+                # Reactivate the existing archived host record
+                existing_archived.write(host_values)
+            else:
+                # Create new stub host
+                host_values['domain'] = hostname
+                host_values['backend_url'] = f'https://{hostname}/'  # Placeholder until SCP provides real URL
+                request.env['sunray.host'].sudo().create(host_values)
 
             # Enqueue async setup job — with_user(sunray_api) is required because
             # this controller uses auth='none' (env.user is public, uid=False).
@@ -454,13 +466,20 @@ class AdvancedRestController(SunrayRESTController):
 
             # Log audit event
             context_data = self._setup_request_context(request)
+            event_type = (
+                'auto_register.reactivation_triggered' if existing_archived
+                else 'auto_register.setup_triggered'
+            )
+            details = {
+                'hostname': hostname,
+                'scp_id': matching_scp.id,
+                'worker_id': worker_obj.id,
+            }
+            if existing_archived:
+                details['reactivated_host_id'] = existing_archived.id
             request.env['sunray.audit.log'].sudo().create_audit_event(
-                event_type='auto_register.setup_triggered',
-                details={
-                    'hostname': hostname,
-                    'scp_id': matching_scp.id,
-                    'worker_id': worker_obj.id,
-                },
+                event_type=event_type,
+                details=details,
                 severity='info',
                 sunray_worker=context_data['worker_id'],
                 request_id=request.env.context.get('request_id'),
@@ -474,9 +493,10 @@ class AdvancedRestController(SunrayRESTController):
     def register_worker(self, **kwargs):
         """Override base register_worker to handle auto-register.
 
-        Two interception points:
+        Three interception points:
         1. 404 (host not found) → trigger auto-register via SCP
         2. 200 but scp_setup_in_progress=True → return 202 (setup still running)
+        3. 200 but host is archived (is_active=False) → trigger auto-register reactivation
         """
         response = super().register_worker(**kwargs)
 
@@ -496,6 +516,22 @@ class AdvancedRestController(SunrayRESTController):
             if pending:
                 return self._json_response({'status': 'setup_in_progress'}, status=202)
 
+        # Intercept 200: host exists but is archived → try SCP re-registration
+        if response.status_code == 200 and hostname:
+            archived = request.env['sunray.host'].sudo().search([
+                ('domain', '=', hostname),
+                ('is_active', '=', False),
+            ], limit=1)
+            if archived:
+                worker_name = request.httprequest.headers.get('X-Worker-ID')
+                if worker_name:
+                    worker_obj = request.env['sunray.worker'].sudo().search([
+                        ('name', '=', worker_name)
+                    ], limit=1)
+                    auto_register_response = self._try_auto_register(hostname, worker_obj)
+                    if auto_register_response:
+                        return auto_register_response
+
         # Intercept 404: host not found → try auto-register
         if response.status_code == 404:
             worker_name = request.httprequest.headers.get('X-Worker-ID')
@@ -511,19 +547,27 @@ class AdvancedRestController(SunrayRESTController):
 
     @http.route('/sunray-srvr/v1/config/<string:hostname>', type='http', auth='none', methods=['GET', 'HEAD'], cors='*', csrf=False)
     def get_host_config(self, hostname, **kwargs):
-        """Override base get_host_config to intercept 404 → auto-register trigger.
+        """Override base get_host_config to intercept 404 or archived → auto-register trigger.
 
-        Delegates to parent for normal flow. When the parent returns 404 and the
-        requesting worker has auto-register enabled, triggers async SCP setup and
-        returns 202.
+        Delegates to parent for normal flow. When the parent returns 404 (host not found)
+        or 200 with an archived host (is_active=False), and the requesting worker has
+        auto-register enabled, triggers async SCP setup and returns 202.
         """
         response = super().get_host_config(hostname, **kwargs)
 
-        # Only intercept 404 (host not found)
-        if response.status_code != 404:
+        # Intercept 200 with archived host or 404 (host not found)
+        if response.status_code == 200:
+            archived = request.env['sunray.host'].sudo().search([
+                ('domain', '=', hostname),
+                ('is_active', '=', False),
+            ], limit=1)
+            if not archived:
+                return response
+            # Fall through to auto-register logic below
+        elif response.status_code != 404:
             return response
 
-        # Host not found — check if auto-register can handle it
+        # Host not found or archived — check if auto-register can handle it
         api_key_obj = self._authenticate_api(request)
         if not api_key_obj:
             return response

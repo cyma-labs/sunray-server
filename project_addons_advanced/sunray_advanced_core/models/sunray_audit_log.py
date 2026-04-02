@@ -29,6 +29,7 @@ class SunrayAuditLogAdvanced(models.Model):
             ('remote_auth.session_terminated', 'Remote Auth Session Terminated'),
             # Auto-Register Events
             ('auto_register.setup_triggered', 'Auto-Register Setup Triggered'),
+            ('auto_register.reactivation_triggered', 'Auto-Register Reactivation Triggered'),
         ],
         ondelete={
             'token.email.sent': 'cascade',
@@ -49,5 +50,6 @@ class SunrayAuditLogAdvanced(models.Model):
             'remote_auth.session_listed': 'cascade',
             'remote_auth.session_terminated': 'cascade',
             'auto_register.setup_triggered': 'cascade',
+            'auto_register.reactivation_triggered': 'cascade',
         }
     )

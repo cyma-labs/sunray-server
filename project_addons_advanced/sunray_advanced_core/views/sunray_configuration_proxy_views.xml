@@ -25,6 +25,10 @@
         <field name="model">sunray.configuration_proxy</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_sync_now" type="object" string="Sync Now"
+                        class="btn-info" invisible="not is_active"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="name"/>

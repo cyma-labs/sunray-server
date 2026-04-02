@@ -436,6 +436,27 @@ class SunrayConfigurationProxy(models.Model):
         else:
             return 'public'
 
+    def action_sync_now(self):
+        """Manually trigger an immediate SCP sync via IMQ."""
+        self.ensure_one()
+        result = self.sync_scp_job.run_async(self)
+        imq_message_id = result.get('id')
+        if imq_message_id:
+            self.env.user.ik_notify_with_link(
+                'info',
+                'SCP Sync launched',
+                f'SCP sync job for "{self.name}" has been enqueued.',
+                model='imq.message',
+                res_id=imq_message_id,
+                button_name='Open IMQ Message',
+            )
+        else:
+            self.env.user.ik_notify(
+                'warning',
+                'Failed to launch SCP Sync',
+                f'Could not enqueue sync job: {result}',
+            )
+
     def sync_all_scp(self):
         """Called by cron: Enqueue one IMQ job per active unique SCP.
 

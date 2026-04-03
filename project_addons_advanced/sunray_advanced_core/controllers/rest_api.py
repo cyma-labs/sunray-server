@@ -555,13 +555,20 @@ class AdvancedRestController(SunrayRESTController):
         """
         response = super().get_host_config(hostname, **kwargs)
 
-        # Intercept 200 with archived host or 404 (host not found)
+        # Intercept 200 with archived host, setup-in-progress, or 404 (host not found)
         if response.status_code == 200:
             archived = request.env['sunray.host'].sudo().search([
                 ('domain', '=', hostname),
                 ('is_active', '=', False),
             ], limit=1)
             if not archived:
+                # Check if setup is still in progress (stub created, IMQ not done)
+                pending = request.env['sunray.host'].sudo().search([
+                    ('domain', '=', hostname),
+                    ('scp_setup_in_progress', '=', True),
+                ], limit=1)
+                if pending:
+                    return self._json_response({'status': 'setup_in_progress'}, status=202)
                 return response
             # Fall through to auto-register logic below
         elif response.status_code != 404:

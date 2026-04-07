@@ -127,10 +127,10 @@ class SunrayUser(models.Model):
         return super().write(vals)
     
     def generate_setup_token(self):
-        """Open wizard to generate a new setup token"""
+        """Open wizard to authorize this user on hosts"""
         return {
             'type': 'ir.actions.act_window',
-            'name': 'Authorize User',
+            'name': 'Authorize Host Access',
             'res_model': 'sunray.authorize.users.wizard',
             'view_mode': 'form',
             'target': 'new',

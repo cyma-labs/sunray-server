@@ -6,37 +6,46 @@
         <field name="model">sunray.authorize.users.wizard</field>
         <field name="arch" type="xml">
             <form>
+                <!-- Hidden computed fields -->
+                <field name="workflow" invisible="1"/>
+                <field name="passkey_mode_available" invisible="1"/>
+                <field name="email_mode_available" invisible="1"/>
+                <field name="no_login_methods_error" invisible="1"/>
+                <field name="generated_token" invisible="1"/>
+                <field name="multi_operation_success" invisible="1"/>
+
                 <!-- Error banner: No login methods enabled -->
                 <div class="alert alert-danger" role="alert"
                      invisible="not no_login_methods_error">
                     <h4><i class="fa fa-exclamation-triangle"/> No Login Methods Enabled</h4>
-                    <p>This protected host has no login methods enabled.</p>
+                    <p>The selected protected host(s) have no login methods enabled.</p>
                     <p>Please enable <strong>Passkey Authentication</strong> or <strong>Email Login</strong>
                        in the host's Login configuration tab before authorizing users.</p>
                 </div>
 
-                <!-- Main wizard content (hidden when error or showing results) -->
-                <group invisible="no_login_methods_error or generated_token or email_authorization_success">
-                    <!-- Hidden computed fields for availability -->
-                    <field name="passkey_mode_available" invisible="1"/>
-                    <field name="email_mode_available" invisible="1"/>
+                <!-- ============================================== -->
+                <!-- HOST-TO-USERS WORKFLOW                         -->
+                <!-- ============================================== -->
 
-                    <!-- Host display and authorization mode selection -->
+                <!-- Host selection and mode (Host-to-Users) -->
+                <group invisible="workflow != 'host_to_users' or no_login_methods_error or generated_token or multi_operation_success">
                     <group>
-                        <field name="host_id" options="{'no_create': True}" readonly="0"/>
+                        <field name="host_id" options="{'no_create': True}" readonly="1"
+                               required="workflow == 'host_to_users'"/>
                         <field name="authorization_mode" widget="radio" required="1"/>
                     </group>
                 </group>
 
-                <!-- Passkey mode fields -->
-                <group string="Passkey Setup Token"
-                       invisible="authorization_mode != 'passkey'"
-                       class="ik_lw180" >
-
-                    <field name="user_id"
+                <!-- Passkey mode fields (Host-to-Users) -->
+                <group name="passkey_host_to_users" string="Passkey Setup Token"
+                       invisible="workflow != 'host_to_users' or authorization_mode != 'passkey' or generated_token or multi_operation_success"
+                       class="ik_lw180">
+                    <field name="passkey_user_ids"
+                            widget="many2many_tags"
                             options="{'no_create': True}"
                             domain="[('is_active', '=', True)]"
-                            required="authorization_mode == 'passkey'"/>
+                            required="workflow == 'host_to_users' and authorization_mode == 'passkey'"
+                            placeholder="Select users..."/>
                     <field name="device_name"
                             placeholder="e.g., John's Laptop, iPhone 15"
                             required="authorization_mode == 'passkey'"/>
@@ -46,10 +55,10 @@
                             placeholder="Optional: IP addresses or CIDR ranges per line&#10;Examples:&#10;192.168.1.100&#10;192.168.1.100/32&#10;10.0.0.0/8"/>
                 </group>
 
-                <!-- Email mode fields -->
+                <!-- Email mode fields (Host-to-Users) -->
                 <group string="Email Login Authorization"
-                       invisible="authorization_mode != 'email'"
-                       class="ik_lw180" >
+                       invisible="workflow != 'host_to_users' or authorization_mode != 'email' or multi_operation_success"
+                       class="ik_lw180">
                     <div class="alert alert-info" role="alert" colspan="2">
                         <p><strong>Email Login Authorization</strong> <br/>
                         Users selected below will be authorized to log in to this host using their email address.<br/>
@@ -64,7 +73,7 @@
                     <field name="send_welcome_email"/>
                 </group>
 
-                <!-- Passkey mode: Token generated result -->
+                <!-- Passkey mode: Single token generated result (Host-to-Users, single user) -->
                 <div invisible="not generated_token">
                     <div class="alert alert-info" role="alert">
                         <h5><i class="fa fa-key"/> Setup Token</h5>
@@ -79,30 +88,112 @@
                     </div>
                 </div>
 
-                <!-- Hidden tracking fields -->
-                <field name="generated_token" invisible="1"/>
-                <field name="no_login_methods_error" invisible="1"/>
+                <!-- ============================================== -->
+                <!-- USER-TO-HOSTS WORKFLOW                         -->
+                <!-- ============================================== -->
+
+                <!-- User display and mode (User-to-Hosts) -->
+                <group invisible="workflow != 'user_to_hosts' or no_login_methods_error or multi_operation_success">
+                    <group>
+                        <field name="user_id" readonly="1" options="{'no_create': True}"
+                               required="workflow == 'user_to_hosts'"/>
+                        <field name="authorization_mode" widget="radio" required="1"/>
+                    </group>
+                </group>
+
+                <!-- Email mode fields (User-to-Hosts) -->
+                <group string="Email Login Authorization"
+                       invisible="workflow != 'user_to_hosts' or authorization_mode != 'email' or multi_operation_success"
+                       class="ik_lw180">
+                    <div class="alert alert-info" role="alert" colspan="2">
+                        <p><strong>Email Login Authorization</strong><br/>
+                        The user will be authorized to log in to the selected hosts using their email address.<br/>
+                        An OTP code will be sent by email each time they log in.</p>
+                    </div>
+                    <field name="host_ids"
+                            widget="many2many_tags"
+                            options="{'no_create': True}"
+                            required="workflow == 'user_to_hosts' and authorization_mode == 'email'"
+                            placeholder="Select hosts to authorize..."/>
+                    <field name="send_welcome_email"/>
+                </group>
+
+                <!-- Passkey mode fields (User-to-Hosts) -->
+                <group name="passkey_user_to_hosts" string="Passkey Setup Tokens"
+                       invisible="workflow != 'user_to_hosts' or authorization_mode != 'passkey' or multi_operation_success"
+                       class="ik_lw180">
+                    <field name="host_ids"
+                            widget="many2many_tags"
+                            options="{'no_create': True}"
+                            required="workflow == 'user_to_hosts' and authorization_mode == 'passkey'"
+                            placeholder="Select hosts..."/>
+                    <field name="device_name"
+                            placeholder="e.g., John's Laptop, iPhone 15"
+                            required="authorization_mode == 'passkey'"/>
+                    <field name="validity_hours"/>
+                    <field name="max_uses"/>
+                    <field name="allowed_cidrs" widget="text"
+                            placeholder="Optional: IP addresses or CIDR ranges per line"/>
+                </group>
+
+                <!-- ============================================== -->
+                <!-- MULTI-OPERATION RESULTS (shared)               -->
+                <!-- ============================================== -->
+
+                <div invisible="not multi_operation_success">
+                    <div class="alert alert-success" role="alert">
+                        <h5><i class="fa fa-check-circle"/> Operation Complete</h5>
+                    </div>
+                    <field name="multi_operation_result" readonly="1" widget="text" nolabel="1"
+                           style="font-family: 'Courier New', monospace; white-space: pre; min-height: 150px;"/>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- FOOTER                                         -->
+                <!-- ============================================== -->
 
                 <footer>
-                    <!-- Close/Cancel buttons -->
+                    <!-- Close buttons (after operation) -->
                     <button string="Close" class="btn-primary" special="cancel"
-                            invisible="not generated_token"/>
+                            invisible="not generated_token and not multi_operation_success"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"
-                            invisible="generated_token"/>
-                    <!-- Passkey mode button -->
+                            invisible="generated_token or multi_operation_success"/>
+
+                    <!-- Host-to-Users: Passkey single user (generate_token for preview) -->
+                    <field name="passkey_user_count" invisible="1"/>
                     <button name="generate_token"
-                            string="Authorize User"
+                            string="Generate Token"
                             type="object"
                             class="btn-primary"
-                            invisible="generated_token or no_login_methods_error or authorization_mode != 'passkey'"/>
+                            invisible="generated_token or multi_operation_success or no_login_methods_error or workflow != 'host_to_users' or authorization_mode != 'passkey' or passkey_user_count != 1"/>
 
-                    <!-- Email mode button (closes wizard after authorization) -->
+                    <!-- Host-to-Users: Passkey multi-user -->
+                    <button name="action_generate_tokens_for_users"
+                            string="Generate Tokens"
+                            type="object"
+                            class="btn-primary"
+                            invisible="generated_token or multi_operation_success or no_login_methods_error or workflow != 'host_to_users' or authorization_mode != 'passkey' or passkey_user_count &lt; 2"/>
+
+                    <!-- Host-to-Users: Email mode -->
                     <button name="action_authorize_email_users"
                             string="Authorize and Close"
                             type="object"
                             class="btn-primary"
-                            invisible="generated_token or no_login_methods_error or authorization_mode != 'email'"/>
+                            invisible="generated_token or multi_operation_success or no_login_methods_error or workflow != 'host_to_users' or authorization_mode != 'email'"/>
 
+                    <!-- User-to-Hosts: Email mode -->
+                    <button name="action_authorize_user_on_hosts"
+                            string="Authorize on Selected Hosts"
+                            type="object"
+                            class="btn-primary"
+                            invisible="multi_operation_success or no_login_methods_error or workflow != 'user_to_hosts' or authorization_mode != 'email'"/>
+
+                    <!-- User-to-Hosts: Passkey mode -->
+                    <button name="action_generate_tokens_for_hosts"
+                            string="Generate Tokens"
+                            type="object"
+                            class="btn-primary"
+                            invisible="multi_operation_success or no_login_methods_error or workflow != 'user_to_hosts' or authorization_mode != 'passkey'"/>
                 </footer>
             </form>
         </field>

@@ -6,29 +6,35 @@
         <field name="model">sunray.authorize.users.wizard</field>
         <field name="inherit_id" ref="sunray_core.authorize_users_wizard__formview"/>
         <field name="arch" type="xml">
-            <!-- Add email option before the end of the first group -->
-            <field name="allowed_cidrs" position="after">
-                <field name="send_email"/>
-            </field>
 
-            <!-- Add email status after token display -->
-            <div class="alert alert-success" position="after">
-                <div invisible="not send_email">
+            <!-- Add send_email checkbox in Host-to-Users passkey section -->
+            <xpath expr="//group[@name='passkey_host_to_users']/field[@name='allowed_cidrs']" position="after">
+                <field name="send_email"/>
+            </xpath>
+
+            <!-- Add send_email checkbox in User-to-Hosts passkey section -->
+            <xpath expr="//group[@name='passkey_user_to_hosts']/field[@name='allowed_cidrs']" position="after">
+                <field name="send_email"/>
+            </xpath>
+
+            <!-- Add email status after single token display -->
+            <xpath expr="//field[@name='token_display']" position="after">
+                <div invisible="not send_email" class="mt-2">
                     <div class="alert alert-success" role="alert" invisible="not email_sent">
                         <h5><i class="fa fa-check-circle"/> Email Sent Successfully</h5>
-                        <p>The setup token has been sent to <strong><field name="user_id" readonly="1" class="oe_inline" style="display: inline;"/> (<field name="user_id" readonly="1" string="" class="oe_inline" style="display: inline;" options="{'fields': {'email': {}}}"/>)</strong></p>
                     </div>
                     <div class="alert alert-danger" role="alert" invisible="not email_error">
                         <h5><i class="fa fa-exclamation-triangle"/> Email Send Failed</h5>
                         <field name="email_error" readonly="1" nolabel="1"/>
                     </div>
                 </div>
-            </div>
+            </xpath>
 
-            <!-- Add hidden fields for state tracking -->
-            <field name="send_email" position="after">
+            <!-- Hidden fields for state tracking -->
+            <xpath expr="//field[@name='multi_operation_success']" position="after">
                 <field name="email_sent" invisible="1"/>
-            </field>
+            </xpath>
+
         </field>
     </record>
 </odoo>

@@ -85,6 +85,18 @@
               action="action_sunray_audit_logs"
               sequence="20"/>
 
+    <!-- Tasks submenu (IMQ messages) -->
+    <menuitem id="menu_sunray_tasks"
+              name="Tasks"
+              parent="menu_sunray_root"
+              sequence="90"/>
+
+    <menuitem id="menu_sunray_imq_messages"
+              name="IMQ Tasks"
+              parent="menu_sunray_tasks"
+              action="sunray_imq_message__actwindow"
+              sequence="10"/>
+
     <!-- Settings menu - will be replaced by Advanced module if installed -->
     <menuitem id="menu_sunray_settings"
               name="Settings"

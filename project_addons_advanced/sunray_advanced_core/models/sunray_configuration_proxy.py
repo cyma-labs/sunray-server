@@ -271,8 +271,18 @@ class SunrayConfigurationProxy(models.Model):
             host_obj.user_ids = [(6, 0, allowed_user_ids)]
 
             # Create access rules from SCP response
-            self._create_rules_from_scp(host_obj, host_data, worker_obj)
+            rule_counts = self._create_rules_from_scp(host_obj, host_data, worker_obj)
 
+            _task_logger.info(
+                f"SCP {self.name}:\n"
+                f"    Host {fqdn}\n"
+                f"    rules:\n"
+                f"       created:   {rule_counts['created']}\n"
+                f"       updated:   {rule_counts['updated']}\n"
+                f"       unchanged: {rule_counts['unchanged']}\n"
+                f"       removed:   {rule_counts['removed']}\n"
+                f"       total_now: {rule_counts['total']}"
+            )
             _task_logger.info(f"SCP {self.name}: Successfully set up host {fqdn}")
 
         except Exception as e:
@@ -332,7 +342,8 @@ class SunrayConfigurationProxy(models.Model):
                 - allowed_tokens (list, currently unused)
 
         Returns:
-            sunray.access.rule record (found or created)
+            Tuple of (sunray.access.rule record, status) where status is one of
+            'created', 'updated', or 'unchanged'.
         """
         rule_name = self._scp_rule_name(fqdn, sequence)
         access_type = self._infer_rule_type(data)
@@ -356,11 +367,12 @@ class SunrayConfigurationProxy(models.Model):
                     rule_obj.url_patterns != url_patterns or
                     rule_obj.allowed_cidrs != allowed_cidrs):
                 rule_obj.write(rule_vals)
-        else:
-            rule_vals.update({'name': rule_name, 'scp_id': self.id})
-            rule_obj = self.env['sunray.access.rule'].create(rule_vals)
+                return rule_obj, 'updated'
+            return rule_obj, 'unchanged'
 
-        return rule_obj
+        rule_vals.update({'name': rule_name, 'scp_id': self.id})
+        rule_obj = self.env['sunray.access.rule'].create(rule_vals)
+        return rule_obj, 'created'
 
     def _create_rules_from_scp(self, host_obj, host_data, worker_obj):
         """Upsert access rules from SCP host data and attach to host.
@@ -372,13 +384,18 @@ class SunrayConfigurationProxy(models.Model):
             host_obj: sunray.host record to attach rules to
             host_data (dict): Host data from SCP response
             worker_obj: sunray.worker with default rules
+
+        Returns:
+            dict: {'created', 'updated', 'unchanged', 'removed', 'total'} counters.
         """
+        counts = {'created': 0, 'updated': 0, 'unchanged': 0, 'removed': 0, 'total': 0}
         scp_rule_names_in_response = set()
         priority = 100  # Start after worker defaults
 
         for rule_data in host_data.get('rules', []):
             seq = rule_data.get('sequence', priority)
-            rule_obj = self._upsert_scp_rule(host_obj.domain, seq, rule_data)
+            rule_obj, status = self._upsert_scp_rule(host_obj.domain, seq, rule_data)
+            counts[status] += 1
             scp_rule_names_in_response.add(rule_obj.name)
 
             # Ensure association exists on this host
@@ -401,6 +418,7 @@ class SunrayConfigurationProxy(models.Model):
             ('rule_id.scp_id', '=', self.id),
             ('rule_id.name', 'not in', list(scp_rule_names_in_response)),
         ])
+        counts['removed'] = len(stale_assocs)
         stale_assocs.unlink()
 
         # Prepend worker default rules
@@ -419,6 +437,12 @@ class SunrayConfigurationProxy(models.Model):
                         'is_active': True,
                     })
                 default_priority += 1
+
+        # Total host.access.rule associations currently on this host (all sources)
+        counts['total'] = self.env['sunray.host.access.rule'].search_count([
+            ('host_id', '=', host_obj.id),
+        ])
+        return counts
 
     def _infer_rule_type(self, rule_data):
         """Infer access rule type from SCP rule data.
@@ -481,6 +505,7 @@ class SunrayConfigurationProxy(models.Model):
         self = self.sudo()  # Escalate to SUPERUSER — cron context may vary
         _task_logger = _imq_logger or _logger
         try:
+            _task_logger.info(f"===== SCP {self.name} sync START =====")
             _task_logger.info(f"Starting sync for SCP {self.name}")
             # Fetch all hosts from SCP (no fqdn parameter)
             scp_response = self.call_scp()
@@ -521,15 +546,70 @@ class SunrayConfigurationProxy(models.Model):
             hosts_synced = 0
             hosts_skipped = 0
             hosts_deactivated = 0
+            rules_totals = {'created': 0, 'updated': 0, 'unchanged': 0, 'removed': 0}
+            untracked_counts = {'new': 0, 'stub': 0, 'unlinked': 0}
 
             # Detect hosts in SCP response not yet tracked in Sunray
             tracked_domains = set(self.host_ids.filtered(lambda h: h.scp_sync_enabled).mapped('domain'))
-            new_domains = set(response_hosts.keys()) - tracked_domains
-            if new_domains:
-                _task_logger.info(
-                    f"SCP {self.name}: New host(s) in SCP response (not yet tracked): "
-                    f"{', '.join(sorted(new_domains))}"
-                )
+            untracked_domains = sorted(set(response_hosts.keys()) - tracked_domains)
+            if untracked_domains:
+                # Classify each untracked FQDN by looking at existing sunray.host records
+                classifications = []  # list of (fqdn, state, detail, host_data)
+                for fqdn in untracked_domains:
+                    existing = self.env['sunray.host'].search(
+                        [('domain', '=', fqdn)], limit=1
+                    )
+                    hd = response_hosts[fqdn]
+                    if not existing:
+                        classifications.append((fqdn, 'NEW', '', hd))
+                        untracked_counts['new'] += 1
+                    elif (existing.scp_id.id == self.id
+                          and getattr(existing, 'scp_setup_in_progress', False)):
+                        classifications.append((fqdn, 'PENDING SETUP', '', hd))
+                        untracked_counts['stub'] += 1
+                    else:
+                        scp_label = existing.scp_id.id or None
+                        detail = (
+                            f"scp_id={scp_label}, "
+                            f"sync={bool(existing.scp_sync_enabled)}"
+                        )
+                        classifications.append((fqdn, 'UNLINKED', detail, hd))
+                        untracked_counts['unlinked'] += 1
+
+                header_lines = [
+                    f"SCP {self.name}: {len(classifications)} untracked host(s) in SCP response:"
+                ]
+                for fqdn, state, detail, _hd in classifications:
+                    tag = f"{state} ({detail})" if detail and state != 'UNLINKED' else state
+                    header_lines.append(f"  - {fqdn} : {tag}")
+                _task_logger.info("\n".join(header_lines))
+
+                # Per-host detail block with rule/user counts from payload
+                for fqdn, state, detail, hd in classifications:
+                    n_rules = len(hd.get('rules', []) or [])
+                    n_users = len(hd.get('allowed_users', []) or [])
+                    if state == 'NEW':
+                        _task_logger.info(
+                            f"SCP {self.name}:\n"
+                            f"     Host {fqdn} NEW — no host record in Sunray.\n"
+                            f"     SCP response: {n_rules} rule(s), {n_users} user(s).\n"
+                            f"     Skipped."
+                        )
+                    elif state == 'PENDING SETUP':
+                        _task_logger.info(
+                            f"SCP {self.name}:\n"
+                            f"     Host {fqdn} PENDING SETUP — stub awaiting setup_host_from_scp.\n"
+                            f"     SCP response: {n_rules} rule(s), {n_users} user(s).\n"
+                            f"     Skipped."
+                        )
+                    else:  # UNLINKED
+                        _task_logger.info(
+                            f"SCP {self.name}:\n"
+                            f"     Host {fqdn} : UNLINKED\n"
+                            f"     reason: host exists but {detail}.\n"
+                            f"     SCP payload ignored ({n_rules} rule(s), {n_users} user(s) in SCP response).\n"
+                            f"     Admin must link/enable SCP sync manually."
+                        )
 
             for host_obj in self.host_ids.filtered(lambda h: h.scp_sync_enabled):
                 if host_obj.domain not in response_hosts:
@@ -539,10 +619,24 @@ class SunrayConfigurationProxy(models.Model):
                         'is_active': False,
                         'scp_last_sync_ts': fields.Datetime.now(),
                     })
-                    _task_logger.info(
-                        f"SCP {self.name}: Host {host_obj.domain} deactivated — no longer in SCP response "
-                        f"(had {len(deactivated_users)} user(s): {', '.join(deactivated_users)})"
-                    )
+                    if len(deactivated_users) > 1:
+                        users_block = "\n".join(
+                            f"      - {e}" for e in deactivated_users
+                        )
+                        _task_logger.info(
+                            f"SCP {self.name}:\n"
+                            f"    Host {host_obj.domain} : DEACTIVATED\n"
+                            f"    no longer in SCP response "
+                            f"(had {len(deactivated_users)} user(s)):\n{users_block}"
+                        )
+                    else:
+                        inline = deactivated_users[0] if deactivated_users else 'none'
+                        _task_logger.info(
+                            f"SCP {self.name}:\n"
+                            f"    Host {host_obj.domain} : DEACTIVATED\n"
+                            f"    no longer in SCP response "
+                            f"(had {len(deactivated_users)} user(s): {inline})"
+                        )
                     hosts_deactivated += 1
                     continue
 
@@ -573,13 +667,34 @@ class SunrayConfigurationProxy(models.Model):
                     added_emails = self.env['sunray.user'].sudo().browse(list(host_users_added)).mapped('email') if host_users_added else []
                     removed_emails = self.env['sunray.user'].sudo().browse(list(host_users_removed)).mapped('email') if host_users_removed else []
                     _task_logger.info(
-                        f"SCP {self.name}: Host {host_obj.domain} — "
-                        f"users added: {', '.join(added_emails) or 'none'}, "
-                        f"users removed: {', '.join(removed_emails) or 'none'}"
+                        f"SCP {self.name}:\n"
+                        f"    Host {host_obj.domain}\n"
+                        f"    users added: {', '.join(added_emails) or 'none'}\n"
+                        f"    users removed: {', '.join(removed_emails) or 'none'}"
+                    )
+                else:
+                    _task_logger.info(
+                        f"SCP {self.name}:\n"
+                        f"    Host {host_obj.domain}\n"
+                        f"    users: no change ({len(synced_user_ids)} user(s))"
                     )
 
                 # Sync rules (delete SCP-managed, recreate from response)
-                self._create_rules_from_scp(host_obj, host_data, host_obj.sunray_worker_id)
+                rule_counts = self._create_rules_from_scp(
+                    host_obj, host_data, host_obj.sunray_worker_id
+                )
+                for k in ('created', 'updated', 'unchanged', 'removed'):
+                    rules_totals[k] += rule_counts[k]
+                _task_logger.info(
+                    f"SCP {self.name}:\n"
+                    f"    Host {host_obj.domain}\n"
+                    f"    rules:\n"
+                    f"       created:   {rule_counts['created']}\n"
+                    f"       updated:   {rule_counts['updated']}\n"
+                    f"       unchanged: {rule_counts['unchanged']}\n"
+                    f"       removed:   {rule_counts['removed']}\n"
+                    f"       total_now: {rule_counts['total']}"
+                )
 
                 # Update hash and sync timestamp
                 host_obj.write({
@@ -589,9 +704,16 @@ class SunrayConfigurationProxy(models.Model):
                 hosts_synced += 1
 
             _task_logger.info(
-                f"SCP {self.name}: Host sync — {hosts_synced + hosts_skipped + hosts_deactivated} tracked, "
-                f"{hosts_synced} updated, {hosts_skipped} unchanged, {hosts_deactivated} deactivated"
-                + (f", {len(new_domains)} new (pending setup)" if new_domains else "")
+                f"SCP {self.name}: Host sync — "
+                f"{hosts_synced + hosts_skipped + hosts_deactivated} tracked, "
+                f"{hosts_synced} updated, {hosts_skipped} unchanged, "
+                f"{hosts_deactivated} deactivated"
+                + (
+                    f" | Untracked: {untracked_counts['new']} NEW, "
+                    f"{untracked_counts['stub']} PENDING SETUP, "
+                    f"{untracked_counts['unlinked']} UNLINKED"
+                    if untracked_domains else ""
+                )
             )
 
             # === Removed User Deactivation ===
@@ -617,13 +739,23 @@ class SunrayConfigurationProxy(models.Model):
 
             _task_logger.info(
                 f"SCP {self.name}: Sync completed — "
-                f"Hosts: {hosts_synced} updated, {hosts_skipped} unchanged, {hosts_deactivated} deactivated | "
-                f"Users: {users_created} new, {len(removed_user_ids)} removed"
+                f"Hosts: {hosts_synced} updated, {hosts_skipped} unchanged, "
+                f"{hosts_deactivated} deactivated | "
+                f"Users: {users_created} new, {len(removed_user_ids)} removed | "
+                f"Rules: {rules_totals['created']} created, "
+                f"{rules_totals['updated']} updated, "
+                f"{rules_totals['removed']} removed "
+                f"({rules_totals['unchanged']} unchanged) | "
+                f"Untracked: {untracked_counts['new']} NEW, "
+                f"{untracked_counts['stub']} PENDING SETUP, "
+                f"{untracked_counts['unlinked']} UNLINKED"
             )
+            _task_logger.info(f"===== SCP {self.name} sync END =====")
 
         except Exception as e:
             error_msg = f"Sync failed: {str(e)}"
             _task_logger.error(f"SCP {self.name}: {error_msg}")
+            _task_logger.info(f"===== SCP {self.name} sync END (error) =====")
             # TODO: fix me self.sudo().last_error = error_msg
 
             # Check if SCP is unreachable beyond cache duration

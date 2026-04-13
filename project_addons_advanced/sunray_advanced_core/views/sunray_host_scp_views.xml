@@ -11,11 +11,13 @@
             <xpath expr="//notebook" position="inside">
                 <page string="Sync Configuration" name="scp_sync_tab">
                     <!-- SCP Assignment -->
-                    <group string="Configuration Proxy" name="scp_assignment">
+                    <group string="Configuration Proxy" name="scp_assignment" class="ik_lw200">
                         <field name="scp_id"
-                            help="SCP managing this host configuration. Auto-register sets this automatically; manually assign to enable SCP synchronization for manually-created hosts."/>
-                        <field name="scp_sync_enabled" widget="boolean_toggle"
-                            help="Enable synchronization with the assigned SCP."/>
+                               required="scp_sync_enabled"
+                               help="SCP managing this host configuration. Auto-register sets this automatically; manually assign to enable SCP synchronization for manually-created hosts."/>
+                        <field name="scp_sync_enabled" 
+                               widget="boolean_toggle"
+                               help="Enable synchronization with the assigned SCP."/>
                     </group>
 
                     <!-- Sync Status -->

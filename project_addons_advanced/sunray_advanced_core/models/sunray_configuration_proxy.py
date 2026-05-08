@@ -771,10 +771,27 @@ class SunrayConfigurationProxy(models.Model):
                 time_since_success = (now - last_success).total_seconds()
                 if time_since_success > cache_duration_s:
                     # SCP unreachable too long, lockdown all managed hosts
-                    self.host_ids.filtered(lambda h: h.scp_sync_enabled).write({
-                        'block_all_traffic': True,
-                    })
-                    _task_logger.warning(
-                        f"SCP {self.name}: Unreachable for {time_since_success}s (limit: {cache_duration_s}s), "
-                        f"locked down {len(self.host_ids)} hosts"
+                    managed_hosts = self.host_ids.filtered(lambda h: h.scp_sync_enabled)
+                    message = (
+                        f"Failed to reach SCP '{self.name}' for {int(time_since_success)}sec "
+                        f"> sunray.auto_register_scp_cache_duration_s = {cache_duration_s}. "
+                        f"Locking down all hosts."
                     )
+                    self.env['sunray.audit.log'].sudo().create_audit_event(
+                        event_type='scp.unreachable_lockdown',
+                        severity='critical',
+                        event_source='system',
+                        details={
+                            'message': message,
+                            'scp_name': self.name,
+                            'scp_id': self.id,
+                            'time_unreachable_s': int(time_since_success),
+                            'threshold_s': cache_duration_s,
+                            'last_sync_ts': fields.Datetime.to_string(last_success),
+                            'locked_host_count': len(managed_hosts),
+                            'locked_host_ids': managed_hosts.ids,
+                            'sync_error': str(e),
+                        },
+                    )
+                    managed_hosts.write({'block_all_traffic': True})
+                    _task_logger.warning(message)

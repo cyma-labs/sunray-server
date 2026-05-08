@@ -30,6 +30,8 @@ class SunrayAuditLogAdvanced(models.Model):
             # Auto-Register Events
             ('auto_register.setup_triggered', 'Auto-Register Setup Triggered'),
             ('auto_register.reactivation_triggered', 'Auto-Register Reactivation Triggered'),
+            # SCP Events
+            ('scp.unreachable_lockdown', 'SCP Unreachable - Mass Lockdown Triggered'),
         ],
         ondelete={
             'token.email.sent': 'cascade',
@@ -51,5 +53,6 @@ class SunrayAuditLogAdvanced(models.Model):
             'remote_auth.session_terminated': 'cascade',
             'auto_register.setup_triggered': 'cascade',
             'auto_register.reactivation_triggered': 'cascade',
+            'scp.unreachable_lockdown': 'cascade',
         }
     )

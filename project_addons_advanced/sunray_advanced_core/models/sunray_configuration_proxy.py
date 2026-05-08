@@ -294,7 +294,8 @@ class SunrayConfigurationProxy(models.Model):
         """Find existing user by email, or create a new one.
 
         If username already exists with a different email, appends
-        ' - SCP:<scp_id>' suffix to avoid unique constraint violation.
+        ' - SCP:<scp_id>' suffix. If the suffixed username also exists
+        (e.g. email changed in SCP), reuses that user record.
 
         Returns:
             sunray.user record
@@ -311,7 +312,15 @@ class SunrayConfigurationProxy(models.Model):
             [('username', '=', username)], limit=1
         )
         if existing:
-            username = f"{username} - SCP:{self.id}"
+            suffixed = f"{username} - SCP:{self.id}"
+            # Check if the SCP-suffixed username already exists (email changed in SCP)
+            suffixed_user = self.env['sunray.user'].search(
+                [('username', '=', suffixed)], limit=1
+            )
+            if suffixed_user:
+                suffixed_user.write({'email': email, 'is_active': True})
+                return suffixed_user
+            username = suffixed
 
         return self.env['sunray.user'].create({
             'email': email,

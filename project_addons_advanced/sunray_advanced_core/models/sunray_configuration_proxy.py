@@ -513,6 +513,10 @@ class SunrayConfigurationProxy(models.Model):
         """
         self = self.sudo()  # Escalate to SUPERUSER — cron context may vary
         _task_logger = _imq_logger or _logger
+        # Savepoint protects the transaction: if sync crashes (e.g. UniqueViolation),
+        # the savepoint is rolled back and the except handler can still execute SQL
+        # for lockdown, audit events, and last_error.
+        sp = self.env.cr.savepoint(flush=True)
         try:
             _task_logger.info(f"===== SCP {self.name} sync START =====")
             _task_logger.info(f"Starting sync for SCP {self.name}")
@@ -760,12 +764,19 @@ class SunrayConfigurationProxy(models.Model):
                 f"{untracked_counts['unlinked']} UNLINKED"
             )
             _task_logger.info(f"===== SCP {self.name} sync END =====")
+            sp.close(rollback=False)  # Release savepoint on success
 
         except Exception as e:
+            # Rollback savepoint to recover from failed transaction state
+            # (e.g. UniqueViolation puts PG into InFailedSqlTransaction).
+            # After rollback, the transaction is clean and the handler can
+            # execute SQL for lockdown, audit events, and last_error.
+            sp.close(rollback=True)
+
             error_msg = f"Sync failed: {str(e)}"
             _task_logger.error(f"SCP {self.name}: {error_msg}")
             _task_logger.info(f"===== SCP {self.name} sync END (error) =====")
-            # TODO: fix me self.sudo().last_error = error_msg
+            self.last_error = error_msg
 
             # Check if SCP is unreachable beyond cache duration
             cache_duration_s = int(

@@ -92,6 +92,7 @@
                            widget="badge"/>
                 </xpath>
                 <xpath expr="//field[@name='sunray_worker_id']" position="after">
+                    <field name="scp_id" string="Config. Proxy" optional="hide"/>
                     <field name="golive_date" optional="hide"/>
                     <field name="days_until_golive" optional="hide"/>
                 </xpath>
@@ -117,6 +118,10 @@
             <field name="model">sunray.host</field>
             <field name="inherit_id" ref="sunray_core.view_sunray_host_search"/>
             <field name="arch" type="xml">
+                <!-- Add SCP as a searchable field in the search bar -->
+                <xpath expr="//field[@name='pending_worker_name']" position="after">
+                    <field name="scp_id" />
+                </xpath>
                 <!-- Add filter for remote auth enabled hosts -->
                 <xpath expr="//filter[@name='pending_migration']" position="after">
                     <separator/>
@@ -147,6 +152,7 @@
                             context="{'group_by': 'remote_auth_enabled'}"/>
                     <filter string="State" name="groupby_state" context="{'group_by': 'state'}"/>
                     <filter string="Go-Live Date" name="groupby_golive" context="{'group_by': 'golive_date'}"/>
+                    <filter string="Configuration Proxy" name="groupby_scp" context="{'group_by': 'scp_id'}"/>
                 </xpath>
             </field>
         </record>

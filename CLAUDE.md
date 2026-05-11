@@ -877,6 +877,49 @@ sunray_core/
   ], string='Authentication Mode')
   ```
 
+- **Smart Buttons (pure-XML pattern)**: To navigate from a parent record to a filtered list of related records, use a dedicated `ir.actions.act_window` whose `domain` references `active_id`. No Python method is needed — `active_id` is resolved to the current record id at click time.
+
+  **Action record** (one per smart button):
+  ```xml
+  <record id="sunray_configuration_proxy__hosts_actwindow" model="ir.actions.act_window">
+      <field name="name">Hosts</field>
+      <field name="res_model">sunray.host</field>
+      <field name="view_mode">list,form</field>
+      <field name="domain">[('scp_id', '=', active_id)]</field>
+      <field name="context">{'default_scp_id': active_id}</field>
+  </record>
+  ```
+
+  **Form view** — button-box as first child of `<sheet>`:
+  ```xml
+  <sheet>
+      <div class="oe_button_box" name="button_box">
+          <button name="%(sunray_configuration_proxy__hosts_actwindow)d"
+                  type="action" class="oe_stat_button" icon="fa-sitemap">
+              <field name="host_count" widget="statinfo" string="Hosts"/>
+          </button>
+      </div>
+      ...
+  </sheet>
+  ```
+
+  **Count field** on the parent model:
+  ```python
+  host_count = fields.Integer(compute='_compute_host_count', store=True)
+
+  @api.depends('host_ids')
+  def _compute_host_count(self):
+      for record in self:
+          record.host_count = len(record.host_ids)
+  ```
+
+  Conventions:
+  - Action XML id: `{parent_model}__{related}_actwindow`.
+  - `domain` filters on the inverse Many2one (e.g. `scp_id`) — simpler than going through `host_ids`.
+  - `context` pre-fills the inverse field so creation from the filtered list auto-links.
+  - Use `type="action"` (not `type="object"`) — no Python method to maintain.
+  - Reserve a Python `action_view_xxx` method only when the domain is dynamic (e.g. depends on aggregated data, computed at runtime).
+
 ### Toast Notifications (inouk_notifications)
 
 - **Module**: `inouk_notifications` - adds `ik_notify` and `ik_notify_with_link` methods to `res.users`

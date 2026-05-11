@@ -6,6 +6,7 @@
         <field name="model">sunray.audit.log</field>
         <field name="arch" type="xml">
             <list create="false" edit="false" delete="false">
+                <field name="id" optional="hide"/>
                 <field name="timestamp"/>
                 <field name="event_type"/>
                 <field name="sunray_admin_user_id" optional="show"/>
@@ -27,7 +28,7 @@
         <field name="model">sunray.audit.log</field>
         <field name="arch" type="xml">
             <search>
-                <field name="event_type"/>
+                <field name="details"/>
                 <field name="sunray_admin_user_id"/>
                 <field name="sunray_user_id"/>
                 <field name="sunray_worker"/>
@@ -35,6 +36,7 @@
                 <field name="request_id"/>
                 <field name="ip_address"/>
                 <field name="username"/>
+                <field name="event_type"/>
                 <separator/>
                 <filter name="critical" string="Critical" domain="[('severity', '=', 'critical')]"/>
                 <filter name="error" string="Error" domain="[('severity', '=', 'error')]"/>

@@ -35,7 +35,10 @@ Technical Components:
     """,
     'author': 'Muppy',
     'website': 'https://github.com/muppy/sunray',
-    'license': 'LGPL-3',
+    # Effective license: FSL-1.1-Apache-2.0 (Functional Source License v1.1 with
+    # Apache 2.0 future-license). See ../../LICENSE and ../../LICENSES/FSL-1.1-Apache-2.0.txt.
+    # Odoo's `license` field accepts a closed vocabulary, so we use the closest match below.
+    'license': 'Other OSI approved licence',
     'depends': ['base', 'web', 'inouk_attachments_storage', 'inouk_ace_editor', 'inouk_notifications'],
     'data': [
         # Inouk Attachment Storage

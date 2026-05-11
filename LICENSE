@@ -1,0 +1,53 @@
+# Sunray Server — License Index
+
+This repository contains Sunray Server software under **dual licensing**.
+The applicable license depends on which addon you use.
+
+| Addon | Tier | License | Full text |
+|-------|------|---------|-----------|
+| `project_addons/sunray_core/` | Free | **FSL-1.1-Apache-2.0** | [LICENSES/FSL-1.1-Apache-2.0.txt](LICENSES/FSL-1.1-Apache-2.0.txt) |
+| `project_addons_advanced/sunray_advanced_core/` | Sunray Enterprise (paid) | **Elastic License 2.0 (ELv2)** | [LICENSES/ELv2.txt](LICENSES/ELv2.txt) |
+| `project_addons_advanced/sunray_dashboard/` | Sunray Enterprise (paid) | **Elastic License 2.0 (ELv2)** | [LICENSES/ELv2.txt](LICENSES/ELv2.txt) |
+
+## Plain-language summary
+
+**Sunray Core (free tier)** is published under the **Functional Source License**
+(FSL-1.1-ALv2). You may use it for any purpose **except offering Sunray as a
+hosted or managed service that competes with our offerings**. Each released
+version automatically converts to **Apache License 2.0** on the second
+anniversary of its publication.
+
+**Sunray Advanced Core (Sunray Enterprise — paid tier)** is published under
+the **Elastic License 2.0**. You may use it for any purpose **except offering
+it as a hosted or managed service**. Productive use additionally requires an
+active commercial subscription with oursbl.eu (9€/month for 20 users + 1€ per
+additional user ; "billed user" = user connecting ≥2 times per month).
+Billing is currently inactive during beta — see [docs/licensing_decision.md](docs/licensing_decision.md).
+
+## Beta status
+
+Sunray is currently in beta. Billing is not yet active and runtime license
+enforcement is on the roadmap. Source-available violations of the ELv2
+commercial-subscription requirement are tolerated for the duration of beta
+only ; this position will be reassessed when both billing and enforcement
+go live.
+
+## Manifest declarations
+
+Odoo accepts only a closed vocabulary of `license` values in `__manifest__.py`.
+We therefore use the closest matching standard value and direct readers to
+this LICENSE file for the actual terms :
+
+- `project_addons/sunray_core/__manifest__.py` declares `'Other OSI approved licence'` — actual license is **FSL-1.1-Apache-2.0**
+- `project_addons_advanced/sunray_advanced_core/__manifest__.py` declares `'Other proprietary'` — actual license is **Elastic License 2.0**
+
+## Distribution & IP
+
+- **IP holder:** Cyril MORISSE (sole owner of all Sunray intellectual property)
+- **Distributor:** oursbl.eu
+- **Partner channel:** partners purchase commercial licenses at standard rates and resell their own hosting service — no white-label, no margin-sharing on the Sunray license fee
+
+## See also
+
+- [docs/licensing_decision.md](docs/licensing_decision.md) — full decision context, beta-exit conditions, legal-review caveat
+- [sunray_ssot.md](../sunray_ssot.md) (at meta-repo root) — Pricing & Offers and Channel sections

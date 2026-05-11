@@ -16,6 +16,9 @@
     'demo_xml': [],
     'auto_install': True,
     'installable': True,
+    # Effective license: Elastic License v2 (ELv2). See ../../LICENSE and
+    # ../../LICENSES/ELv2.txt. Productive use additionally requires an active
+    # Sunray Enterprise commercial subscription (aligned with sunray_advanced_core).
     'license': 'Other proprietary',
     'application': True,
     'assets': {

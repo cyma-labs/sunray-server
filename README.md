@@ -285,7 +285,20 @@ docker run -e IKB_ODOO_ADMIN_PASSWORD="admin" -it sunray-srvr18:latest
 
 ## 📄 License
 
-[Your License Here]
+Sunray Server is **dual-licensed** :
+
+| Addon | Tier | License |
+|-------|------|---------|
+| `project_addons/sunray_core/` | Free | **FSL-1.1-Apache-2.0** (Functional Source License v1.1, converts to Apache 2.0 on the 2nd anniversary of each release) |
+| `project_addons_advanced/sunray_advanced_core/` | Sunray Enterprise (paid) | **Elastic License 2.0** (perpetual source-available) |
+
+Both licenses **forbid third parties from offering Sunray as a hosted or managed service** without a commercial agreement with oursbl.eu. Sunray Enterprise additionally requires an active commercial subscription (9€/month for 20 users + 1€/user above) — billing is currently inactive during beta.
+
+See [LICENSE](LICENSE), [LICENSES/FSL-1.1-Apache-2.0.txt](LICENSES/FSL-1.1-Apache-2.0.txt), [LICENSES/ELv2.txt](LICENSES/ELv2.txt), and [docs/licensing_decision.md](docs/licensing_decision.md) for full terms and context.
+
+**IP:** Cyril MORISSE · **Distribution:** oursbl.eu · **Partner model:** no white-label, partners purchase licenses at standard rates and resell their own hosting service with their own margin.
+
+> ⚠️ This README still contains pre-2026-05-08 commercial wording (e.g. "Open Source"). The repository's source of truth is now [`sunray_ssot.md`](../sunray_ssot.md) ; this README will be regenerated from the SSOT.
 
 ---
 

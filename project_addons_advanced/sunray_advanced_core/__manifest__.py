@@ -42,5 +42,9 @@ Advanced features for Sunray Zero Trust Access solution:
     'installable': True,
     'application': False,
     'auto_install': False,
-    'license': 'LGPL-3',
+    # Effective license: Elastic License v2 (ELv2). See ../../LICENSE and
+    # ../../LICENSES/ELv2.txt. Productive use additionally requires an active
+    # commercial subscription (Sunray Enterprise — 9€/month for 20 users + 1€/user).
+    # Odoo's `license` field accepts a closed vocabulary, so we use 'Other proprietary'.
+    'license': 'Other proprietary',
 }

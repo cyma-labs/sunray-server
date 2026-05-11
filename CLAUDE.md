@@ -49,7 +49,7 @@ Think of Sunray as a security bouncer at a club entrance:
 
 ### Advanced Features (Paid)
 
-**Sunray Advanced Core** (`advanced_addons/sunray_advanced_core/`) extends the base system with premium features:
+**Sunray Advanced Core** (`project_addons_advanced/sunray_advanced_core/`) extends the base system with premium features:
 
 - **Remote Authentication**: Mobile device authentication for shared/untrusted computers
   - Users scan QR code on computer with mobile device
@@ -82,7 +82,7 @@ Think of Sunray as a security bouncer at a club entrance:
 - Follow server-centric design principles: no worker-side validation or default values
 
 ### Advanced Feature Development
-- Advanced/paid features MUST be implemented in `advanced_addons/sunray_advanced_core/` addon
+- Advanced/paid features MUST be implemented in `project_addons_advanced/sunray_advanced_core/` addon
 - Extend base models using `_inherit` pattern (never modify core models directly)
 - Add API endpoints by extending the `RestAPI` controller class
 - Document all new endpoints in `docs/API_CONTRACT.md`
@@ -164,7 +164,7 @@ Sunray is organized as separate repositories following a server-centric architec
 │   │   ├── controllers/
 │   │   ├── views/
 │   │   └── security/
-├── advanced_addons/           # Paid/Advanced features
+├── project_addons_advanced/   # Paid/Advanced features (Sunray Enterprise — ELv2)
 │   └── sunray_advanced_core/  # Advanced edition addon
 │       ├── __manifest__.py
 │       ├── models/
@@ -1244,7 +1244,7 @@ Worker Receives (exceptions_tree):
 
 **Implementation Status: COMPLETED**
 
-**Module**: `advanced_addons/sunray_advanced_core/` (Paid feature)
+**Module**: `project_addons_advanced/sunray_advanced_core/` (Paid feature)
 
 Remote Authentication enables users to authenticate to Protected Hosts using their mobile device's passkey while accessing from an untrusted device (e.g., shared computer, kiosk, library terminal).
 
@@ -1354,7 +1354,7 @@ Workers detect Remote Authentication availability by checking for the `remote_au
 
 **Implementation Files:**
 ```
-advanced_addons/sunray_advanced_core/
+project_addons_advanced/sunray_advanced_core/
 ├── models/
 │   ├── sunray_host.py         # 5 new fields for remote auth config
 │   └── sunray_session.py      # 2 new fields for session tracking

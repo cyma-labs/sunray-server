@@ -67,6 +67,12 @@
                         <field name="last_error" readonly="1" widget="text"/>
                     </group>
 
+                    <!-- Failure Handling -->
+                    <group string="Failure Handling" name="failure_handling" class="ik_lw240">
+                        <field name="auto_lockdown_on_unreachable" widget="boolean_toggle"/>
+                        <field name="scp_cache_duration_s"/>
+                    </group>
+
                     <!-- Counts -->
                     <group string="Managed Resources" class="oe_read_only">
                         <field name="host_count" readonly="1"/>

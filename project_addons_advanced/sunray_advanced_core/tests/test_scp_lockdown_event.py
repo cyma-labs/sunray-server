@@ -51,7 +51,8 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
             self.scp.sync_scp_job()
 
     def test_lockdown_event_emitted_when_threshold_exceeded(self):
-        """SCP failing past threshold → 1 audit event + hosts locked."""
+        """auto_lockdown_on_unreachable=True + threshold exceeded → critical event + hosts locked."""
+        self.scp.auto_lockdown_on_unreachable = True
         self.scp.last_sync_ts = fields.Datetime.now() - timedelta(seconds=300)
 
         events_before = self.AuditLog.search_count([
@@ -77,15 +78,16 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
         self.assertEqual(details['scp_id'], self.scp.id)
         self.assertEqual(details['threshold_s'], 60)
         self.assertGreater(details['time_unreachable_s'], 60)
-        self.assertEqual(details['locked_host_count'], 2)
-        self.assertIn(self.host_a.id, details['locked_host_ids'])
-        self.assertIn(self.host_b.id, details['locked_host_ids'])
+        self.assertEqual(details['managed_host_count'], 2)
+        self.assertIn(self.host_a.id, details['managed_host_ids'])
+        self.assertIn(self.host_b.id, details['managed_host_ids'])
+        self.assertTrue(details['lockdown_applied'])
         self.assertIn(
             "Failed to reach SCP 'TestSCP'",
             details['message'],
         )
         self.assertIn(
-            'sunray.auto_register_scp_cache_duration_s = 60',
+            'scp_cache_duration_s = 60',
             details['message'],
         )
 
@@ -143,6 +145,7 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
         InFailedSqlTransaction state. The savepoint must rollback so the
         except handler can run subsequent SQL (audit event, lockdown).
         """
+        self.scp.auto_lockdown_on_unreachable = True
         self.scp.last_sync_ts = fields.Datetime.now() - timedelta(seconds=300)
 
         # Pre-create a user we will collide with
@@ -196,3 +199,61 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
 
         self.scp.invalidate_recordset(['last_error'])
         self.assertIn('simulated SCP unreachable', self.scp.last_error or '')
+
+    def test_lockdown_skipped_when_disabled(self):
+        """auto_lockdown_on_unreachable=False (default) → warning event, no hosts locked."""
+        # Default is False, but be explicit
+        self.scp.auto_lockdown_on_unreachable = False
+        self.scp.last_sync_ts = fields.Datetime.now() - timedelta(seconds=300)
+
+        self._trigger_failed_sync()
+
+        events = self.AuditLog.search([
+            ('event_type', '=', 'scp.unreachable_lockdown')
+        ], order='id desc', limit=1)
+        self.assertTrue(events)
+        self.assertEqual(events.severity, 'warning')
+
+        details = events.get_details_dict()
+        self.assertFalse(details['lockdown_applied'])
+        self.assertFalse(details['lockdown_enabled'])
+        self.assertIn('SKIPPED', details['message'])
+        self.assertEqual(details['managed_host_count'], 2)
+
+        self.host_a.invalidate_recordset(['block_all_traffic'])
+        self.host_b.invalidate_recordset(['block_all_traffic'])
+        self.assertFalse(self.host_a.block_all_traffic)
+        self.assertFalse(self.host_b.block_all_traffic)
+
+    def test_lockdown_default_is_off(self):
+        """New SCP must have auto_lockdown_on_unreachable=False by default."""
+        new_scp = self.Scp.create({
+            'name': 'DefaultsSCP',
+            'url': 'https://x.test/inouk-scp/v1/',
+        })
+        self.assertFalse(new_scp.auto_lockdown_on_unreachable)
+
+    def test_scp_cache_duration_default_from_system_param(self):
+        """New SCP's scp_cache_duration_s inherits the system param value."""
+        self.env['ir.config_parameter'].sudo().set_param(
+            'sunray.auto_register_scp_cache_duration_s', '7200'
+        )
+        new_scp = self.Scp.create({
+            'name': 'SCP2',
+            'url': 'https://x.test/inouk-scp/v1/',
+        })
+        self.assertEqual(new_scp.scp_cache_duration_s, 7200)
+
+    def test_scp_cache_duration_per_scp_override(self):
+        """Per-SCP scp_cache_duration_s overrides the global threshold."""
+        self.scp.auto_lockdown_on_unreachable = True
+        self.scp.scp_cache_duration_s = 10  # very short threshold
+        self.scp.last_sync_ts = fields.Datetime.now() - timedelta(seconds=30)
+
+        self._trigger_failed_sync()
+
+        events = self.AuditLog.search([
+            ('event_type', '=', 'scp.unreachable_lockdown')
+        ], order='id desc', limit=1)
+        self.assertTrue(events, 'Lockdown should fire because 30s > scp_cache_duration_s=10')
+        self.assertEqual(events.get_details_dict()['threshold_s'], 10)

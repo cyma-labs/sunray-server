@@ -39,6 +39,19 @@ class SunrayConfigurationProxy(models.Model):
         default=True,
         help='Disable to stop syncing this SCP'
     )
+    auto_lockdown_on_unreachable = fields.Boolean(
+        string='Lockdown Hosts on Unreachable',
+        default=False,
+        help="When enabled, all managed hosts are locked (block_all_traffic=True) "
+             "if SCP remains unreachable beyond scp_cache_duration_s."
+    )
+    scp_cache_duration_s = fields.Integer(
+        string="Cache Duration (seconds)",
+        help="Maximum time the SCP can be unreachable before the unreachable-lockdown "
+             "mechanism kicks in (subject to auto_lockdown_on_unreachable). "
+             "Default value is taken from system parameter "
+             "sunray.auto_register_scp_cache_duration_s at creation time."
+    )
 
     # Relations
     host_ids = fields.One2many(
@@ -109,6 +122,17 @@ class SunrayConfigurationProxy(models.Model):
     def _onchange_url(self):
         if self.url and not self.url.endswith('/'):
             self.url = self.url + '/'
+
+    @api.model
+    def default_get(self, fields_list):
+        defaults = super().default_get(fields_list)
+        if 'scp_cache_duration_s' in fields_list:
+            defaults['scp_cache_duration_s'] = int(
+                self.env['ir.config_parameter'].sudo().get_param(
+                    'sunray.auto_register_scp_cache_duration_s', '0'
+                )
+            )
+        return defaults
 
     def match_fqdn(self, fqdn):
         """Check if FQDN matches this SCP's regex pattern.
@@ -778,28 +802,34 @@ class SunrayConfigurationProxy(models.Model):
             _task_logger.info(f"===== SCP {self.name} sync END (error) =====")
             self.last_error = error_msg
 
-            # Check if SCP is unreachable beyond cache duration
-            cache_duration_s = int(
-                self.env['ir.config_parameter'].sudo().get_param(
-                    'sunray.auto_register_scp_cache_duration_s',
-                    '43200'
-                )
-            )
+            # Check if SCP is unreachable beyond per-SCP cache duration
+            cache_duration_s = self.scp_cache_duration_s
             last_success = self.last_sync_ts
             if last_success:
                 now = fields.Datetime.now()
                 time_since_success = (now - last_success).total_seconds()
                 if time_since_success > cache_duration_s:
-                    # SCP unreachable too long, lockdown all managed hosts
                     managed_hosts = self.host_ids.filtered(lambda h: h.scp_sync_enabled)
-                    message = (
-                        f"Failed to reach SCP '{self.name}' for {int(time_since_success)}sec "
-                        f"> sunray.auto_register_scp_cache_duration_s = {cache_duration_s}. "
-                        f"Locking down all hosts."
-                    )
+                    lockdown_enabled = self.auto_lockdown_on_unreachable
+
+                    if lockdown_enabled:
+                        message = (
+                            f"Failed to reach SCP '{self.name}' for {int(time_since_success)}sec "
+                            f"> scp_cache_duration_s = {cache_duration_s}. "
+                            f"Locking down all hosts."
+                        )
+                        severity = 'critical'
+                    else:
+                        message = (
+                            f"Failed to reach SCP '{self.name}' for {int(time_since_success)}sec "
+                            f"> scp_cache_duration_s = {cache_duration_s}. "
+                            f"Lockdown SKIPPED (auto_lockdown_on_unreachable=False)."
+                        )
+                        severity = 'warning'
+
                     self.env['sunray.audit.log'].sudo().create_audit_event(
                         event_type='scp.unreachable_lockdown',
-                        severity='critical',
+                        severity=severity,
                         event_source='system',
                         details={
                             'message': message,
@@ -808,10 +838,14 @@ class SunrayConfigurationProxy(models.Model):
                             'time_unreachable_s': int(time_since_success),
                             'threshold_s': cache_duration_s,
                             'last_sync_ts': fields.Datetime.to_string(last_success),
-                            'locked_host_count': len(managed_hosts),
-                            'locked_host_ids': managed_hosts.ids,
+                            'managed_host_count': len(managed_hosts),
+                            'managed_host_ids': managed_hosts.ids,
+                            'lockdown_enabled': lockdown_enabled,
+                            'lockdown_applied': lockdown_enabled,
                             'sync_error': str(e),
                         },
                     )
-                    managed_hosts.write({'block_all_traffic': True})
+
+                    if lockdown_enabled:
+                        managed_hosts.write({'block_all_traffic': True})
                     _task_logger.warning(message)

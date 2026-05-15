@@ -21,14 +21,6 @@ class ResConfigSettings(models.TransientModel):
         config_parameter='sunray.setup_token_send_email_default'
     )
 
-    # IP Whitelist Settings
-    sunray_admin_ip_whitelist = fields.Char(
-        string='Admin IP Whitelist',
-        help='IP addresses or CIDR ranges allowed to access the Sunray admin interface (comma-separated)\n'
-             'Examples: 192.168.1.100, 192.168.1.0/24, 10.0.0.0/8',
-        config_parameter='sunray.admin_ip_whitelist'
-    )
-
     # Host Configuration
     sunray_golive_period_duration_days = fields.Integer(
         string='Default Go-Live Period (days)',

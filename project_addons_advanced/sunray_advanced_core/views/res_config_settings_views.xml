@@ -15,19 +15,6 @@
                 </setting>
             </xpath>
             <xpath expr="//block[@id='sunray_setup_token_defaults']" position="after">
-                <block title="IP Whitelist">
-                    <setting help="Restrict access to the Sunray admin interface by IP address">
-                        <field name="sunray_admin_ip_whitelist"
-                                class="oe_inline"
-                                placeholder="192.168.1.100, 192.168.1.0/24, 10.0.0.0/8"/>
-                        <div class="content-group">
-                            <div class="text-muted mt-2">
-                                Configure which IP addresses or CIDR ranges are allowed to access the Sunray server admin interface.
-                                Separate multiple IPs/CIDRs with commas. When configured, only requests from whitelisted IPs will be able to reach the Odoo interface.
-                            </div>
-                        </div>
-                    </setting>
-                </block>
                 <block title="Host Configuration">
                     <setting string="Go-Live Period" help="Default number of days for the go-live period when creating new hosts">
                         <div class="content-group">

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Backend favicon: set `x_icon` before web.layout's
+        <link rel="shortcut icon"> evaluates so the backend shows the
+        Sunray favicon. Stock hook: t-att-href="x_icon or '/web/static/img/favicon.ico'"
+    -->
+    <template id="sunray_core__webclient_favicon"
+              inherit_id="web.layout"
+              name="Sunray Backend Favicon">
+        <xpath expr="//head/link[@rel='shortcut icon']" position="before">
+            <t t-set="x_icon" t-value="'/sunray_core/static/src/img/favicon.ico'"/>
+        </xpath>
+    </template>
+
+    <!--
+        Keep the stock Odoo favicon on portal/frontend pages.
+        web.frontend_layout inherits web.layout, so without this revert
+        it would also pick up the Sunray favicon set above.
+    -->
+    <template id="sunray_core__frontend_favicon"
+              inherit_id="web.frontend_layout"
+              name="Sunray: keep stock favicon on frontend">
+        <xpath expr="//head/link[@rel='shortcut icon']" position="before">
+            <t t-set="x_icon" t-value="'/web/static/img/favicon.ico'"/>
+        </xpath>
+    </template>
+
+</odoo>

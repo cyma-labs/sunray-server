@@ -76,6 +76,7 @@ Technical Components:
         'views/sunray_worker_views.xml',
         'views/res_config_settings_views.xml',
         'views/sunray_imq_message_views.xml',
+        'views/webclient_templates.xml',
 
         # Menu (must be last)
         'views/sunray_menu.xml',

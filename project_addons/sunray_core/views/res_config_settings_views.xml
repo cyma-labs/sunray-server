@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app string="Sunray" name="sunray_settings" logo="/sunray_core/static/description/icon.svg" groups="sunray_core.group_sunray_admin">
+                <app string="Sunray" name="sunray_settings" logo="/sunray_core/static/description/icon.png" groups="sunray_core.group_sunray_admin">
                     <block title="Setup Token" id="sunray_setup_token_defaults">
                         <setting string="Device Name" help="Default device name when generating setup tokens">
                             <div class="content-group">

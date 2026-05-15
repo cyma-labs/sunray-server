@@ -3,6 +3,8 @@ import json
 import re
 import requests
 import logging
+import time
+import traceback
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
@@ -214,38 +216,104 @@ class SunrayConfigurationProxy(models.Model):
         """
         self = self.sudo()  # Escalate to SUPERUSER — may be called from auth='none' context
         _task_logger = _imq_logger or _logger
+        # Track current step for diagnostic logging in the except block.
+        # Updated at every meaningful phase so a failure can pinpoint where.
+        current_step = 'init'
+        t_start = time.monotonic()
         try:
-            _task_logger.info(f"Setting up host {fqdn} from SCP {self.name}")
-            # Find the stub host created by the controller
+            _task_logger.info(
+                f"===== setup_host_from_scp START — "
+                f"fqdn={fqdn} scp={self.name} scp_id={self.id} worker_id={worker_id} ====="
+            )
+
+            # --- Step 1: Find the stub host created by the controller -----------
+            current_step = 'stub_lookup'
+            _task_logger.info(
+                f"[stub_lookup] Searching stub host: "
+                f"domain='{fqdn}' AND scp_id={self.id}"
+            )
             host_obj = self.env['sunray.host'].search([
                 ('domain', '=', fqdn),
                 ('scp_id', '=', self.id),
             ], limit=1)
 
             if not host_obj:
+                # Diagnostic: any host with this domain at all? Help admin understand
+                # whether the stub was deleted, never created, or linked to a different SCP.
+                any_with_domain = self.env['sunray.host'].search([('domain', '=', fqdn)])
+                _task_logger.error(
+                    f"[stub_lookup] No stub found for domain='{fqdn}' under scp_id={self.id}. "
+                    f"Hosts with same domain (any SCP): "
+                    f"{[(h.id, h.scp_id.id, h.is_active, h.scp_setup_in_progress) for h in any_with_domain]} "
+                    f"(format: [(host_id, scp_id, is_active, setup_in_progress), ...])"
+                )
                 raise ValidationError(
                     f"Stub host for {fqdn} not found — expected controller to create it"
                 )
 
-            # Fetch SCP data for this specific FQDN
-            scp_data = self.call_scp(fqdn=fqdn)
+            _task_logger.info(
+                f"[stub_lookup] Stub found: id={host_obj.id} "
+                f"is_active={host_obj.is_active} "
+                f"scp_setup_in_progress={host_obj.scp_setup_in_progress} "
+                f"scp_sync_enabled={host_obj.scp_sync_enabled} "
+                f"sunray_worker_id={host_obj.sunray_worker_id.id}"
+            )
 
-            # Find matching host in response
+            # --- Step 2: Fetch SCP data for this specific FQDN ------------------
+            current_step = 'scp_call'
+            _task_logger.info(
+                f"[scp_call] Calling SCP {self.name} (url={self.url}) for fqdn={fqdn}"
+            )
+            scp_data = self.call_scp(fqdn=fqdn)
+            response_hosts = scp_data.get('protected_hosts', []) or []
+            response_users = scp_data.get('users', []) or []
+            _task_logger.info(
+                f"[scp_call] SCP response received: "
+                f"{len(response_hosts)} host(s), {len(response_users)} user(s)"
+            )
+
+            # --- Step 3: Find matching host in response -------------------------
+            current_step = 'fqdn_match'
+            available_fqdns = [h.get('fqdn') for h in response_hosts]
+            _task_logger.info(
+                f"[fqdn_match] Searching '{fqdn}' in SCP response. "
+                f"Available FQDNs: {available_fqdns}"
+            )
             host_data = None
-            for h in scp_data.get('protected_hosts', []):
+            for h in response_hosts:
                 if h.get('fqdn') == fqdn:
                     host_data = h
                     break
 
             if not host_data:
+                _task_logger.error(
+                    f"[fqdn_match] FQDN '{fqdn}' NOT FOUND in SCP response. "
+                    f"Available FQDNs were: {available_fqdns}"
+                )
                 raise ValidationError(f"FQDN {fqdn} not found in SCP response")
 
-            # Get worker for defaults
+            _task_logger.info(
+                f"[fqdn_match] Match found: fqdn='{fqdn}' "
+                f"rules={len(host_data.get('rules', []) or [])} "
+                f"allowed_users={len(host_data.get('allowed_users', []) or [])} "
+                f"has_hash={bool(host_data.get('hash'))}"
+            )
+
+            # --- Step 4: Get worker for defaults --------------------------------
+            current_step = 'worker_lookup'
+            _task_logger.info(f"[worker_lookup] Looking up worker id={worker_id}")
             worker_obj = self.env['sunray.worker'].browse(worker_id)
             if not worker_obj.exists():
+                _task_logger.error(
+                    f"[worker_lookup] Worker id={worker_id} does not exist in database"
+                )
                 raise ValidationError(f"Worker {worker_id} not found")
+            _task_logger.info(
+                f"[worker_lookup] Worker found: id={worker_obj.id} name='{worker_obj.name}'"
+            )
 
-            # Update the stub host with SCP and worker defaults
+            # --- Step 5: Build host values + write ------------------------------
+            current_step = 'host_write'
             host_values = {
                 'scp_sync_enabled': True,
                 'backend_url': f'https://{fqdn}/',
@@ -275,26 +343,66 @@ class SunrayConfigurationProxy(models.Model):
             if host_data.get('hash'):
                 host_values['scp_hash'] = host_data['hash']
 
+            _task_logger.info(
+                f"[host_write] Writing {len(host_values)} field(s) on host id={host_obj.id}. "
+                f"Key transitions: "
+                f"is_active {host_obj.is_active}→{host_values['is_active']}, "
+                f"scp_setup_in_progress {host_obj.scp_setup_in_progress}→"
+                f"{host_values['scp_setup_in_progress']}, "
+                f"scp_sync_enabled {host_obj.scp_sync_enabled}→{host_values['scp_sync_enabled']}"
+            )
             host_obj.write(host_values)
+            _task_logger.info(f"[host_write] write() returned (no exception raised)")
 
-            # Create or update users from users[] list
-            user_emails = {u['email']: u for u in scp_data.get('users', [])}
+            # --- Step 6: Create or update users from users[] list ---------------
+            current_step = 'user_sync'
+            user_emails = {u['email']: u for u in response_users}
+            _task_logger.info(
+                f"[user_sync] Resolving {len(user_emails)} user(s) from SCP response: "
+                f"{list(user_emails.keys())}"
+            )
             new_user_ids = []
             for email, user_data in user_emails.items():
                 user_obj = self._find_or_create_user(email, user_data.get('username', email))
                 new_user_ids.append(user_obj.id)
+            _task_logger.info(
+                f"[user_sync] Resolved {len(new_user_ids)} sunray.user record(s) "
+                f"(ids={new_user_ids}); linking to SCP {self.name} (additive)"
+            )
 
             # Add users to scp.user_ids (additive — don't overwrite users from other hosts)
             self.user_ids = [(4, uid, 0) for uid in new_user_ids]
 
-            # Assign allowed_users to host
-            allowed_user_emails = host_data.get('allowed_users', [])
+            # --- Step 7: Assign allowed_users to host ---------------------------
+            current_step = 'host_user_assign'
+            allowed_user_emails = host_data.get('allowed_users', []) or []
+            _task_logger.info(
+                f"[host_user_assign] SCP host_data allowed_users ({len(allowed_user_emails)}): "
+                f"{allowed_user_emails}"
+            )
             allowed_user_ids = self.env['sunray.user'].sudo().search(
                 [('email', 'in', allowed_user_emails)]
             ).ids
+            unresolved = set(allowed_user_emails) - set(
+                self.env['sunray.user'].sudo().browse(allowed_user_ids).mapped('email')
+            )
+            if unresolved:
+                _task_logger.warning(
+                    f"[host_user_assign] {len(unresolved)} allowed_user email(s) could not be "
+                    f"resolved to sunray.user records: {sorted(unresolved)}"
+                )
+            _task_logger.info(
+                f"[host_user_assign] Assigning {len(allowed_user_ids)} user(s) to host "
+                f"id={host_obj.id} (ids={allowed_user_ids})"
+            )
             host_obj.user_ids = [(6, 0, allowed_user_ids)]
 
-            # Create access rules from SCP response
+            # --- Step 8: Create access rules from SCP response ------------------
+            current_step = 'rule_sync'
+            _task_logger.info(
+                f"[rule_sync] Creating/updating rules from SCP host_data "
+                f"({len(host_data.get('rules', []) or [])} rule(s) in payload)"
+            )
             rule_counts = self._create_rules_from_scp(host_obj, host_data, worker_obj)
 
             _task_logger.info(
@@ -307,11 +415,28 @@ class SunrayConfigurationProxy(models.Model):
                 f"       removed:   {rule_counts['removed']}\n"
                 f"       total_now: {rule_counts['total']}"
             )
-            _task_logger.info(f"SCP {self.name}: Successfully set up host {fqdn}")
+
+            current_step = 'success'
+            elapsed_ms = int((time.monotonic() - t_start) * 1000)
+            _task_logger.info(
+                f"===== setup_host_from_scp END (success) — "
+                f"fqdn={fqdn} duration={elapsed_ms}ms ====="
+            )
 
         except Exception as e:
-            _task_logger.error(f"SCP {self.name}: Failed to set up host {fqdn}: {str(e)}")
-            self.sudo().last_error = f"Host setup failed: {str(e)}"
+            elapsed_ms = int((time.monotonic() - t_start) * 1000)
+            _task_logger.error(
+                f"[FAILED at step='{current_step}'] SCP {self.name}: "
+                f"Failed to set up host {fqdn} after {elapsed_ms}ms: {str(e)}"
+            )
+            _task_logger.error(f"Traceback:\n{traceback.format_exc()}")
+            _task_logger.info(
+                f"===== setup_host_from_scp END (failure at step='{current_step}') — "
+                f"fqdn={fqdn} duration={elapsed_ms}ms ====="
+            )
+            self.sudo().last_error = (
+                f"Host setup failed at step '{current_step}': {str(e)}"
+            )
             # Keep scp_setup_in_progress=True on the stub for retry/manual intervention
 
     def _find_or_create_user(self, email, username):

@@ -7,31 +7,80 @@
         <field name="model">sunray.host</field>
         <field name="inherit_id" ref="sunray_core.view_sunray_host_form"/>
         <field name="arch" type="xml">
+
+            <!-- Form-level warning banner: always visible (above the sheet), not buried in a tab -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning mb-0" role="alert"
+                     invisible="not scp_setup_in_progress">
+                    <h4>⚠ Host stub — SCP setup pending or stuck</h4>
+                    <p>
+                        This host is a <strong>stub</strong> created by the auto-register
+                        flow. An async IMQ job (<code>setup_host_from_scp</code>) is expected
+                        to complete it with the configuration fetched from the SCP.
+                        While <code>scp_setup_in_progress = True</code>:
+                    </p>
+                    <ul>
+                        <li>The worker receives <code>202 setup_in_progress</code> on every
+                            <code>/config/register</code> call — the host is <strong>not
+                            served</strong>.</li>
+                        <li>The periodic <code>sync_scp_job</code> cron classifies this host
+                            as <code>PENDING SETUP</code> and <strong>skips</strong> it.</li>
+                        <li><strong>No automatic retry</strong> will happen, even if the SCP
+                            URL or configuration has been fixed in the meantime.</li>
+                    </ul>
+                    <p>
+                        <strong>If the initial setup failed:</strong> check
+                        <code>last_error</code> on the parent SCP record. To unblock, either
+                        click <strong>Retry SCP Setup</strong> below to re-enqueue the async
+                        job, or delete this host (the worker will recreate a clean stub on
+                        its next registration attempt).
+                    </p>
+                    <button name="action_retry_scp_setup"
+                            type="object"
+                            string="Retry SCP Setup"
+                            class="btn-warning"
+                            icon="fa-refresh"/>
+                </div>
+            </xpath>
+
             <!-- Insert SCP Sync Configuration tab in the notebook -->
             <xpath expr="//notebook" position="inside">
                 <page string="Sync Configuration" name="scp_sync_tab">
+
                     <!-- SCP Assignment -->
                     <group string="Configuration Proxy" name="scp_assignment" class="ik_lw200">
+                        <div invisible="not scp_sync_enabled or scp_setup_in_progress"
+                            class="mb16">
+                            <button name="action_scp_sync_now"
+                                    type="object"
+                                    string="Sync Now"
+                                    class="btn-primary"
+                                    icon="fa-refresh"
+                                    help="Trigger an immediate SCP sync (delegates to the parent SCP's action_sync_now, which syncs all hosts managed by this SCP)."/>
+                        </div>
                         <field name="scp_id"
                                required="scp_sync_enabled"
                                help="SCP managing this host configuration. Auto-register sets this automatically; manually assign to enable SCP synchronization for manually-created hosts."/>
-                        <field name="scp_sync_enabled" 
+                        <field name="scp_sync_enabled"
                                widget="boolean_toggle"
                                help="Enable synchronization with the assigned SCP."/>
                     </group>
 
-                    <!-- Sync Status -->
-                    <group string="Sync Status" name="sync_status" class="oe_read_only">
+                    <!-- Sync Status (always visible, including in edit mode) -->
+                    <group string="Sync Status" name="sync_status">
                         <field name="scp_last_sync_ts" readonly="1"
                             help="Timestamp of last successful SCP synchronization"/>
                         <field name="scp_setup_in_progress" readonly="1" widget="boolean_toggle"
-                            help="True while async auto-register setup is running"/>
+                            help="True while async auto-register setup is running. While True, the worker is blocked on this host (returns 202 setup_in_progress) and the SCP sync cron skips it."/>
                         <field name="scp_hash" readonly="1"
                             help="Last hash received from SCP for change detection"/>
                     </group>
 
-                    <!-- Information Box -->
-                    <div class="alert alert-info" role="alert">
+                    <!-- Information Box: setup instructions for manually-created hosts.
+                         Hidden once sync is enabled (already configured) or for stubs
+                         (irrelevant context). -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="scp_sync_enabled or scp_setup_in_progress">
                         <h4>Enabling SCP Sync for Manually-Created Hosts</h4>
                         <p>
                             For hosts created manually in Sunray (not via auto-register), you can enable

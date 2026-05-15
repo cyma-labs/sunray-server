@@ -110,6 +110,7 @@ class SunrayRESTController(http.Controller):
             api_key_obj.track_usage(
                 worker_name=worker_name,
                 worker_type=worker_type,
+                worker_version=worker_version,
                 ip_address=ip_address
             )
             return api_key_obj

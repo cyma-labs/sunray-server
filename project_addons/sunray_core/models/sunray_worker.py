@@ -65,7 +65,7 @@ class SunrayWorker(models.Model):
     
     version = fields.Char(
         string='Version',
-        help='Worker version (from X-Worker-Version header if provided)'
+        help='Worker version. Set automatically from the X-Worker-Version header on each call.'
     )
     
     last_ip = fields.Char(

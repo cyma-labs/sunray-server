@@ -237,13 +237,20 @@ class SunrayAccessRule(models.Model):
 
         return config
 
-    def name_get(self):
-        """Custom name display for better UX"""
-        result = []
+    @api.depends('name')
+    def _compute_display_name(self):
+        """Custom display name with id suffix for debug correlation.
+
+        The id is exposed to end-users via the worker access-mode cookie as
+        "Rule (#42)"; appending it here lets admins immediately locate the
+        matching rule wherever it is referenced (rule library, host m2m
+        chips, dropdowns, audit logs).
+        """
         for rule in self:
-            name = f"{rule.name} ({rule.access_type})"
-            result.append((rule.id, name))
-        return result
+            if rule.id:
+                rule.display_name = f"{rule.name} (#{rule.id})"
+            else:
+                rule.display_name = rule.name or ""
 
     def action_view_hosts(self):
         """View hosts using this rule"""

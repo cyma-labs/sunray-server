@@ -483,6 +483,11 @@ class SunrayHost(models.Model):
             # Get rule config without priority
             rule_config = rule.get_worker_config()
 
+            # Inject absolute rule id (sunray.access.rule PK, not the M2M
+            # association id). Used by workers as a debug identifier exposed
+            # to end-users via the access-mode cookie.
+            rule_config['id'] = rule.id
+
             # Inject priority from association
             rule_config['priority'] = assoc.priority
 

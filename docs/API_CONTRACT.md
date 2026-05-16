@@ -334,7 +334,14 @@ The `/config/register` endpoint handles all migration logic:
 - `authorized_users`: List of usernames allowed access
 - `session_duration_s`: Session duration in seconds (always present, default: 3600)
 - `websocket_url_prefix`: String prefix for authenticated WebSocket endpoints (empty string means no WebSocket support)
-- `exceptions_tree`: Access rules for public, CIDR, and token-based access
+- `exceptions_tree`: Access rules for public, CIDR, and token-based access. Flat list of rule entries; each entry includes:
+  - `id` (integer): Absolute `sunray.access.rule` record id. Stable across config refreshes. Workers can use this as a debug identifier to expose the matched rule to end-users (e.g. via the access-mode cookie).
+  - `priority` (integer): Per-host priority (from the host↔rule association).
+  - `access_type` (string): One of `public`, `cidr`, `token`.
+  - `description` (string): Rule description (falls back to rule name).
+  - `url_patterns` (list of strings): Regex patterns matched against the request URI.
+  - `allowed_cidrs` (list of strings, only when `access_type=cidr`): CIDR blocks granting access.
+  - `tokens` (list of objects, only when `access_type=token`): Token extraction configurations.
 - `bypass_waf_for_authenticated`: Enable WAF bypass for authenticated users
 - `waf_bypass_revalidation_s`: WAF bypass cookie revalidation period in seconds (always present, default: 900)
 - `worker_id`: ID of the worker protecting this host (null if not yet bound)

@@ -1249,7 +1249,7 @@ class SunrayRESTController(http.Controller):
 
         Template resolution order:
         1. Host's email_otp_template_id (if set)
-        2. System setting sunray.email_otp_template_id (required)
+        2. System setting sunray.email_otp_template_id (required, numeric DB id)
 
         Args:
             email: Recipient email address
@@ -1262,17 +1262,19 @@ class SunrayRESTController(http.Controller):
 
         try:
             # Get template: host override → system setting (required)
-            template = host_obj.email_otp_template_id
-            if not template:
-                template_xmlid = request.env['ir.config_parameter'].sudo().get_param(
+            template_obj = host_obj.email_otp_template_id
+            if not template_obj:
+                template_param = request.env['ir.config_parameter'].sudo().get_param(
                     'sunray.email_otp_template_id'
                 )
-                if not template_xmlid:
+                if not template_param:
                     raise ValueError("System parameter 'sunray.email_otp_template_id' not configured")
-                template = request.env.ref(template_xmlid)
+                template_obj = request.env['mail.template'].sudo().browse(int(template_param)).exists()
+                if not template_obj:
+                    raise ValueError(f"Email OTP template id '{template_param}' not found")
 
             # Send email with context values
-            template.sudo().with_context(
+            template_obj.sudo().with_context(
                 otp_code=otp_code,
                 recipient_email=email,
                 client_ip=client_ip or 'Unknown',

@@ -207,7 +207,10 @@ class SunrayHost(models.Model):
             'enabled': self.deployment_mode,
             'golive_date': self.golive_date.isoformat() if self.golive_date else None,
             'days_until_golive': self.days_until_golive,
-            'session_ttl': self.deployment_session_ttl
+            'session_duration_s': self.deployment_session_ttl,
+            # DEPRECATED: replaced by session_duration_s. Still emitted during
+            # the transition; remove once all workers read session_duration_s.
+            'session_ttl': self.deployment_session_ttl,
         }
 
     @api.model
@@ -296,12 +299,17 @@ class SunrayHost(models.Model):
             host_config_dict['remote_auth'] = {
                 # Force enabled=False when passkey_enabled=False (remote auth requires passkeys)
                 'enabled': host_obj.remote_auth_enabled and host_obj.passkey_enabled,
+                'session_duration_s': host_obj.remote_auth_session_ttl,
+                'max_session_duration_s': host_obj.remote_auth_max_session_ttl,
+                'session_mgmt_enabled': host_obj.session_mgmt_enabled,
+                'session_mgmt_duration_s': host_obj.session_mgmt_ttl,
+                'polling_interval': int(polling_interval),
+                'challenge_ttl': int(challenge_ttl),
+                # DEPRECATED keys below: replaced by *_duration_s. Still emitted
+                # during the transition; remove once all workers are migrated.
                 'session_ttl': host_obj.remote_auth_session_ttl,
                 'max_session_ttl': host_obj.remote_auth_max_session_ttl,
-                'session_mgmt_enabled': host_obj.session_mgmt_enabled,
                 'session_mgmt_ttl': host_obj.session_mgmt_ttl,
-                'polling_interval': int(polling_interval),
-                'challenge_ttl': int(challenge_ttl)
             }
 
             if 'domain' in host_config_dict:
@@ -339,10 +347,15 @@ class SunrayHost(models.Model):
 
         return {
             'enabled': self.remote_auth_enabled,
+            'session_duration_s': self.remote_auth_session_ttl,
+            'max_session_duration_s': self.remote_auth_max_session_ttl,
+            'session_mgmt_enabled': self.session_mgmt_enabled,
+            'session_mgmt_duration_s': self.session_mgmt_ttl,
+            'polling_interval': int(polling_interval),
+            'challenge_ttl': int(challenge_ttl),
+            # DEPRECATED keys below: replaced by *_duration_s. Still emitted
+            # during the transition; remove once all workers are migrated.
             'session_ttl': self.remote_auth_session_ttl,
             'max_session_ttl': self.remote_auth_max_session_ttl,
-            'session_mgmt_enabled': self.session_mgmt_enabled,
             'session_mgmt_ttl': self.session_mgmt_ttl,
-            'polling_interval': int(polling_interval),
-            'challenge_ttl': int(challenge_ttl)
         }

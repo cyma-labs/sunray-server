@@ -311,12 +311,22 @@ The `/config/register` endpoint handles all migration logic:
       "config_version": "2024-01-01T11:55:00Z",
       "remote_auth": {
         "enabled": true,
+        "session_duration_s": 3600,
+        "max_session_duration_s": 7200,
+        "session_mgmt_enabled": true,
+        "session_mgmt_duration_s": 120,
+        "polling_interval": 2,
+        "challenge_ttl": 300,
         "session_ttl": 3600,
         "max_session_ttl": 7200,
-        "session_mgmt_enabled": true,
-        "session_mgmt_ttl": 120,
-        "polling_interval": 2,
-        "challenge_ttl": 300
+        "session_mgmt_ttl": 120
+      },
+      "deployment_mode": {
+        "enabled": false,
+        "golive_date": null,
+        "days_until_golive": 0,
+        "session_duration_s": 7200,
+        "session_ttl": 7200
       }
     }
   ]
@@ -348,12 +358,21 @@ The `/config/register` endpoint handles all migration logic:
 - `worker_name`: Name of the worker protecting this host (null if not yet bound)
 - `remote_auth` (object, optional): Remote Authentication configuration (Advanced feature - only present if `sunray_advanced_core` is installed)
   - `enabled` (boolean): Whether Remote Authentication is enabled for this host
-  - `session_ttl` (integer): Default remote session duration in seconds
-  - `max_session_ttl` (integer): Maximum allowed remote session duration in seconds
+  - `session_duration_s` (integer): Default remote session duration in seconds
+  - `max_session_duration_s` (integer): Maximum allowed remote session duration in seconds
   - `session_mgmt_enabled` (boolean): Whether session management feature is enabled
-  - `session_mgmt_ttl` (integer): Session management access duration in seconds
+  - `session_mgmt_duration_s` (integer): Session management access duration in seconds
   - `polling_interval` (integer): Computer polling interval for challenge verification (seconds)
   - `challenge_ttl` (integer): QR code/challenge validity duration (seconds)
+  - `session_ttl` (integer, **DEPRECATED**): Legacy alias of `session_duration_s`. Still emitted for backward compatibility; will be removed once all workers read `session_duration_s`.
+  - `max_session_ttl` (integer, **DEPRECATED**): Legacy alias of `max_session_duration_s`.
+  - `session_mgmt_ttl` (integer, **DEPRECATED**): Legacy alias of `session_mgmt_duration_s`.
+- `deployment_mode` (object, optional): Deployment / go-live mode configuration (Advanced feature - only present if `sunray_advanced_core` is installed)
+  - `enabled` (boolean): Whether deployment mode is enabled for this host
+  - `golive_date` (string|null): ISO date when the host goes live (protected); `null` if open-ended
+  - `days_until_golive` (integer): Days remaining before go-live
+  - `session_duration_s` (integer): Deployment-mode session duration in seconds
+  - `session_ttl` (integer, **DEPRECATED**): Legacy alias of `session_duration_s`. Still emitted for backward compatibility; will be removed once all workers read `session_duration_s`.
 
 **Version Tracking**:
 - Each host includes its own `config_version` for cache invalidation
@@ -413,12 +432,22 @@ The `/config/register` endpoint handles all migration logic:
     "config_version": "2024-01-01T11:55:00Z",
     "remote_auth": {
       "enabled": true,
+      "session_duration_s": 3600,
+      "max_session_duration_s": 7200,
+      "session_mgmt_enabled": true,
+      "session_mgmt_duration_s": 120,
+      "polling_interval": 2,
+      "challenge_ttl": 300,
       "session_ttl": 3600,
       "max_session_ttl": 7200,
-      "session_mgmt_enabled": true,
-      "session_mgmt_ttl": 120,
-      "polling_interval": 2,
-      "challenge_ttl": 300
+      "session_mgmt_ttl": 120
+    },
+    "deployment_mode": {
+      "enabled": false,
+      "golive_date": null,
+      "days_until_golive": 0,
+      "session_duration_s": 7200,
+      "session_ttl": 7200
     }
   },
   "users": {
@@ -523,12 +552,22 @@ The `/config/register` endpoint handles all migration logic:
     "config_version": "2024-01-01T11:55:00Z",
     "remote_auth": {
       "enabled": true,
+      "session_duration_s": 3600,
+      "max_session_duration_s": 7200,
+      "session_mgmt_enabled": true,
+      "session_mgmt_duration_s": 120,
+      "polling_interval": 2,
+      "challenge_ttl": 300,
       "session_ttl": 3600,
       "max_session_ttl": 7200,
-      "session_mgmt_enabled": true,
-      "session_mgmt_ttl": 120,
-      "polling_interval": 2,
-      "challenge_ttl": 300
+      "session_mgmt_ttl": 120
+    },
+    "deployment_mode": {
+      "enabled": false,
+      "golive_date": null,
+      "days_until_golive": 0,
+      "session_duration_s": 7200,
+      "session_ttl": 7200
     }
   },
   "users": {

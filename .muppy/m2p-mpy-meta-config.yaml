@@ -86,9 +86,9 @@ mpy_meta_config:
         args:
         - imq-worker
         - '--database=@{ obj.dash_pg_database }@'
-        - --queue=default
-        - --max-messages=2000
-        - --observability-port=8000 
+        - --queues=*
+        - --max-messages=200
+        - --observability-port=9000 
         env_vars:
         resources:
           requests:

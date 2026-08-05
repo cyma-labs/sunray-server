@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Form View: expose account ownership (read-only, it is a fact not a setting) -->
+    <record id="sunray_user__formview_scp" model="ir.ui.view">
+        <field name="name">sunray.user.form.scp</field>
+        <field name="model">sunray.user</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_user_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='display_name']" position="after">
+                <field name="added_by_scp" widget="boolean_toggle" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List View -->
+    <record id="sunray_user__treeview_scp" model="ir.ui.view">
+        <field name="name">sunray.user.list.scp</field>
+        <field name="model">sunray.user</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_user_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='passkey_count']" position="after">
+                <field name="added_by_scp" widget="boolean_toggle" readonly="1" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Search View: make the responsibility boundary filterable -->
+    <record id="sunray_user__searchview_scp" model="ir.ui.view">
+        <field name="name">sunray.user.search.scp</field>
+        <field name="model">sunray.user</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_user_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='no_passkeys']" position="after">
+                <separator/>
+                <filter name="added_by_scp" string="Provisioned by SCP"
+                        domain="[('added_by_scp', '=', True)]"/>
+                <filter name="locally_managed" string="Locally Managed"
+                        domain="[('added_by_scp', '=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

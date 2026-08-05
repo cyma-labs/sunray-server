@@ -32,6 +32,8 @@ class SunrayAuditLogAdvanced(models.Model):
             ('auto_register.reactivation_triggered', 'Auto-Register Reactivation Triggered'),
             # SCP Events
             ('scp.unreachable_lockdown', 'SCP Unreachable - Mass Lockdown Triggered'),
+            ('security.scp.authorization_revoked_with_passkey',
+             'SCP Revoked Host Authorization From a Passkey Holder'),
         ],
         ondelete={
             'token.email.sent': 'cascade',
@@ -54,5 +56,6 @@ class SunrayAuditLogAdvanced(models.Model):
             'auto_register.setup_triggered': 'cascade',
             'auto_register.reactivation_triggered': 'cascade',
             'scp.unreachable_lockdown': 'cascade',
+            'security.scp.authorization_revoked_with_passkey': 'cascade',
         }
     )

@@ -34,6 +34,7 @@ Advanced features for Sunray Zero Trust Access solution:
         'views/sunray_configuration_proxy_views.xml',  # SCP management UI
         'views/sunray_worker_autoregister_views.xml',  # Worker auto-register UI
         'views/sunray_host_scp_views.xml',  # Host SCP sync UI
+        'views/sunray_user_scp_views.xml',  # SCP account-ownership flag
         'views/res_config_settings_views.xml',
         'wizards/setup_token_wizard_views.xml',
         'wizards/setup_token_bulk_wizard_views.xml',

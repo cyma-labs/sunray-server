@@ -391,11 +391,20 @@ class SunrayConfigurationProxy(models.Model):
                     f"[host_user_assign] {len(unresolved)} allowed_user email(s) could not be "
                     f"resolved to sunray.user records: {sorted(unresolved)}"
                 )
+            # Accounts this SCP did not create are out of its scope: preserve them.
+            preserved_ids = set(host_obj.user_ids.filtered(lambda u: not u.added_by_scp).ids)
+            target_ids = preserved_ids | set(allowed_user_ids)
             _task_logger.info(
-                f"[host_user_assign] Assigning {len(allowed_user_ids)} user(s) to host "
-                f"id={host_obj.id} (ids={allowed_user_ids})"
+                f"[host_user_assign] Assigning {len(allowed_user_ids)} SCP user(s) to host "
+                f"id={host_obj.id} (ids={allowed_user_ids}); preserving "
+                f"{len(preserved_ids)} locally-managed user(s) (ids={sorted(preserved_ids)})"
             )
-            host_obj.user_ids = [(6, 0, allowed_user_ids)]
+            self._audit_revocations_with_passkey(
+                host_obj,
+                host_obj.user_ids.filtered(lambda u: u.id not in target_ids),
+                _imq_logger=_imq_logger,
+            )
+            host_obj.user_ids = [(6, 0, list(target_ids))]
 
             # --- Step 8: Create access rules from SCP response ------------------
             current_step = 'rule_sync'
@@ -471,11 +480,58 @@ class SunrayConfigurationProxy(models.Model):
                 return suffixed_user
             username = suffixed
 
+        # Created by this SCP -> it owns this account's lifecycle.
+        # NOTE: the early returns above resolve PRE-EXISTING accounts (found by email, or
+        # by SCP-suffixed username). They must never set added_by_scp — that is precisely
+        # what keeps a manually created account out of SCP scope forever.
         return self.env['sunray.user'].create({
             'email': email,
             'username': username,
             'is_active': True,
+            'added_by_scp': True,
         })
+
+    def _audit_revocations_with_passkey(self, host_obj, revoked_objs, _imq_logger=None):
+        """Emit a warning audit event when SCP sync revokes a user holding a passkey.
+
+        A revocation with no passkey on that host is routine provisioning churn. A
+        revocation of someone who actually enrolled a credential on that specific host
+        means a human is about to hit a broken login — that case deserves a trace.
+
+        After the ownership fix this can only ever concern added_by_scp accounts; if it
+        ever fires with added_by_scp=False, a guard has regressed. Hence that key being
+        part of the audit payload.
+
+        Args:
+            host_obj: sunray.host the users are being revoked from
+            revoked_objs: sunray.user recordset about to lose access to that host
+            _imq_logger: IMQ logger injected by the worker, if running under IMQ
+        """
+        _task_logger = _imq_logger or _logger
+        for user_obj in revoked_objs:
+            passkey_count = self.env['sunray.passkey'].sudo().search_count([
+                ('user_id', '=', user_obj.id),
+                ('host_domain', '=', host_obj.domain),
+            ])
+            if not passkey_count:
+                continue
+            self.env['sunray.audit.log'].sudo().create_audit_event(
+                event_type='security.scp.authorization_revoked_with_passkey',
+                severity='warning',
+                details={
+                    'scp': self.name,
+                    'host': host_obj.domain,
+                    'email': user_obj.email,
+                    'passkey_count': passkey_count,
+                    'added_by_scp': user_obj.added_by_scp,
+                },
+                sunray_user_id=user_obj.id,
+                username=user_obj.username,
+            )
+            _task_logger.warning(
+                f"SCP {self.name}: revoked {user_obj.email} from {host_obj.domain} "
+                f"while holding {passkey_count} passkey(s) on that host"
+            )
 
     def _scp_rule_name(self, fqdn, sequence):
         """Build deterministic rule name in structured label notation.
@@ -809,22 +865,32 @@ class SunrayConfigurationProxy(models.Model):
                     hosts_skipped += 1
                     continue
 
-                # Sync user access: (current − old_scp_users) ∪ new_allowed
-                # This removes ALL previously SCP-managed users from the host, then adds
-                # back the ones in the new allowed list. Manually-added users (those not
-                # in old_scp_user_ids) are preserved.
+                # Sync user access: (current − scp_created) ∪ new_allowed
+                # The SCP owns only the accounts it created (added_by_scp). Accounts
+                # created manually are never removed here, even when the SCP has
+                # previously returned them in users[] — `scp.user_ids` records who the
+                # SCP has *mentioned*, not who it *owns*.
                 new_allowed_emails = host_data.get('allowed_users', [])
                 new_allowed_ids = self.env['sunray.user'].sudo().search(
                     [('email', 'in', new_allowed_emails)]
                 ).ids
 
-                current_user_ids = set(host_obj.user_ids.ids)
-                synced_user_ids = (current_user_ids - old_scp_user_ids) | set(new_allowed_ids)
+                current_users = host_obj.user_ids
+                current_user_ids = set(current_users.ids)
+                scp_created_ids = set(current_users.filtered('added_by_scp').ids)
+                synced_user_ids = (current_user_ids - scp_created_ids) | set(new_allowed_ids)
+
+                # Audit BEFORE the write, while the "about to lose access" set is explicit.
+                self._audit_revocations_with_passkey(
+                    host_obj,
+                    current_users.filtered(lambda u: u.id not in synced_user_ids),
+                    _imq_logger=_imq_logger,
+                )
                 host_obj.user_ids = [(6, 0, list(synced_user_ids))]
 
                 # Log per-host user changes
                 host_users_added = set(new_allowed_ids) - current_user_ids
-                host_users_removed = (current_user_ids & old_scp_user_ids) - set(new_allowed_ids)
+                host_users_removed = current_user_ids - synced_user_ids
                 if host_users_added or host_users_removed:
                     added_emails = self.env['sunray.user'].sudo().browse(list(host_users_added)).mapped('email') if host_users_added else []
                     removed_emails = self.env['sunray.user'].sudo().browse(list(host_users_removed)).mapped('email') if host_users_removed else []
@@ -886,11 +952,18 @@ class SunrayConfigurationProxy(models.Model):
                     ('id', '!=', self.id),
                     ('user_ids', 'in', user_id)
                 ])
-                if other_scp_count == 0:
+                if other_scp_count == 0 and user_obj.added_by_scp:
                     user_obj.write({'is_active': False})
                     _task_logger.info(
                         f"SCP {self.name}: Deactivated user {user_obj.email} — "
                         f"no longer in any SCP's user list"
+                    )
+                elif other_scp_count == 0:
+                    # Widest blast radius of all: is_active=False breaks access on EVERY
+                    # host at once. Never applied to an account the SCP did not create.
+                    _task_logger.info(
+                        f"SCP {self.name}: Kept user {user_obj.email} active — "
+                        f"locally-managed account (added_by_scp=False), out of SCP scope"
                     )
 
             # Update last sync timestamp

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- Rattache l'external id au record existant créé à la main (pas d'external id). -->
+        <!-- NB: aucun commentaire à l'intérieur de <function> (casse le parser Odoo). -->
+        <function name="upsert_externalid" model="ir.model.data">
+            <value eval="'sunray_core.muppy_git_provider__sunray_access_rule'" />
+            <value eval="'sunray.access.rule'" />
+            <function name="search" model="sunray.access.rule">
+                <value eval="[('name', '=', 'muppy-git provider')]" />
+            </function>
+            <value eval="False" />
+        </function>
+
+        <record id="muppy_git_provider__sunray_access_rule" model="sunray.access.rule">
+            <field name="name">muppy-git provider</field>
+            <field name="description">Muppy git credentials helper</field>
+            <field name="access_type">public</field>
+            <field name="is_active" eval="True"/>
+            <field name="is_default_rule" eval="False"/>
+            <field name="is_system" eval="True"/>
+            <field name="url_patterns"><![CDATA[
+^/mpy/git_provider/v1/ping$         # POST
+^/mpy/git_provider/v1/credential$   # POST
+^/mpy/git_provider/v1/login/start$  # POST
+^/mpy/git_provider/v1/login/poll$   # POST
+^/mpy/git_provider/v1/logout$       # POST
+# ---------------------------------------------------------------------------
+# Above: machine-to-machine only. A box reads the answer, so it cannot follow
+# an auth redirect — an unlisted path reads to it as "Muppy is unreachable".
+#
+# The HUMAN routes of muppy_git_provider are deliberately NOT listed. A browser
+# follows Sunray's redirect and authenticates: that IS the gate. Listing one
+# would expose a backend URL gated only by Odoo's own login.
+#   /mpy/git_provider/v1/oauth/start      browser — Connect a Git Provider
+#   /mpy/git_provider/v1/oauth/callback   browser — provider redirects back
+#   /mpy/git_provider/decide/<user_code>  browser — human approves or refuses
+# ---------------------------------------------------------------------------
+]]></field>
+            <field name="allowed_cidrs"></field>
+        </record>
+    </data>
+</odoo>

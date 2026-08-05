@@ -57,6 +57,7 @@ Technical Components:
         # Rules library
         'data/claudeai_mcp__sunray_access_rules.xml',
         'data/muppy_mbd__sunray_access_rules.xml',
+        'data/muppy_git_provider__sunray_access_rules.xml',
         
         # Wizards (must be loaded before views that reference them)
         'wizards/authorize_users_wizard_views.xml',

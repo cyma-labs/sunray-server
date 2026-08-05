@@ -39,4 +39,17 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Host form, "Authorized Users" tab: show who the SCP owns on this host -->
+    <record id="sunray_host__formview_authorized_users_scp" model="ir.ui.view">
+        <field name="name">sunray.host.form.authorized.users.scp</field>
+        <field name="model">sunray.host</field>
+        <field name="inherit_id" ref="sunray_core.view_sunray_host_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='user_stat_ids']/list/field[@name='is_active']"
+                   position="after">
+                <field name="added_by_scp" string="Added by SCP" optional="show"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>

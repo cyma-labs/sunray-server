@@ -7,5 +7,6 @@ from . import sunray_host
 from . import sunray_configuration_proxy
 from . import sunray_host_scp
 from . import sunray_user_scp
+from . import sunray_protected_host_user_list_report_scp
 from . import sunray_access_rule_scp
 from . import sunray_worker_autoregister

@@ -1,93 +1,70 @@
 #!/bin/bash
-
-# Function to log with timestamp and step info
-log_step() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SUNRAY-INIT: $1"
-}
-
-log_step "Starting Sunray database initialization"
-log_step "Script: /opt/muppy/appserver-sunray18/bin/sunray_init_db.sh"
-echo -e "\n"
-
-log_step "Installing sunray_core module"
-/opt/muppy/appserver-sunray18/bin/sunray-srvr -i sunray_core  --without-demo=all --stop-after-init
-
 #
-# Sunray Server setup
+# sunray_init_db.sh — Initialize a fresh Sunray database and provision the first
+#                     company + user.
 #
-#   Depending on MPY_USERINIT_USER_PASSWORD being set, this script will configure differently:
-#  - If MPY_USERINIT_USER_PASSWORD is set, we create a user with the given password and signup mail is not sent.
-#  - If MPY_USERINIT_USER_PASSWORD is not set, we create a user with the given email and name ans we send signup mail.
-#  - In all cases, User is 'base.user_admin' (id=2)
+# This is the thin SUNRAY WRAPPER around the generic engine
+# bin/odoo_init_db.lib.sh (server-agnostic, candidate for ikb/buildit). It only
+# sets the Sunray-specific knobs and maps the public env namespace
+# (MPY_USERINIT_*) onto the engine's generic input vars, then delegates.
 #
-# Used ENV Vars in this script
-# - MPY_USERINIT_EXTERNAL_ID: external id of the user to setup
-# - MPY_USERINIT_USER_EMAIL: email of the user to setup
-# - MPY_USERINIT_USER_NAME: name of the user to setup
-# - MPY_USERINIT_USER_COMPANY: company name of the user to setup
+# Public contract (unchanged): invoked by path, with no args, non-interactive,
+# from App Definitions, k8s package profiles (db_init_command) and the
+# devcontainer. MPY_USERINIT_* remains the documented public env — renaming it
+# would break those deployment paths, which is exactly why the mapping below
+# lives in the wrapper and not in the engine.
 #
-# Next are used only for on premise deployment
+# Two modes:
+#   * non-interactive (DEFAULT) — env-var driven (k8s / App Server / CI path).
+#   * interactive (--interactive) — wizard (see engine help). This is what
+#     `make initdb` uses.
 #
-# - MPY_USERINIT_USER_PASSWORD: Optional password of user. If set, signup email is not sent.
-# - MPY_USERINIT_TOTP: Optional TOTP secret of the user to setup (optional)
+# Env vars consumed (public namespace)
+# ------------------------------------
+# Required:
+#   - MPY_USERINIT_USER_EMAIL    : email/login of the user to setup
+#   - MPY_USERINIT_USER_NAME     : full name of the user to setup
+#   - MPY_USERINIT_USER_COMPANY  : company name of the user to setup
+#   - APP_PRIMARY_URL            : primary URL of the application
+#   - APP_LOADBALANCER_URL       : publicly exposed URL (preferred over
+#                                  APP_PRIMARY_URL when set).
+# Optional:
+#   - MPY_USERINIT_USER_PASSWORD : if set, signup email is not sent
+#   - MPY_USERINIT_TOTP          : TOTP secret of the user to setup
+#   - MPY_USERINIT_EXTERNAL_ID   : external-id of the main user
+#                                  (default: base.user_admin — Sunray ships no
+#                                  sunray_core.main_user record of its own)
+# SMTP (required only to send the signup email):
+#   - IKB_SMTP, IKB_SMTP_PORT, IKB_SMTP_SSL, IKB_SMTP_USER,
+#     IKB_SMTP_PASSWORD, IKB_EMAIL_FROM
 #
-# Next is always required
+# Usage:
+#   sunray_init_db.sh [--interactive] [--no-interactive] [-h|--help]
 #
-# - APP_PRIMARY_URL: primary URL of the application
-#
-# SMTP is passed on command line via IKB ENV Vars (Required only to send signup email)
-# - IKB_SMTP
-# - IKB_SMTP_PORT
-# - IKB_SMTP_SSL
-# - IKB_SMTP_USER
-# - IKB_SMTP_PASSWORD
-# - IKB_EMAIL_FROM
-#
-# New environment variables for company setup:
-# - MPY_USERINIT_WEBSITE: Website URL for company (default: https://gitlab.com/cmorisse/inouk-sunray-server)
-# - MPY_USERINIT_PARTNER_ROOT_NAME: Partner root name (default: SunrayBot)
 
-# Use APP_LOADBALANCER_URL if available, otherwise fall back to APP_PRIMARY_URL
-APP_EFFECTIVE_URL="${APP_LOADBALANCER_URL:-$APP_PRIMARY_URL}"
+set -euo pipefail
 
-log_step "Setting up company configuration"
-log_step "  Company: $MPY_USERINIT_USER_COMPANY"
-log_step "  Email: $IKB_SMTP_USER"
-log_step "  Website: $MPY_USERINIT_WEBSITE"
-log_step "  Primary / Direct URL: $APP_PRIMARY_URL"
-log_step "  Public URL.         : $APP_LOADBALANCER_URL"
-log_step "  Effective URL       : $APP_EFFECTIVE_URL"
-log_step "  Partner root name: $MPY_USERINIT_PARTNER_ROOT_NAME"
+# Resolve paths relative to this script (bin/), no hardcoded deploy path.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-bin/sunray-srvr setup-company --name="$MPY_USERINIT_USER_COMPANY" \
-    --email=$IKB_SMTP_USER \
-    --website="$MPY_USERINIT_WEBSITE" \
-    --base-url=$APP_EFFECTIVE_URL \
-    --update-partner \
-    --partner-root-name="$MPY_USERINIT_PARTNER_ROOT_NAME"
+# --- Sunray specificities (the per-server knobs) ---
+OIDB_LAUNCHER="$SCRIPT_DIR/sunray-srvr"
+OIDB_IKCLI="ik-cli"               # Sunray is Odoo 18-based -> inouk_odoo_cli subcommand is 'ik-cli'
+OIDB_INIT_MODULE="sunray_core"
+OIDB_MAIN_USER_XMLID="${MPY_USERINIT_EXTERNAL_ID:-base.user_admin}"
+OIDB_COMPANY_WEBSITE="https://gitlab.com/cmorisse/inouk-sunray-server"
+OIDB_PARTNER_ROOT_NAME="SunrayBot"
+OIDB_PRODUCT_LABEL="Sunray"
+OIDB_ENV_PREFIX_HINT="MPY_USERINIT"
 
-# We check if password is set, if not, we will send a signup email
-log_step "Setting up user account"
-if [ -z "$MPY_USERINIT_USER_PASSWORD" ]; then
-    log_step "No password set, will send signup email to $MPY_USERINIT_USER_EMAIL"
-    
-    log_step "Creating user without password"
-    bin/sunray-srvr setup-user --external-id=$MPY_USERINIT_EXTERNAL_ID \
-        --login=$MPY_USERINIT_USER_EMAIL \
-        --name="$MPY_USERINIT_USER_NAME"
-    
-    log_step "Sending signup invitation email"
-    bin/sunray-srvr send-signup-email --login=$MPY_USERINIT_USER_EMAIL --create-user
-    
-    log_step "Getting signup URL for user"
-    bin/sunray-srvr get-signup-url --login=$MPY_USERINIT_USER_EMAIL
+# --- Map the public MPY_USERINIT_* env onto the engine vars ---
+OIDB_USER_EMAIL="${MPY_USERINIT_USER_EMAIL:-}"
+OIDB_USER_NAME="${MPY_USERINIT_USER_NAME:-}"
+OIDB_USER_COMPANY="${MPY_USERINIT_USER_COMPANY:-}"
+OIDB_USER_PASSWORD="${MPY_USERINIT_USER_PASSWORD:-}"
+OIDB_USER_TOTP="${MPY_USERINIT_TOTP:-}"
 
-else
-    log_step "Creating user $MPY_USERINIT_USER_EMAIL with supplied password"
-    bin/sunray-srvr setup-user --external-id=$MPY_USERINIT_EXTERNAL_ID \
-        --login=$MPY_USERINIT_USER_EMAIL \
-        --name="$MPY_USERINIT_USER_NAME" \
-        --password=$MPY_USERINIT_USER_PASSWORD
-fi
+# shellcheck source=odoo_init_db.lib.sh
+source "$SCRIPT_DIR/odoo_init_db.lib.sh"
 
-log_step "Sunray database initialization completed"
+odoo_init_db_main "$@"

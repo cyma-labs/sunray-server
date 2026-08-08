@@ -63,3 +63,6 @@ inouk-sunray-worker-cloudflare
 inouk-sunray-worker-cloudflare/
 
 sunray-srvr*.log
+
+# Database dumps written by `make backup-db` (repo root, next to the logs)
+*.pg_dump

@@ -77,14 +77,16 @@ usage() {
 list_tests() {
     print_header "Available Test Classes"
     
-    print_msg $CYAN "Discovering test classes in project_addons/sunray_core/tests/"
+    # Both addon roots are scanned: sunray_advanced_core (and any other advanced addon) ships
+    # tests too, and they used to be invisible here because only project_addons/ was searched.
+    print_msg $CYAN "Discovering test classes in project_addons/ and project_addons_advanced/"
     echo ""
-    
+
     # Find all test files and extract class names
-    local test_files=($(find project_addons/sunray_core/tests -name "test_*.py" -type f 2>/dev/null | sort))
-    
+    local test_files=($(find project_addons project_addons_advanced -path "*/tests/test_*.py" -type f 2>/dev/null | sort))
+
     if [[ ${#test_files[@]} -eq 0 ]]; then
-        print_msg $RED "No test files found in project_addons/sunray_core/tests/"
+        print_msg $RED "No test files found under project_addons/ or project_addons_advanced/"
         return 1
     fi
     
@@ -97,19 +99,23 @@ list_tests() {
     for file in "${test_files[@]}"; do
         # Extract test class names from the file
         local classes=$(grep -oP '^class (Test[A-Za-z0-9_]+)' "$file" | sed 's/class //' | sort -u)
-        
+
         if [[ -n "$classes" ]]; then
             local basename=$(basename "$file" .py)
-            print_msg $YELLOW "From $basename:"
-            
+            # <root>/<module>/tests/<file>.py -> the module is the 2nd path component. It must
+            # be shown: a class name alone is ambiguous now that two roots are scanned.
+            local module=$(echo "$file" | cut -d/ -f2)
+            print_msg $YELLOW "From $module/$basename:"
+
             while IFS= read -r class; do
                 print_msg $BLUE "  $class"
-                print_msg $GREEN "    $0 --test $class"
+                print_msg $GREEN "    $0 --module $module --test $class"
+                print_msg $GREEN "    make test ADDONS=$module TAGS=/$module:$class"
                 echo ""
             done <<< "$classes"
         fi
     done
-    
+
     print_msg $CYAN "Note: Test class names are case-sensitive!"
 }
 

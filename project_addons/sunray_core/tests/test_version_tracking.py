@@ -121,9 +121,11 @@ class TestVersionTracking(TransactionCase):
             'hosts': []
         }
         
-        # Add host with config_version in the host object
+        # Add host with config_version in the host object.
+        # get_config_data() works on a recordset and returns a list of host
+        # dicts, so it extends the array rather than being appended to it.
         host_config = self.test_host.get_config_data()
-        config['hosts'].append(host_config)
+        config['hosts'].extend(host_config)
         
         # Verify structure
         self.assertIn('hosts', config, "Config should have hosts array")

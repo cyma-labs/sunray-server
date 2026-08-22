@@ -6,6 +6,18 @@ import json
 
 class TestAccessRules(TransactionCase):
 
+    def _create_host(self, **vals):
+        """Create a host with a deterministic (empty) rule set.
+
+        default_get() auto-attaches every rule flagged is_default_rule, so a
+        host created here inherits whatever the database happens to contain.
+        Purge those associations to keep exceptions_tree / association counts
+        independent of the database the suite runs against.
+        """
+        host_obj = self.env['sunray.host'].create(vals)
+        host_obj.access_rule_rel_ids.unlink()
+        return host_obj
+
     def setUp(self):
         super().setUp()
 
@@ -26,12 +38,12 @@ class TestAccessRules(TransactionCase):
         })
 
         # Create a test host
-        self.host = self.env['sunray.host'].create({
-            'domain': 'api.example.com',
-            'sunray_worker_id': self.worker.id,
-            'backend_url': 'https://backend.example.com',
-            'is_active': True
-        })
+        self.host = self._create_host(
+            domain='api.example.com',
+            sunray_worker_id=self.worker.id,
+            backend_url='https://backend.example.com',
+            is_active=True,
+        )
 
         # Create test tokens (no longer tied to specific host)
         self.token1 = self.env['sunray.webhook.token'].create({
@@ -561,12 +573,12 @@ class TestAccessRules(TransactionCase):
         """Test that tokens can be reused across multiple hosts via access rules"""
 
         # Create a second host
-        host2 = self.env['sunray.host'].create({
-            'domain': 'api2.example.com',
-            'sunray_worker_id': self.worker.id,
-            'backend_url': 'https://backend2.example.com',
-            'is_active': True
-        })
+        host2 = self._create_host(
+            domain='api2.example.com',
+            sunray_worker_id=self.worker.id,
+            backend_url='https://backend2.example.com',
+            is_active=True,
+        )
 
         # Create a single global token
         global_token = self.env['sunray.webhook.token'].create({

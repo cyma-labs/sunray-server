@@ -44,8 +44,12 @@ class TestSetupToken(TransactionCase):
         self.assertEqual(token_obj.current_uses, 0)
         self.assertFalse(token_obj.consumed)
         
-        # Verify token hash matches plain token
-        expected_hash = f"sha512:{hashlib.sha512(plain_token.encode()).hexdigest()}"
+        # Verify token hash matches the normalized plain token. Normalization
+        # (strip dashes/spaces, uppercase) is spelled out here rather than
+        # calling the model helper: this is the contract workers reimplement on
+        # their side, so the test must pin it independently.
+        normalized_token = plain_token.replace('-', '').replace(' ', '').upper()
+        expected_hash = f"sha512:{hashlib.sha512(normalized_token.encode()).hexdigest()}"
         self.assertEqual(token_obj.token_hash, expected_hash)
         
         # Verify expiration is set correctly

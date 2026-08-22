@@ -8,6 +8,17 @@ from unittest.mock import patch
 class TestTimingConfiguration(TransactionCase):
     """Test timing configuration and validation"""
 
+    def _audit_baseline(self):
+        """Highest audit log id before the change under test.
+
+        Audit logs carry no host FK, so counting them by event_type alone also
+        counts whatever the database already holds from real admin activity.
+        Searching on ('id', '>', baseline) restricts each assertion to the logs
+        this test produced, whatever the database and whatever user writes them.
+        """
+        last_log_obj = self.env['sunray.audit.log'].search([], order='id desc', limit=1)
+        return last_log_obj.id or 0
+
     def setUp(self):
         super().setUp()
         
@@ -79,12 +90,13 @@ class TestTimingConfiguration(TransactionCase):
     def test_session_duration_audit_logging(self):
         """Test session duration changes are audited"""
         # Change session duration
+        baseline = self._audit_baseline()
         self.host_obj.write({'session_duration_s': 7200})
-        
+
         # Check audit log was created
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.session_duration_changed'),
-            ('sunray_admin_user_id', '=', self.env.user.id)
+            ('id', '>', baseline)
         ])
         
         self.assertEqual(len(audit_logs), 1)
@@ -94,12 +106,13 @@ class TestTimingConfiguration(TransactionCase):
     def test_waf_revalidation_audit_logging(self):
         """Test WAF revalidation changes are audited"""
         # Change WAF revalidation period
+        baseline = self._audit_baseline()
         self.host_obj.write({'waf_bypass_revalidation_s': 1800})
-        
+
         # Check audit log was created
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.waf_revalidation_changed'),
-            ('sunray_admin_user_id', '=', self.env.user.id)
+            ('id', '>', baseline)
         ])
         
         self.assertEqual(len(audit_logs), 1)
@@ -154,12 +167,13 @@ class TestTimingConfiguration(TransactionCase):
     def test_no_audit_log_on_same_value(self):
         """Test no audit log created when value doesn't change"""
         # Write same value
+        baseline = self._audit_baseline()
         self.host_obj.write({'session_duration_s': 3600})  # Same as default
-        
+
         # Should not create audit log
         audit_logs = self.env['sunray.audit.log'].search([
             ('event_type', '=', 'config.session_duration_changed'),
-            ('sunray_admin_user_id', '=', self.env.user.id)
+            ('id', '>', baseline)
         ])
         
         self.assertEqual(len(audit_logs), 0)
@@ -167,17 +181,20 @@ class TestTimingConfiguration(TransactionCase):
     def test_multiple_field_changes(self):
         """Test changing both fields creates separate audit logs"""
         # Change both fields at once
+        baseline = self._audit_baseline()
         self.host_obj.write({
             'session_duration_s': 7200,
             'waf_bypass_revalidation_s': 1800
         })
-        
+
         # Should create two audit logs
         session_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'config.session_duration_changed')
+            ('event_type', '=', 'config.session_duration_changed'),
+            ('id', '>', baseline)
         ])
         waf_logs = self.env['sunray.audit.log'].search([
-            ('event_type', '=', 'config.waf_revalidation_changed')
+            ('event_type', '=', 'config.waf_revalidation_changed'),
+            ('id', '>', baseline)
         ])
         
         self.assertEqual(len(session_logs), 1)

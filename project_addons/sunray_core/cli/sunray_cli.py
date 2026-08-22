@@ -855,7 +855,7 @@ class SunrayCommand(Command):
                 active = '✓' if host.is_active else '✗'
                 worker_name = host.sunray_worker_id.name if host.sunray_worker_id else 'none'
                 pending_worker = host.pending_worker_name[:12] + '...' if host.pending_worker_name and len(host.pending_worker_name) > 15 else host.pending_worker_name or ''
-                rules_count = len(host.access_rule_ids)
+                rules_count = len(host.access_rule_rel_ids)
                 user_count = len(host.user_ids)
                 session_duration = f"{host.session_duration_s}s"
                 print(f"{host.domain:<25} {worker_name:<20} {pending_worker:<15} {active:<8} {rules_count:<6} {user_count:<6} {session_duration:<8}")
@@ -884,18 +884,24 @@ class SunrayCommand(Command):
             print(f"WAF Bypass Enabled:         {'Yes' if host.bypass_waf_for_authenticated else 'No'}")
             print(f"Created:                    {host.create_date}")
             
-            if host.access_rule_ids:
-                print(f"\nAccess Rules: {len(host.access_rule_ids)}")
-                for rule in host.access_rule_ids.sorted('priority'):
+            # Rules are a reusable library: the host reaches them through the
+            # association model, which is where the per-host priority lives.
+            if host.access_rule_rel_ids:
+                print(f"\nAccess Rules: {len(host.access_rule_rel_ids)}")
+                for assoc in host.access_rule_rel_ids.sorted('priority'):
+                    rule = assoc.rule_id
                     access_type = rule.access_type.replace('_', ' ').title()
                     patterns = ', '.join(rule.get_url_patterns()[:2])  # Show first 2 patterns
                     if len(rule.get_url_patterns()) > 2:
                         patterns += f" (+ {len(rule.get_url_patterns())-2} more)"
-                    print(f"  - Priority {rule.priority}: {access_type} - {patterns}")
-            
-            if host.webhook_token_ids:
-                print(f"\nWebhook Tokens: {len(host.webhook_token_ids)}")
-                for token in host.webhook_token_ids:
+                    state = '' if assoc.is_active else ' [inactive on this host]'
+                    print(f"  - Priority {assoc.priority}: {access_type} - {patterns}{state}")
+
+            # Tokens hang off the rules, not off the host.
+            token_objs = host.access_rule_rel_ids.rule_id.token_ids
+            if token_objs:
+                print(f"\nWebhook Tokens: {len(token_objs)}")
+                for token in token_objs:
                     status = "Active" if not token.expires_at or token.expires_at > fields.Datetime.now() else "Expired"
                     print(f"  - {token.name}: {status}")
         
@@ -951,16 +957,19 @@ class SunrayCommand(Command):
                 print(f"Warning: Host has {len(active_sessions)} active session(s)")
             
             domain = host.domain
-            webhook_count = len(host.webhook_token_ids)
-            
+            rule_count = len(host.access_rule_rel_ids)
+
             # Delete the host
             host.unlink()
-            
+
             print(f"Host '{domain}' deleted")
             if users:
                 print(f"  - {len(users)} user association(s) removed")
-            if webhook_count:
-                print(f"  - {webhook_count} webhook token(s) removed")
+            if rule_count:
+                # Only the associations go: access rules and their tokens are a
+                # shared library, still in use by the other hosts.
+                print(f"  - {rule_count} access rule association(s) removed "
+                      f"(the rules themselves are kept)")
         
         elif args.action == 'force-cache-refresh':
             host = Host.search([('domain', '=', args.domain)], limit=1)

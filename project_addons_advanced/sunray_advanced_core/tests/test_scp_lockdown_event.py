@@ -5,7 +5,10 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import fields
+from odoo.addons.inouk_message_queue.api import IMQError
 from odoo.tests import TransactionCase
+
+from .common import assert_raises_keeping_writes
 
 
 class TestScpUnreachableLockdownEvent(TransactionCase):
@@ -43,12 +46,15 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
         })
 
     def _trigger_failed_sync(self):
+        # A failed sync now raises IMQError so the IMQ message lands in 'failed'
+        # and notifies, instead of reporting 'done'. The lockdown, audit event
+        # and last_error asserted by the callers are written before it is raised.
         with patch.object(
             type(self.scp),
             'call_scp',
             side_effect=RuntimeError('simulated SCP unreachable'),
         ):
-            self.scp.sync_scp_job()
+            assert_raises_keeping_writes(self, IMQError, self.scp.sync_scp_job)
 
     def test_lockdown_event_emitted_when_threshold_exceeded(self):
         """auto_lockdown_on_unreachable=True + threshold exceeded → critical event + hosts locked."""
@@ -167,7 +173,7 @@ class TestScpUnreachableLockdownEvent(TransactionCase):
             return {'protected_hosts': [], 'users': []}
 
         with patch.object(type(self.scp), 'call_scp', side_effect=trigger_real_pg_error):
-            self.scp.sync_scp_job()
+            assert_raises_keeping_writes(self, IMQError, self.scp.sync_scp_job)
 
         # Verify the cursor is back in a usable state by running a SELECT
         self.env.cr.execute("SELECT 1")

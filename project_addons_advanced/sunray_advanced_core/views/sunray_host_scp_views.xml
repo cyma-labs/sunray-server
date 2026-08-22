@@ -23,17 +23,22 @@
                         <li>The worker receives <code>202 setup_in_progress</code> on every
                             <code>/config/register</code> call — the host is <strong>not
                             served</strong>.</li>
-                        <li>The periodic <code>sync_scp_job</code> cron classifies this host
-                            as <code>PENDING SETUP</code> and <strong>skips</strong> it.</li>
-                        <li><strong>No automatic retry</strong> will happen, even if the SCP
-                            URL or configuration has been fixed in the meantime.</li>
+                        <li>If the SCP still has <code>scp_sync_enabled = False</code> on this
+                            host, the periodic <code>sync_scp_job</code> cron classifies it as
+                            <code>PENDING SETUP</code> and <strong>skips</strong> it — nothing
+                            will clear this state on its own.</li>
+                        <li>Once the host is synced and appears in the SCP response, the cron
+                            clears this flag by itself on its next run.</li>
                     </ul>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not scp_setup_error">
+                        <strong>Last setup failure:</strong>
+                        <field name="scp_setup_error" readonly="1" nolabel="1"/>
+                    </div>
                     <p>
-                        <strong>If the initial setup failed:</strong> check
-                        <code>last_error</code> on the parent SCP record. To unblock, either
-                        click <strong>Retry SCP Setup</strong> below to re-enqueue the async
-                        job, or delete this host (the worker will recreate a clean stub on
-                        its next registration attempt).
+                        <strong>To unblock now:</strong> click <strong>Retry SCP Setup</strong>
+                        below to re-enqueue the async job, or delete this host (the worker
+                        recreates a clean stub on its next registration attempt).
                     </p>
                     <button name="action_retry_scp_setup"
                             type="object"

@@ -37,6 +37,13 @@ class SunrayHostSCP(models.Model):
         default=False,
         help='True while async auto-register setup is running. Worker will show setup page.'
     )
+    scp_setup_error = fields.Char(
+        string='Setup Error',
+        readonly=True,
+        help='Why the last setup_host_from_scp run failed for this host. Kept on '
+             'the host rather than on the SCP, whose last_error is overwritten by '
+             'the next successful call and so goes blank while the host stays stuck.'
+    )
 
     def action_retry_scp_setup(self):
         """Re-enqueue the async setup_host_from_scp IMQ job for a stuck stub host.

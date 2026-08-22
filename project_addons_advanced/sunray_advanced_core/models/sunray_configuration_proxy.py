@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import ipaddress
 import json
 import re
 import requests
@@ -8,9 +9,13 @@ import traceback
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
-from odoo.addons.inouk_message_queue.api import processor_method
+from odoo.addons.inouk_message_queue.api import IMQError, processor_method
 
 _logger = logging.getLogger(__name__)
+
+# Names a SCP must never publish as a protected host: a protected host is
+# reached by name from the outside, so a loopback alias designates nothing.
+UNPUBLISHABLE_FQDNS = frozenset({'localhost', 'localhost.localdomain'})
 
 
 class SunrayConfigurationProxy(models.Model):
@@ -153,6 +158,78 @@ class SunrayConfigurationProxy(models.Model):
             _logger.error(f"Invalid regex in SCP {self.name}: {self.fqdn_regex} - {e}")
             return False
 
+    def _is_publishable_fqdn(self, fqdn):
+        """Check that an FQDN can designate a host reachable from the outside.
+
+        Args:
+            fqdn: Candidate value read from a SCP response
+
+        Returns:
+            bool: False for a non-string, an IP literal, a loopback alias, or a
+                  bare label with no dot.
+        """
+        if not fqdn or not isinstance(fqdn, str):
+            return False
+        candidate = fqdn.strip().lower()
+        if candidate in UNPUBLISHABLE_FQDNS:
+            return False
+        try:
+            # Bracketed form is how IPv6 travels in URLs — strip before parsing.
+            ipaddress.ip_address(candidate.strip('[]'))
+            return False
+        except ValueError:
+            pass
+        return '.' in candidate
+
+    def _validate_scp_payload(self, data, fqdn=None):
+        """Reject a structurally valid but nonsensical SCP response.
+
+        An empty `protected_hosts` list is legitimate: a SCP may genuinely have
+        no host left, and Sunray must stay able to deactivate them all. What is
+        never legitimate is an entry Sunray cannot act on — a missing FQDN, or
+        one that cannot designate a reachable host. Without this check a
+        misconfigured SCP (`web.base.url` left on a loopback URL) passes off a
+        placeholder entry as the whole host inventory, and the sync deactivates
+        every host that placeholder does not mention.
+
+        Args:
+            data: Parsed JSON response from the SCP
+            fqdn (str, optional): FQDN the response was requested for, for logs
+
+        Raises:
+            IMQError: The response cannot be acted upon. Not retryable — the SCP
+                      has to be fixed first.
+        """
+        scope = f"fqdn={fqdn}" if fqdn else 'all hosts'
+
+        if not isinstance(data, dict):
+            raise IMQError(
+                f"SCP {self.name}: response for {scope} is not a JSON object "
+                f"(got {type(data).__name__})"
+            )
+
+        protected_hosts = data.get('protected_hosts')
+        if not isinstance(protected_hosts, list):
+            raise IMQError(
+                f"SCP {self.name}: response for {scope} has no "
+                f"'protected_hosts' list"
+            )
+
+        offenders = [
+            entry.get('fqdn') if isinstance(entry, dict) else entry
+            for entry in protected_hosts
+            if not isinstance(entry, dict)
+            or not self._is_publishable_fqdn(entry.get('fqdn'))
+        ]
+        if offenders:
+            raise IMQError(
+                f"SCP {self.name}: response for {scope} carries "
+                f"{len(offenders)} unusable protected_hosts entrie(s): "
+                f"{offenders!r}. Refusing the whole response — a SCP that "
+                f"publishes an unreachable host name cannot be trusted to "
+                f"describe the host inventory."
+            )
+
     def call_scp(self, fqdn=None):
         """Call the SCP API and return parsed JSON response.
 
@@ -164,6 +241,8 @@ class SunrayConfigurationProxy(models.Model):
 
         Raises:
             ValidationError: On HTTP error or invalid response
+            IMQError: On a response that cannot be acted upon (see
+                      `_validate_scp_payload`)
         """
         if not self.url:
             raise ValidationError("SCP URL is not configured")
@@ -191,7 +270,6 @@ class SunrayConfigurationProxy(models.Model):
                 f"for {'fqdn=' + fqdn if fqdn else 'all hosts'}: "
                 f"{json.dumps(data, default=str)[:2000]}"
             )
-            return data
         except requests.exceptions.RequestException as e:
             error_msg = f"SCP API call failed: {str(e)}"
             _logger.error(f"{self.name}: {error_msg}")
@@ -202,6 +280,17 @@ class SunrayConfigurationProxy(models.Model):
             _logger.error(f"{self.name}: {error_msg}")
             self.sudo().last_error = error_msg
             raise ValidationError(error_msg)
+
+        # Validated outside the try/except above so an IMQError is not mistaken
+        # for a transport or JSON-decoding failure.
+        try:
+            self._validate_scp_payload(data, fqdn=fqdn)
+        except IMQError as e:
+            _logger.error(f"{self.name}: {e}")
+            self.sudo().last_error = str(e)
+            raise
+
+        return data
 
     @processor_method(queue_name='sunray')
     def setup_host_from_scp(self, fqdn, worker_id, _imq_logger=None):
@@ -319,6 +408,7 @@ class SunrayConfigurationProxy(models.Model):
                 'backend_url': f'https://{fqdn}/',
                 'is_active': True,
                 'scp_setup_in_progress': False,
+                'scp_setup_error': False,
                 'scp_last_sync_ts': fields.Datetime.now(),
                 # Apply worker defaults
                 'session_duration_s': worker_obj.auto_register_session_duration_s,
@@ -443,10 +533,25 @@ class SunrayConfigurationProxy(models.Model):
                 f"===== setup_host_from_scp END (failure at step='{current_step}') — "
                 f"fqdn={fqdn} duration={elapsed_ms}ms ====="
             )
-            self.sudo().last_error = (
-                f"Host setup failed at step '{current_step}': {str(e)}"
-            )
-            # Keep scp_setup_in_progress=True on the stub for retry/manual intervention
+            error_msg = f"Host setup failed at step '{current_step}': {str(e)}"
+            self.sudo().last_error = error_msg
+
+            # Also recorded on the host itself: last_error above lives on the SCP
+            # and is wiped by the next successful call, so it reads blank while
+            # this host is still stuck. The admin banner shows this one.
+            host_obj = self.env['sunray.host'].sudo().search([
+                ('domain', '=', fqdn),
+                ('scp_id', '=', self.id),
+            ], limit=1)
+            if host_obj:
+                host_obj.scp_setup_error = error_msg[:512]
+
+            # scp_setup_in_progress stays True on the stub, for retry/manual
+            # intervention. Raising is what makes the IMQ message land in
+            # 'failed' instead of 'done' — without it a setup that never ran to
+            # completion is indistinguishable from a successful one, and no
+            # notification is ever sent.
+            raise IMQError(error_msg) from e
 
     def _find_or_create_user(self, email, username):
         """Find existing user by email, or create a new one.
@@ -674,6 +779,46 @@ class SunrayConfigurationProxy(models.Model):
         else:
             return 'public'
 
+    def _recover_stub_host(self, host_obj, _imq_logger=None):
+        """Clear the stub flag on a host the SCP response describes.
+
+        `setup_host_from_scp` leaves `scp_setup_in_progress=True` when it fails,
+        so the admin can retry it. But nothing retries on its own: the controller
+        keeps answering 202 and `_try_auto_register` sees a pending stub and
+        re-enqueues nothing. A host stuck that way is unreachable for good, even
+        once the SCP is healthy again. Since the caller already holds the SCP
+        payload for this host, the sync can finish what the setup job could not.
+
+        Args:
+            host_obj: sunray.host record flagged `scp_setup_in_progress`
+            _imq_logger: IMQ logger of the calling job, module logger otherwise
+        """
+        _task_logger = _imq_logger or _logger
+        previous_error = host_obj.scp_setup_error or None
+        host_obj.write({
+            'scp_setup_in_progress': False,
+            'scp_setup_error': False,
+        })
+
+        _task_logger.info(
+            f"SCP {self.name}:\n"
+            f"    Host {host_obj.domain} : STUB RECOVERED\n"
+            f"    setup_in_progress cleared by sync — the host is in the SCP "
+            f"response, so its failed setup job is no longer blocking it."
+        )
+        self.env['sunray.audit.log'].sudo().create_audit_event(
+            event_type='auto_register.stub_recovered',
+            severity='warning',
+            event_source='system',
+            details={
+                'hostname': host_obj.domain,
+                'host_id': host_obj.id,
+                'scp_id': self.id,
+                'scp_name': self.name,
+                'previous_setup_error': previous_error,
+            },
+        )
+
     def action_sync_now(self):
         """Manually trigger an immediate SCP sync via IMQ."""
         self.ensure_one()
@@ -764,6 +909,7 @@ class SunrayConfigurationProxy(models.Model):
             hosts_synced = 0
             hosts_skipped = 0
             hosts_deactivated = 0
+            hosts_recovered = 0
             rules_totals = {'created': 0, 'updated': 0, 'unchanged': 0, 'removed': 0}
             untracked_counts = {'new': 0, 'stub': 0, 'unlinked': 0}
 
@@ -859,6 +1005,15 @@ class SunrayConfigurationProxy(models.Model):
                     continue
 
                 host_data = response_hosts[host_obj.domain]
+
+                # Recover a stub whose setup_host_from_scp failed. The flag makes
+                # get_host_config answer 202 forever and nothing else ever clears
+                # it, so a host the SCP describes perfectly well stays unserved
+                # for good. Done before the hash short-circuit below, otherwise a
+                # stub whose hash already matches would be skipped unrepaired.
+                if host_obj.scp_setup_in_progress:
+                    self._recover_stub_host(host_obj, _imq_logger=_imq_logger)
+                    hosts_recovered += 1
 
                 # Check hash for change detection
                 if host_obj.scp_hash and host_obj.scp_hash == host_data.get('hash'):
@@ -975,7 +1130,7 @@ class SunrayConfigurationProxy(models.Model):
             _task_logger.info(
                 f"SCP {self.name}: Sync completed — "
                 f"Hosts: {hosts_synced} updated, {hosts_skipped} unchanged, "
-                f"{hosts_deactivated} deactivated | "
+                f"{hosts_deactivated} deactivated, {hosts_recovered} stub(s) recovered | "
                 f"Users: {users_created} new, {len(removed_user_ids)} removed | "
                 f"Rules: {rules_totals['created']} created, "
                 f"{rules_totals['updated']} updated, "
@@ -1047,3 +1202,12 @@ class SunrayConfigurationProxy(models.Model):
                     if lockdown_enabled:
                         managed_hosts.write({'block_all_traffic': True})
                     _task_logger.warning(message)
+
+            # Raised last, once last_error, the audit event and the lockdown are
+            # written: without it the IMQ message ends 'done' on every failure,
+            # which is why repeated SCP 502s and a setup that never completed
+            # both went unnoticed. IMQError specifically — it is the only IMQ
+            # outcome that commits; IMQRetryableError rolls the cursor back and
+            # would discard the lockdown and audit event just written. No retry
+            # is lost either way, the cron re-runs this sync on its next tick.
+            raise IMQError(error_msg) from e

@@ -135,6 +135,19 @@ The two red states are kept apart because the fix differs: link a SCP, versus en
 linked. The badge says only whether the worker can register at all — *which* SCPs it registers
 against is form detail, read on the Auto Register tab, not list noise.
 
+**Refusing a SCP payload.** `_validate_scp_payload` drops the *whole* response when any entry
+carries a name that cannot designate a reachable host (`localhost`, an IP literal, a bare label with
+no dot). An empty `protected_hosts` stays legitimate: emptying a SCP must remain possible. Partial
+acceptance is what caused the August outage, where a loopback placeholder passed for the full
+inventory and the sync deactivated 62 hosts.
+
+Because the fault is on the other side of the API and nobody watches the IMQ queue, the refusal also
+sends a sticky `danger` toast to the `group_sunray_admin` members, naming the SCP, the offending
+values and the fact that nothing was applied. Two things matter if you touch it: the job runs as the
+API service account with no session, so the notification names the group rather than `env.user`; and
+it is throttled on `last_error` (substring, since the calling job re-wraps the message), because the
+sync runs every 5 minutes and this guard fired 82 times in one day in September.
+
 **Host state cascade (STD-26).** `_compute_state` is an `if/elif` chain, so branch order is a
 priority ranking. `scp_setup` sits **after** `locked`: a stub can hold `block_all_traffic` with no
 admin action, because reactivating an archived host writes `host_values` that do not include that

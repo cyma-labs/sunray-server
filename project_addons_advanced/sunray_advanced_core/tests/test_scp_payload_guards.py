@@ -95,6 +95,75 @@ class TestScpPayloadGuards(TransactionCase):
         )
         self.assertTrue(self.scp.last_error, 'The failure must be recorded on the SCP')
 
+    # ------------------------------------------- the refusal reaches a human
+
+    def _sync_capturing_notifications(self, payload):
+        """Run a refused sync and return the ik_notify_with_link call args."""
+        with patch.object(
+            type(self.env['res.users']), 'ik_notify_with_link'
+        ) as notify_mock:
+            self._http_sync(payload, raises=IMQError)
+        return notify_mock
+
+    def test_refusal_notifies_the_sunray_admins(self):
+        """Nobody watches the IMQ queue; the people who can fix the SCP are told.
+
+        The fault is on the other side of the API, and the job runs as the API
+        service account with no session, so the notification has to name the
+        administrators explicitly.
+        """
+        notify_mock = self._sync_capturing_notifications(
+            self._payload([self._host_entry('localhost')])
+        )
+
+        notify_mock.assert_called_once()
+        args, kwargs = notify_mock.call_args
+        self.assertEqual(args[0], 'danger')
+        self.assertIn('localhost', str(args[2]))
+        self.assertIn(self.scp.name, str(args[2]))
+        self.assertIn('whole response was ignored', str(args[2]))
+        self.assertEqual(kwargs['model'], 'sunray.configuration_proxy')
+        self.assertEqual(kwargs['res_id'], self.scp.id)
+        self.assertTrue(kwargs['sticky'])
+
+    def test_repeated_identical_failure_notifies_once(self):
+        """The sync runs every 5 minutes; a sticky toast per tick is unusable.
+
+        During the September episode this guard fired 82 times in a single day.
+        Re-notify only when the error changes. The throttle reads `last_error`,
+        which the calling job stores re-wrapped ("Sync failed: ..."), so the
+        check has to be a substring test rather than equality.
+        """
+        payload = self._payload([self._host_entry('localhost')])
+
+        first_mock = self._sync_capturing_notifications(payload)
+        second_mock = self._sync_capturing_notifications(payload)
+
+        first_mock.assert_called_once()
+        second_mock.assert_not_called()
+
+    def test_a_different_failure_notifies_again(self):
+        """A new fault is news, even right after another one."""
+        self._sync_capturing_notifications(
+            self._payload([self._host_entry('localhost')])
+        )
+
+        notify_mock = self._sync_capturing_notifications(
+            self._payload([self._host_entry('127.0.0.1')])
+        )
+
+        notify_mock.assert_called_once()
+
+    def test_offender_values_are_escaped(self):
+        """Offenders come from an external API and land in an admin's browser."""
+        notify_mock = self._sync_capturing_notifications(
+            self._payload([self._host_entry('<img src=x onerror=alert(1)>')])
+        )
+
+        body = str(notify_mock.call_args[0][2])
+        self.assertNotIn('<img', body)
+        self.assertIn('&lt;img', body)
+
     def test_unpublishable_fqdns_are_refused(self):
         """Every FQDN shape that cannot designate a reachable host."""
         for fqdn in ('127.0.0.1', '::1', '[::1]', 'localhost', 'bare-label', '', None):

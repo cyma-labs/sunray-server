@@ -7,7 +7,9 @@ import logging
 import time
 import traceback
 
-from odoo import api, fields, models
+from markupsafe import Markup
+
+from odoo import SUPERUSER_ID, api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.addons.inouk_message_queue.api import IMQError, processor_method
 
@@ -222,13 +224,88 @@ class SunrayConfigurationProxy(models.Model):
             or not self._is_publishable_fqdn(entry.get('fqdn'))
         ]
         if offenders:
-            raise IMQError(
+            error_msg = (
                 f"SCP {self.name}: response for {scope} carries "
                 f"{len(offenders)} unusable protected_hosts entrie(s): "
                 f"{offenders!r}. Refusing the whole response — a SCP that "
                 f"publishes an unreachable host name cannot be trusted to "
                 f"describe the host inventory."
             )
+            # Only when the error is new. The sync runs every 5 minutes and this
+            # guard fired 82 times in a single day during the September episode;
+            # a sticky danger toast per tick would be unusable. `last_error` is
+            # still the previous run's value here — call_scp overwrites it on the
+            # way out — so it is the natural throttle key. Substring, not
+            # equality: the calling job re-wraps the message before storing it
+            # ("Sync failed: ...", "Host setup failed at step '...': ...").
+            if error_msg not in (self.last_error or ''):
+                self._notify_admins_payload_refused(offenders, scope)
+            raise IMQError(error_msg)
+
+    def _notify_admins_payload_refused(self, offenders, scope):
+        """Toast the Sunray admins that this SCP's whole response was dropped.
+
+        The guard is otherwise silent to anyone not watching the IMQ queue: it
+        raises IMQError, which lands in the message result and in `last_error`,
+        and someone has to go and look. But the fault is on the *other* side of
+        the API, so the people who can fix it are told directly instead.
+
+        This runs inside an IMQ job, where `self.env.user` is the API service
+        account with no browser session, so the notification names the Sunray
+        administrators rather than the current user. `ik_notify` iterates its
+        recordset, so the whole group is served by one call.
+
+        Args:
+            offenders: the unusable values read from the response
+            scope: 'all hosts', or the FQDN the response was requested for
+        """
+        admin_group_obj = self.env.ref(
+            'sunray_core.group_sunray_admin', raise_if_not_found=False
+        )
+        if not admin_group_obj:
+            return
+
+        # Service accounts hold the group but never hold a session.
+        service_user_ids = {SUPERUSER_ID}
+        api_user_obj = self.env.ref(
+            'sunray_advanced_core.user_sunray_api', raise_if_not_found=False
+        )
+        if api_user_obj:
+            service_user_ids.add(api_user_obj.id)
+
+        recipient_objs = admin_group_obj.sudo().users.filtered(
+            lambda u: u.active and not u.share and u.id not in service_user_ids
+        )
+        if not recipient_objs:
+            return
+
+        # Markup(...) % value escapes each substitution: `offenders` and the SCP
+        # name come from an external API response, and this body is rendered as
+        # HTML in an admin's browser.
+        offender_items = Markup('').join(
+            Markup('<li><code>%s</code></li>') % repr(offender)
+            for offender in offenders
+        )
+        message = Markup(
+            '<p><b>%s</b> published %s host name(s) that cannot designate a '
+            'reachable host (scope: %s):</p>'
+            '<ul>%s</ul>'
+            '<p><b>The whole response was ignored</b>: no host was created, '
+            'updated or deactivated. A SCP publishing an unreachable host name '
+            'cannot be trusted to describe the host inventory, so Sunray refuses '
+            'the payload rather than act on part of it.</p>'
+            '<p>Sync stays broken for this SCP until its response is fixed.</p>'
+        ) % (self.name, len(offenders), scope, offender_items)
+
+        recipient_objs.ik_notify_with_link(
+            'danger',
+            'SCP response refused',
+            message,
+            model='sunray.configuration_proxy',
+            res_id=self.id,
+            button_name='Open SCP',
+            sticky=True,
+        )
 
     def call_scp(self, fqdn=None):
         """Call the SCP API and return parsed JSON response.

@@ -121,13 +121,19 @@ disabled SCP with an empty `fqdn_regex` (= match all) silently won over the live
 host on a control plane that no longer knew it.
 
 Skipping them is right, but it trades a loud failure (the host hangs on the worker's setup page)
-for a silent one (404, the worker serves an error page, nothing points at the worker). Two computed
-fields keep it visible: `auto_register_no_active_scp` is true when auto-register is on and no
-*active* SCP is linked, and `auto_register_status` spells the state out — `Off`,
-`On — no SCP linked`, `On — all N SCP(s) disabled`, or the names of the active SCPs. The status is a
-column in the worker list and a field on the Auto Register tab; the boolean drives the red banner
-and the list decoration. Both causes are reported separately because the fix differs: link a SCP,
-versus enable the one already linked.
+for a silent one (404, the worker serves an error page, nothing points at the worker). The computed
+`auto_register_status` badge keeps it visible, in the worker list and on the Auto Register tab:
+
+| Value | Badge | Meaning |
+|---|---|---|
+| `off` | grey | auto-registration disabled, nothing to check |
+| `no_scp` | red | enabled with no SCP linked at all |
+| `no_active_scp` | red | SCPs linked, every one of them disabled |
+| `ready` | green | at least one active SCP |
+
+The two red states are kept apart because the fix differs: link a SCP, versus enable the one already
+linked. The badge says only whether the worker can register at all — *which* SCPs it registers
+against is form detail, read on the Auto Register tab, not list noise.
 
 **Host state cascade (STD-26).** `_compute_state` is an `if/elif` chain, so branch order is a
 priority ranking. `scp_setup` sits **after** `locked`: a stub can hold `block_all_traffic` with no

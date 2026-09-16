@@ -15,8 +15,10 @@
                             <field name="auto_register_enabled" widget="boolean_toggle"/>
                         </group>
                         <group class="ik_lw200">
-                            <field name="auto_register_status" readonly="1"/>
-                            <field name="auto_register_no_active_scp" invisible="1"/>
+                            <field name="auto_register_status" widget="badge" readonly="1"
+                                   decoration-muted="auto_register_status == 'off'"
+                                   decoration-danger="auto_register_status in ('no_scp', 'no_active_scp')"
+                                   decoration-success="auto_register_status == 'ready'"/>
                         </group>
                     </group>
 
@@ -31,7 +33,7 @@
                              at the worker. Both causes (nothing linked, everything
                              disabled) need to be loud, here and in the worker list. -->
                         <div class="alert alert-danger mb16" role="alert" colspan="2"
-                             invisible="not auto_register_no_active_scp">
+                             invisible="auto_register_status not in ('no_scp', 'no_active_scp')">
                             <i class="fa fa-exclamation-triangle" title="Warning"/>
                             <strong>Auto-registration cannot register anything:</strong>
                             this worker has no <em>active</em> SCP. Unknown hosts are answered 404 and
@@ -139,13 +141,13 @@
         <field name="inherit_id" ref="sunray_core.view_sunray_worker_tree"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='host_count']" position="after">
-                <field name="auto_register_status"
-                       string="Auto-Register"
-                       decoration-danger="auto_register_no_active_scp"
-                       decoration-muted="not auto_register_enabled"
+                <!-- Badge only: whether the worker can register at all. Which SCPs
+                     it registers against is form detail, not list noise. -->
+                <field name="auto_register_status" widget="badge"
+                       decoration-muted="auto_register_status == 'off'"
+                       decoration-danger="auto_register_status in ('no_scp', 'no_active_scp')"
+                       decoration-success="auto_register_status == 'ready'"
                        optional="show"/>
-                <field name="auto_register_no_active_scp" column_invisible="1"/>
-                <field name="auto_register_enabled" column_invisible="1"/>
             </xpath>
         </field>
     </record>

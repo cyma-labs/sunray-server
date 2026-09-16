@@ -6,6 +6,14 @@ from odoo import api, fields, models
 _logger = logging.getLogger(__name__)
 
 
+AUTO_REGISTER_STATUS_LIST = [
+    ('off', 'Off'),
+    ('no_scp', 'On - no SCP linked'),
+    ('no_active_scp', 'On - no SCP active'),
+    ('ready', 'On'),
+]
+
+
 class SunrayWorkerAutoRegister(models.Model):
     """Extend sunray.worker with auto-registration and SCP configuration fields."""
 
@@ -32,18 +40,15 @@ class SunrayWorkerAutoRegister(models.Model):
              'disabled SCPs are skipped.'
     )
 
-    auto_register_no_active_scp = fields.Boolean(
-        string='Auto-Register Broken',
-        compute='_compute_auto_register_status',
-        help='True when auto-registration is enabled but no ACTIVE SCP is linked, '
-             'so no host can ever be auto-registered by this worker. Covers both '
-             'causes: no SCP linked at all, and every linked SCP disabled.'
-    )
-    auto_register_status = fields.Char(
+    auto_register_status = fields.Selection(
+        AUTO_REGISTER_STATUS_LIST,
         string='Auto-Register',
         compute='_compute_auto_register_status',
-        help='One-line auto-registration readiness, for the worker list: whether '
-             'it is on, and whether it can actually register anything.'
+        help='Auto-registration readiness, shown as a badge in the worker list:\n'
+             '- Off: auto-registration disabled, nothing to check\n'
+             '- On - no SCP linked: enabled with no SCP at all, cannot register\n'
+             '- On - no SCP active: SCPs linked but all disabled, cannot register\n'
+             '- On: at least one active SCP, see the Auto Register tab for which'
     )
 
     # Default configuration values for auto-registered hosts
@@ -158,8 +163,8 @@ class SunrayWorkerAutoRegister(models.Model):
                 # is the only skip that changes the outcome. No audit event — the
                 # caller is an auth='none' endpoint the worker polls every 5s, and
                 # one audit row per request would flood the table. The standing
-                # signal is auto_register_status / auto_register_no_active_scp,
-                # shown in the worker list and on the worker form.
+                # signal is the auto_register_status badge, in the worker list
+                # and on the worker form.
                 _logger.warning(
                     "Worker %s: SCP '%s' matches %s but is disabled (is_active=False) "
                     "— skipped. Enable it, or link an active SCP to this worker.",
@@ -178,26 +183,20 @@ class SunrayWorkerAutoRegister(models.Model):
         unknown host is answered 404, the worker serves a 503, and nothing points
         at the worker. That is how a whole environment stopped registering hosts
         while its worker still looked fine in the list. The two causes read the
-        same to a host and are reported separately here, because the fix differs:
-        link a SCP, versus enable the one already linked.
+        same to a host and are kept apart here, because the fix differs: link a
+        SCP, versus enable the one already linked. Which SCPs are linked belongs
+        on the form, not in this badge — the list only has to say whether the
+        worker can register at all.
         """
         for worker_obj in self:
             linked_scp_objs = worker_obj.auto_register_scp_ids
             active_scp_objs = linked_scp_objs.filtered('is_active')
 
             if not worker_obj.auto_register_enabled:
-                worker_obj.auto_register_no_active_scp = False
-                worker_obj.auto_register_status = 'Off'
+                worker_obj.auto_register_status = 'off'
             elif not linked_scp_objs:
-                worker_obj.auto_register_no_active_scp = True
-                worker_obj.auto_register_status = 'On — no SCP linked'
+                worker_obj.auto_register_status = 'no_scp'
             elif not active_scp_objs:
-                worker_obj.auto_register_no_active_scp = True
-                worker_obj.auto_register_status = (
-                    f'On — all {len(linked_scp_objs)} SCP(s) disabled'
-                )
+                worker_obj.auto_register_status = 'no_active_scp'
             else:
-                worker_obj.auto_register_no_active_scp = False
-                worker_obj.auto_register_status = ', '.join(
-                    active_scp_objs.mapped('name')
-                )
+                worker_obj.auto_register_status = 'ready'

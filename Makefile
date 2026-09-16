@@ -47,6 +47,33 @@ MESSAGES ?= 20
 # Base branch for `make diff-vs-default` (override: `make diff-vs-default DEFAULT=sunray_config_proxy`).
 DEFAULT ?= main
 
+# Where pg_backup stacks its dumps. Outside the repo tree on purpose: dumps are large and
+# carry live credentials, and until now they landed in the repo root.
+BACKUP_DIR ?= scrap_zone/sunray-backups
+
+# Parallel jobs for pg_restore (-j). 1 disables parallelism.
+JOBS ?= 4
+
+# WHY THESE ARE VARIABLES AND NOT INLINE $(MAKE) CALLS.
+# GNU make runs any recipe line whose UNEXPANDED text contains "$(MAKE)" even under -n,
+# so `make -n pg_restore` with an inline sub-make would really drop the database. Hiding
+# the call behind a variable keeps -n a dry run.
+LIST_BACKUPS = ls -1t $(BACKUP_DIR)/*.pg_dump 2>/dev/null
+RUN_BACKUP   = $(MAKE) --no-print-directory pg_backup
+
+# The pg_backups listing, as a variable, so pg_backup and pg_restore can end with it
+# WITHOUT an inline $(MAKE) — see the -n note above.
+define SHOW_BACKUPS
+	if $(LIST_BACKUPS) >/dev/null 2>&1; then \
+		printf '\033[1mBackups in %s (newest first):\033[0m\n' "$(BACKUP_DIR)"; \
+		$(LIST_BACKUPS) | while read -r f; do \
+			printf '  %-12s %s\n' "$$(du -h "$$f" | cut -f1)" "$$f"; \
+		done; \
+	else \
+		printf 'No backup in %s yet — `make pg_backup` creates one.\n' "$(BACKUP_DIR)"; \
+	fi
+endef
+
 # Supervised systemd units on a provisioned App Server. They respawn in 0.5s, so a target
 # that stops/upgrades the server or drops the database races them: a registry lock lands
 # mid-upgrade, and dropdb reports "database is being accessed by other users".
@@ -84,7 +111,7 @@ UNITS_GUARD_STRICT = up=$(UNITS_UP); \
 # /var/lib so creating it needs sudo once; afterwards it persists across reboots.
 TEXTFILE_DIR ?= /var/lib/node_exporter/textfile
 
-.PHONY: help initdb backup-db kill update test test-list run-gui run-wrkr metrics-dir clean-logs diff-vs-default code-review
+.PHONY: help initdb pg_backup pg_backups pg_restore kill update test test-list run-gui run-wrkr metrics-dir clean-logs diff-vs-default code-review
 
 help: ## Show this help. The two sections are GENERATED from each target's trailing tag, so the listing can never drift from the targets themselves. [agent]
 	@printf '\n\033[1mSunray server dev commands\033[0m — usage: make <target> [VAR=value]   (params listed per target)\n\n'
@@ -174,17 +201,40 @@ code-review: ## Explain the 5 Claude Code review/audit commands, their default s
 # `sunray-srvr*.log` glob — `make clean-logs` must never sweep away a database backup.
 # A failed dump deletes its own partial file: a truncated .pg_dump that looks like a backup is
 # worse than no backup at all.
-backup-db: ## Dump PGDATABASE to sunray-db-<timestamp>.pg_dump in the repo root (pg_dump -Fc, compressed). Server does NOT need to be stopped. Kept out of clean-logs. Prints the pg_restore line when done. [user, writes a large file]
-	@out=sunray-db-$$(date +%Y%m%d-%H%M%S).pg_dump; \
+pg_backups: ## List the DB backups available in $(BACKUP_DIR) (newest first). Creates nothing. Auto-run at the end of pg_backup and pg_restore. [agent]
+	@$(SHOW_BACKUPS)
+
+pg_backup: ## Snapshot the DB (PGDATABASE) with pg_dump --format=custom into $(BACKUP_DIR)/. STACKS — never overwrites a previous backup. Safe on a running server. Restore with `make pg_restore`. [user, writes a large file]
+	@mkdir -p $(BACKUP_DIR)
+	@out=$(BACKUP_DIR)/$$(date +%Y%m%d-%H%M%S)__$(PGDATABASE).pg_dump; \
 	echo "Dumping '$(PGDATABASE)' -> $$out …"; \
 	if pg_dump --format=custom --file="$$out" $(PGDATABASE); then \
-		printf '\033[32mbackup-db: %s written to %s\033[0m\n' "$$(du -h "$$out" | cut -f1)" "$$out"; \
-		echo "restore:   pg_restore -d $(PGDATABASE) --clean --if-exists $$out"; \
+		printf '\033[32mpg_backup: %s written to %s\033[0m\n' "$$(du -h "$$out" | cut -f1)" "$$out"; \
 	else \
 		rm -f "$$out"; \
-		printf '\033[31mbackup-db: FAILED — partial file removed, no backup kept.\033[0m\n' >&2; \
+		printf '\033[31mpg_backup: FAILED — partial file removed, no backup kept.\033[0m\n' >&2; \
 		exit 1; \
 	fi
+	@$(SHOW_BACKUPS)
+
+pg_restore: kill ## Restore the DB (PGDATABASE) from a backup: dropdb + createdb + pg_restore. DESTRUCTIVE, kills the server first. Params BACKUP=<file|path> (default: most recent), JOBS=<n> (default 4). [user, DESTRUCTIVE]
+	@$(call UNITS_GUARD_STRICT,pg_restore,dropdb refuses while a respawned server still holds a connection)
+	@b='$(BACKUP)'; \
+	if [ -z "$$b" ]; then b=$$($(LIST_BACKUPS) | head -1); fi; \
+	if [ -z "$$b" ]; then \
+		printf '\033[31mpg_restore: no backup found in %s and no BACKUP= given.\033[0m\n' "$(BACKUP_DIR)" >&2; \
+		exit 1; \
+	fi; \
+	if [ ! -f "$$b" ] && [ -f "$(BACKUP_DIR)/$$b" ]; then b="$(BACKUP_DIR)/$$b"; fi; \
+	if [ ! -f "$$b" ]; then \
+		printf '\033[31mpg_restore: %s does not exist.\033[0m\n' "$$b" >&2; exit 1; \
+	fi; \
+	printf '\033[1mRestoring %s into %s\033[0m — this DESTROYS the current database.\n' "$$b" "$(PGDATABASE)"; \
+	dropdb --if-exists $(PGDATABASE) && \
+	createdb -T template0 $(PGDATABASE) && \
+	pg_restore -d $(PGDATABASE) -j $(JOBS) --no-owner "$$b" && \
+	printf '\033[32mpg_restore: %s restored into %s\033[0m\n' "$$b" "$(PGDATABASE)"
+	@$(SHOW_BACKUPS)
 
 initdb: ## Fresh Sunray DB via interactive wizard: dropdb + createdb (PGDATABASE) + bin/sunray_init_db.sh. Requires NO active cnx to the DB. Env: MPY_USERINIT_USER_EMAIL/_NAME/_COMPANY + APP_PRIMARY_URL (see bin/sunray_init_db.sh --help). [user, interactive, DESTRUCTIVE]
 	@$(call UNITS_GUARD_STRICT,initdb,dropdb refuses while a respawned server still holds a connection)

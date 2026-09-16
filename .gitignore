@@ -64,5 +64,13 @@ inouk-sunray-worker-cloudflare/
 
 sunray-srvr*.log
 
-# Database dumps written by `make backup-db` (repo root, next to the logs)
+# Database dumps written by `make pg_backup`. They are large and carry live credentials,
+# so they live outside the tree that gets committed; the bare *.pg_dump stays because
+# dumps used to land in the repo root and older checkouts may still have some.
+scrap_zone/
 *.pg_dump
+
+# Per-box Claude permissions (`make setup-agent-permissions`). Deliberately NOT committed:
+# a committed grant would apply to every clone, production included.
+.claude/settings.local.json
+

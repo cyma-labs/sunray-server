@@ -197,6 +197,26 @@ the fix.
 Executable scripts and utilities go in `bin/`, not the repo root or an addon directory.
 Flag: a new `.sh` / `.py` tool committed outside `bin/`.
 
+## Model design
+
+**STD-26 — A stored state cascade orders its branches by descending permanence.**
+In an `if/elif` chain computing a stored state field, a branch only a human can clear comes before
+a branch that resolves on its own.
+Why: the transient state would mask the durable one, and the admin watches a waiting page while
+the real blocker sits behind it, untouched. On `sunray.host._compute_state`, `locked` comes before
+`scp_setup` because `block_all_traffic` is never written back to `False` anywhere in the codebase,
+while `scp_setup_in_progress` is cleared by a successful setup and by the Retry SCP Setup button.
+Flag: a branch inserted into an existing state cascade with no comment justifying its position.
+
+**STD-27 — A Selection value never reuses a word that already carries another concept.**
+Before adding a Selection value, check its name is not already used elsewhere in the product for
+something else; prefix it with its domain if it is.
+Why: `setup` already means token-based user enrolment across Sunray, from the `sunray.setup.token`
+model to the worker's `endpoints/setup.py`. A host state called `setup` would read as an enrolment
+state. Hence `scp_setup`, which names its domain.
+Flag: a Selection value whose name already appears as a model, route or module prefix elsewhere in
+the repository.
+
 ---
 
 ## Out of scope for this checklist

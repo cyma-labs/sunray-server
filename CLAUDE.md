@@ -90,6 +90,51 @@ Think of Sunray as a security bouncer at a club entrance:
 - Feature detection: Workers check for feature presence in API responses (e.g., `remote_auth` object)
 - Use `protected_host_id` in API documentation/examples (maps to `host_id` internally)
 
+### Auto-Register & Configuration Proxies (SCP) (STD-26, STD-27)
+
+A **SCP** (`sunray.configuration_proxy`) is an external control plane that tells Sunray which hosts
+exist, who may reach them and under which rules. A worker with `auto_register_enabled` can have
+unknown hosts registered automatically against the first SCP whose `fqdn_regex` matches.
+
+**Stub lifecycle.** An unknown FQDN makes `_try_auto_register` (advanced `controllers/rest_api.py`)
+create a *stub* host: `scp_setup_in_progress=True`, `scp_sync_enabled=False`, a placeholder
+`backend_url`, and the worker's `auto_register_*` defaults. It then enqueues the IMQ job
+`setup_host_from_scp` and answers **202** `setup_in_progress`. The worker shows a waiting page; the
+host is **not served** until the job completes.
+
+**The invariant that has caused two outages: `scp_sync_enabled` is only set at step 5
+(`host_write`) of a *successful* setup.** Everything that repairs a stub is gated behind that flag:
+
+- `sync_scp_job` iterates `self.host_ids.filtered(lambda h: h.scp_sync_enabled)`, so a stub whose
+  *first* setup failed is classified `PENDING SETUP` in the untracked block and skipped;
+- `_recover_stub_host` is only reachable from inside that loop;
+- `sync_all_scp` only iterates SCPs with `is_active=True`, so a stub bound to a disabled SCP is
+  invisible to every periodic mechanism.
+
+**Nothing retries a failed setup.** `_try_auto_register` sees an existing pending stub and answers
+202 without re-enqueueing. The only way out is the **Retry SCP Setup** button
+(`sunray_host_scp.action_retry_scp_setup`), which re-enqueues against the host's *current* `scp_id` —
+so fix `scp_id` first, then press it. `scp_setup_error` carries the failing step.
+
+**Selecting a SCP.** `find_matching_scp` skips SCPs with `is_active=False`. It used not to, and a
+disabled SCP with an empty `fqdn_regex` (= match all) silently won over the live one, stranding the
+host on a control plane that no longer knew it. When every linked SCP is disabled the worker form
+raises `auto_register_has_only_inactive_scp`, because the fix turns a loud failure (host hangs in
+setup) into a silent one (404, worker serves an error page).
+
+**Host state cascade (STD-26).** `_compute_state` is an `if/elif` chain, so branch order is a
+priority ranking. `scp_setup` sits **after** `locked`: a stub can hold `block_all_traffic` with no
+admin action, because reactivating an archived host writes `host_values` that do not include that
+field, and nothing in the codebase ever writes it back to `False`. Show the state only a human can
+clear before the one that resolves on its own.
+
+**Naming (STD-27).** The state is `scp_setup`, not `setup`. `setup` already means token-based user
+enrolment throughout Sunray (`sunray.setup.token`, `/sunray-srvr/v1/setup-tokens/*`, the worker's
+`endpoints/setup.py`). Do not "simplify" it.
+
+**Finding a stuck stub.** Host list, filter *SCP Setup in Progress*, then show the optional
+*Setup Error* column to tell a failed setup from one still running.
+
 ### Passkey Registration Security (STD-07)
 - All passkey registrations MUST use setup tokens for authorization
 - Setup tokens are validated in the model layer (register_with_setup_token method)

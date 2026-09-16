@@ -10,7 +10,7 @@
                 <!-- Add statusbar before sheet -->
                 <xpath expr="//sheet" position="before">
                     <header>
-                        <field name="state" widget="statusbar" statusbar_visible="unprotected,locked,deployment,protected"/>
+                        <field name="state" widget="statusbar" statusbar_visible="unprotected,locked,scp_setup,deployment,protected"/>
                     </header>
                 </xpath>
 
@@ -84,7 +84,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='config_version']" position="after">
                     <field name="state"
-                           decoration-warning="state == 'locked'"
+                           decoration-warning="state in ('locked', 'scp_setup')"
                            decoration-info="state == 'deployment'"
                            decoration-success="state == 'protected'"
                            decoration-danger="state == 'unprotected'"
@@ -93,6 +93,10 @@
                 </xpath>
                 <xpath expr="//field[@name='sunray_worker_id']" position="after">
                     <field name="scp_id" string="Config. Proxy" optional="hide"/>
+                    <!-- Companion to the "SCP Setup in Progress" filter: the filter
+                         returns every stub, this column separates the ones whose
+                         setup job failed from the ones still running. -->
+                    <field name="scp_setup_error" string="Setup Error" optional="hide"/>
                     <field name="golive_date" optional="hide"/>
                     <field name="days_until_golive" optional="hide"/>
                 </xpath>
@@ -137,6 +141,7 @@
                     <separator/>
                     <filter string="Unprotected" name="unprotected" domain="[('state', '=', 'unprotected')]"/>
                     <filter string="Locked" name="locked" domain="[('state', '=', 'locked')]"/>
+                    <filter string="SCP Setup in Progress" name="scp_setup" domain="[('state', '=', 'scp_setup')]"/>
                     <filter string="In Deployment" name="deployment" domain="[('state', '=', 'deployment')]"/>
                     <filter string="Protected" name="protected" domain="[('state', '=', 'protected')]"/>
                     <separator/>

@@ -50,7 +50,7 @@
 
             <!-- Insert SCP Sync Configuration tab in the notebook -->
             <xpath expr="//notebook" position="inside">
-                <page string="Sync Configuration" name="scp_sync_tab">
+                <page string="SCP Config." name="scp_sync_tab">
 
                     <!-- SCP Assignment -->
                     <group string="Configuration Proxy" name="scp_assignment" class="ik_lw200">
@@ -99,7 +99,7 @@
                         <strong>Setup Steps:</strong>
                         <ol>
                             <li>Create the protected host normally in Sunray (name, domain, backend_url, worker)</li>
-                            <li>Go to this <strong>"Sync Configuration"</strong> tab</li>
+                            <li>Go to this <strong>"SCP Config."</strong> tab</li>
                             <li>Select the <strong>SCP</strong> from the scp_id dropdown</li>
                             <li><strong>Enable</strong> the scp_sync_enabled checkbox</li>
                             <li><strong>Verify with the SCP admin</strong> that the host FQDN is included in the SCP's response</li>

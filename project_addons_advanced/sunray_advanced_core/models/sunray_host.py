@@ -14,6 +14,7 @@ SUNRAY_HOST_STATE_LIST = [
     ('archived', 'Archived'),
     ('unprotected', 'Unprotected'),
     ('locked', 'Locked'),
+    ('scp_setup', 'SCP Setup'),
     ('deployment', 'Deployment'),
     ('protected', 'Protected'),
 ]
@@ -49,6 +50,10 @@ class SunrayHost(models.Model):
              '- Archived: Host is decommissioned (is_active=False)\n'
              '- Unprotected: Active host with no worker assigned\n'
              '- Locked: Security lockdown active (block_all_traffic=True)\n'
+             '- SCP Setup: auto-register stub whose SCP setup has not completed '
+             '(scp_setup_in_progress=True). The host is NOT served: the worker is '
+             'answered 202 and shows a waiting page. Named scp_setup, not setup, '
+             'because "setup" already means token-based user enrolment in Sunray.\n'
              '- Deployment: Deployment mode with future go-live date\n'
              '- Protected: Normal operation with worker assigned'
     )
@@ -150,7 +155,7 @@ class SunrayHost(models.Model):
     
     @api.depends('sunray_worker_id', 'is_active', 'block_all_traffic', 'access_rule_rel_ids',
                  'access_rule_rel_ids.is_active', 'access_rule_rel_ids.rule_id.is_active',
-                 'golive_date', 'deployment_mode')
+                 'golive_date', 'deployment_mode', 'scp_setup_in_progress')
     def _compute_state(self):
         """Compute the host protection state based on configuration
 
@@ -158,8 +163,30 @@ class SunrayHost(models.Model):
         1. Archived: Host is not active (is_active=False)
         2. Unprotected: Active but no worker assigned
         3. Locked: Active with security lockdown (block_all_traffic=True)
-        4. Deployment: deployment_mode enabled and (no golive_date OR future golive_date)
-        5. Protected: All other cases with worker assigned
+        4. SCP Setup: auto-register stub whose setup_host_from_scp never completed
+        5. Deployment: deployment_mode enabled and (no golive_date OR future golive_date)
+        6. Protected: All other cases with worker assigned
+
+        Why 'scp_setup' sits AFTER 'locked' (STD-26)
+        --------------------------------------------
+        This is an if/elif cascade, so branch order is a priority ranking: the
+        first match wins and hides every branch below it. A stub can carry
+        block_all_traffic at the same time as scp_setup_in_progress, and the path
+        needs no admin action — `_try_auto_register` reactivates an archived host
+        by writing host_values onto it, and those values do not include
+        block_all_traffic, so a host locked before it was archived comes back as a
+        stub still holding its lock. Nothing in this codebase ever writes
+        block_all_traffic back to False; only an admin unticking it clears it.
+        scp_setup_in_progress, by contrast, is cleared by a successful setup and
+        by the Retry SCP Setup button. Show the state that will not fix itself.
+
+        Why 'scp_setup' and not 'setup' (STD-27)
+        ----------------------------------------
+        'setup' already means token-based user enrolment throughout Sunray:
+        sunray.setup.token, /sunray-srvr/v1/setup-tokens/*, validate_setup_token,
+        register_with_setup_token, and the worker's own endpoints/setup.py. A host
+        state called 'setup' would read as an enrolment state. Do not "simplify"
+        this name back to 'setup'.
         """
         today = date.today()
 
@@ -170,6 +197,8 @@ class SunrayHost(models.Model):
                 record.state = 'unprotected'
             elif record.block_all_traffic:
                 record.state = 'locked'
+            elif record.scp_setup_in_progress:
+                record.state = 'scp_setup'
             elif record.deployment_mode and (not record.golive_date or record.golive_date > today):
                 record.state = 'deployment'
             else:

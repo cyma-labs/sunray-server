@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class SunrayWorkerAutoRegister(models.Model):
@@ -24,7 +28,15 @@ class SunrayWorkerAutoRegister(models.Model):
         'scp_id',
         string='Configuration Proxies',
         help='SCPs linked to this worker, evaluated alphabetically by name. '
-             'First SCP whose fqdn_regex matches the incoming FQDN is used.'
+             'First ACTIVE SCP whose fqdn_regex matches the incoming FQDN is used; '
+             'disabled SCPs are skipped.'
+    )
+
+    auto_register_has_only_inactive_scp = fields.Boolean(
+        string='All Linked SCPs Disabled',
+        compute='_compute_auto_register_has_only_inactive_scp',
+        help='True when auto-registration is enabled but every linked SCP is '
+             'disabled, so no host can ever be auto-registered by this worker.'
     )
 
     # Default configuration values for auto-registered hosts
@@ -116,15 +128,51 @@ class SunrayWorkerAutoRegister(models.Model):
     )
 
     def find_matching_scp(self, fqdn):
-        """Find the first SCP whose fqdn_regex matches the given FQDN.
+        """Find the first *active* SCP whose fqdn_regex matches the given FQDN.
+
+        Disabled SCPs are skipped. `is_active` is a plain Boolean here, not Odoo's
+        magic `active` field, so nothing filters them out of the Many2many on its
+        own: a SCP left disabled with an empty `fqdn_regex` (= match all) used to
+        win over every active one and strand the host on a control plane that no
+        longer manages it. Its own help text already says "Disable to stop syncing
+        this SCP", so selecting one for auto-register contradicted the intent.
 
         Args:
             fqdn (str): Fully qualified domain name
 
         Returns:
-            sunray.configuration_proxy: First matching SCP, or None
+            sunray.configuration_proxy: First matching active SCP, or False
         """
-        for scp in self.auto_register_scp_ids:
-            if scp.match_fqdn(fqdn):
-                return scp
-        return None
+        for scp_obj in self.auto_register_scp_ids:
+            if not scp_obj.match_fqdn(fqdn):
+                continue
+            if not scp_obj.is_active:
+                # Warning, not debug: this SCP *would* have been selected, so it
+                # is the only skip that changes the outcome. No audit event — the
+                # caller is an auth='none' endpoint the worker polls every 5s, and
+                # one audit row per request would flood the table. The standing
+                # signal is auto_register_has_only_inactive_scp on the worker form.
+                _logger.warning(
+                    "Worker %s: SCP '%s' matches %s but is disabled (is_active=False) "
+                    "— skipped. Enable it, or link an active SCP to this worker.",
+                    self.name, scp_obj.name, fqdn,
+                )
+                continue
+            return scp_obj
+        return False
+
+    @api.depends('auto_register_enabled', 'auto_register_scp_ids',
+                 'auto_register_scp_ids.is_active')
+    def _compute_auto_register_has_only_inactive_scp(self):
+        """Flag the configuration that produced the stuck-host incident.
+
+        Skipping disabled SCPs turns a loud failure (the host registers against a
+        dead SCP and hangs in setup) into a silent one (404, the worker serves a
+        503 and nothing on the server says why). This field is what keeps it loud.
+        """
+        for worker_obj in self:
+            worker_obj.auto_register_has_only_inactive_scp = bool(
+                worker_obj.auto_register_enabled
+                and worker_obj.auto_register_scp_ids
+                and not worker_obj.auto_register_scp_ids.filtered('is_active')
+            )

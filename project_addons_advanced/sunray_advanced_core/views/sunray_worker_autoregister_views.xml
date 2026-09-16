@@ -19,9 +19,20 @@
                     <!-- SCP Configuration -->
                     <group string="Configuration Proxies" name="scp_config">
                         <div class="alert alert-info mb16" role="status" colspan="2">
-                            SCPs are evaluated in order. The first SCP whose fqdn_regex matches the incoming FQDN is used.
-                            Leave fqdn_regex empty to match all FQDNs.
+                            SCPs are evaluated in order. The first ACTIVE SCP whose fqdn_regex matches the incoming FQDN is used.
+                            Disabled SCPs are skipped. Leave fqdn_regex empty to match all FQDNs.
                         </div>
+                        <!-- Without this, the "every linked SCP is disabled" case is
+                             silent: auto-register simply answers 404 and the worker
+                             shows a 503, with nothing on the server saying why. -->
+                        <div class="alert alert-danger mb16" role="alert" colspan="2"
+                             invisible="not auto_register_has_only_inactive_scp">
+                            <i class="fa fa-exclamation-triangle" title="Warning"/>
+                            Every SCP linked to this worker is disabled. Auto-registration is enabled
+                            but no host can be registered: unknown hosts are answered 404 and the worker
+                            serves an error page. Enable one of these SCPs, or link an active one.
+                        </div>
+                        <field name="auto_register_has_only_inactive_scp" invisible="1"/>
                         <field name="auto_register_scp_ids" nolabel="1" colspan="2"/>
                     </group>
 

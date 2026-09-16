@@ -47,6 +47,38 @@ MESSAGES ?= 20
 # Base branch for `make diff-vs-default` (override: `make diff-vs-default DEFAULT=sunray_config_proxy`).
 DEFAULT ?= main
 
+# Supervised systemd units on a provisioned App Server. They respawn in 0.5s, so a target
+# that stops/upgrades the server or drops the database races them: a registry lock lands
+# mid-upgrade, and dropdb reports "database is being accessed by other users".
+#
+# UNITS_GUARD warns; UNITS_GUARD_STRICT refuses (exit 2) unless UNITS_OK=1 is passed. The
+# probe needs no sudo and answers "unknown" on a box without the units, so it is inert off
+# an App Server. The [agent] targets never call either: nothing supervised can see the
+# scratch database.
+SUPERVISED_UNITS ?= mpy_anyv2_appsrv_sunray_srv.service mpy_anyv2_appsrv_sunray_imqwrkr0.service
+
+UNITS_UP = $$(systemctl is-active $(SUPERVISED_UNITS) 2>/dev/null | grep -c '^active' || true)
+
+define UNITS_WARN
+	printf '\033[33m%s: %s supervised unit(s) ACTIVE — systemd respawns them in 0.5s.\033[0m\n' "$(1)" "$$up" >&2; \
+	printf '  sudo systemctl stop %s\n' "$(SUPERVISED_UNITS)" >&2
+endef
+
+# $(call UNITS_GUARD,<target>) — warn only.
+UNITS_GUARD = up=$(UNITS_UP); if [ "$${up:-0}" -gt 0 ]; then $(call UNITS_WARN,$(1)); fi
+
+# $(call UNITS_GUARD_STRICT,<target>,<what it would corrupt>) — refuse unless UNITS_OK=1.
+UNITS_GUARD_STRICT = up=$(UNITS_UP); \
+	if [ "$${up:-0}" -gt 0 ]; then \
+		$(call UNITS_WARN,$(1)); \
+		if [ -z "$$UNITS_OK" ]; then \
+			printf '  refusing: %s\n' "$(2)" >&2; \
+			printf '  override with UNITS_OK=1 if you know what you are doing.\n' >&2; \
+			exit 2; \
+		fi; \
+		printf '\033[33m  UNITS_OK=1 — proceeding anyway.\033[0m\n' >&2; \
+	fi
+
 # node_exporter textfile dir that `make run-wrkr` writes its .prom metrics into
 # (imq-worker --metrics-export-mode=textfile default --textfile-dir). Lives under
 # /var/lib so creating it needs sudo once; afterwards it persists across reboots.
@@ -155,6 +187,7 @@ backup-db: ## Dump PGDATABASE to sunray-db-<timestamp>.pg_dump in the repo root 
 	fi
 
 initdb: ## Fresh Sunray DB via interactive wizard: dropdb + createdb (PGDATABASE) + bin/sunray_init_db.sh. Requires NO active cnx to the DB. Env: MPY_USERINIT_USER_EMAIL/_NAME/_COMPANY + APP_PRIMARY_URL (see bin/sunray_init_db.sh --help). [user, interactive, DESTRUCTIVE]
+	@$(call UNITS_GUARD_STRICT,initdb,dropdb refuses while a respawned server still holds a connection)
 	dropdb $(PGDATABASE)
 	createdb $(PGDATABASE)
 	bin/sunray_init_db.sh --interactive
@@ -167,6 +200,7 @@ initdb: ## Fresh Sunray DB via interactive wizard: dropdb + createdb (PGDATABASE
 #     EXIT' and their cmdline contains sunray-srvr, one pkill -9 kills the GUI AND the worker
 #     AND those wrapper shells in a single shot, with nothing left tailing a dead process.
 kill: ## Kill running sunray server (GUI) + IMQ worker so an upgrade/test won't fail on DB/registry locks. Reports running/killed count. Auto-run as a prereq of `update` and `test`. ('[s]unray-srvr' avoids matching pkill itself.) [user]
+	@$(call UNITS_GUARD,kill)
 	@n=$$(pgrep -fc '[s]unray-srvr' || true); \
 	if [ "$${n:-0}" -gt 0 ]; then \
 		echo "sunray server: $$n process(es) running — killing…"; \
@@ -180,6 +214,7 @@ kill: ## Kill running sunray server (GUI) + IMQ worker so an upgrade/test won't 
 	fi
 
 update: kill ## Upgrade modules (sunray-srvr -u --stop-after-init), killing the server first. Prints ERROR/CRITICAL lines from sunray-srvr-update.log when done (even on failure). Param ADDONS=<module> (default all), e.g. make update ADDONS=sunray_core [user]
+	@$(call UNITS_GUARD_STRICT,update,a respawned worker holds a DB/registry lock and the upgrade fails mid-way)
 	@if [ -f sunray-srvr-update.log ]; then mv sunray-srvr-update.log sunray-srvr-update.$$(date +%Y%m%d-%H%M%S).log; fi
 	@set +e; \
 	time bin/sunray-srvr -u $(ADDONS) --stop-after-init --logfile=sunray-srvr-update.log; \
@@ -197,6 +232,7 @@ update: kill ## Upgrade modules (sunray-srvr -u --stop-after-init), killing the 
 # --workers=0 is REQUIRED here: Odoo's test runner needs the single-process mode (this is what
 # bin/test_server.sh does too). With workers>0 the tests do not run in the master process.
 test: kill ## Run tests (sunray-srvr --test-enable --workers=0 --stop-after-init), killing the server first. Prints the odoo.tests result lines; full detail in sunray-srvr-tests.log. Params ADDONS=<module> (default all), TAGS=<test-tags> (optional), e.g. make test ADDONS=sunray_core TAGS=/sunray_core:TestAccessRules [user]
+	@$(call UNITS_GUARD_STRICT,test,a respawned worker holds a DB/registry lock and the run dies or reports phantom failures)
 	@if [ -f sunray-srvr-tests.log ]; then mv sunray-srvr-tests.log sunray-srvr-tests.$$(date +%Y%m%d-%H%M%S).log; fi
 	@set +e; \
 	time bin/sunray-srvr --test-enable --stop-after-init --workers=0 -u $(ADDONS) $(if $(TAGS),--test-tags=$(TAGS)) --logfile=sunray-srvr-tests.log; \

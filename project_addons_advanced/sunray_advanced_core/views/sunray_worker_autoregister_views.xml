@@ -7,6 +7,22 @@
         <field name="model">sunray.worker</field>
         <field name="inherit_id" ref="sunray_core.view_sunray_worker_form"/>
         <field name="arch" type="xml">
+            <!-- Form-level banner: above the sheet, not inside the Auto Register
+                 tab. A worker that cannot register anything is silently inert —
+                 unknown hosts get a 404 and the worker serves a 503 — so the
+                 warning has to be visible without opening a tab to find it. -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-danger mb-0" role="alert"
+                     invisible="auto_register_status not in ('no_scp', 'no_active_scp')">
+                    <i class="fa fa-exclamation-triangle" title="Warning"/>
+                    <strong>Auto-registration cannot register anything:</strong>
+                    this worker has no <em>active</em> Configuration Proxy. Unknown hosts are
+                    answered 404 and the worker serves an error page to visitors.
+                    Open the <strong>Auto Register</strong> tab to link an active SCP, or to
+                    enable one of the SCPs already linked.
+                </div>
+            </xpath>
+
             <!-- Insert Auto Register tab in the notebook -->
             <xpath expr="//notebook" position="inside">
                 <page string="Auto Register" name="autoregister_tab">
@@ -27,18 +43,6 @@
                         <div class="alert alert-info mb16" role="status" colspan="2">
                             SCPs are evaluated in order. The first ACTIVE SCP whose fqdn_regex matches the incoming FQDN is used.
                             Disabled SCPs are skipped. Leave fqdn_regex empty to match all FQDNs.
-                        </div>
-                        <!-- Auto-register with no usable SCP is silently inert: unknown
-                             hosts get a 404, the worker serves a 503, and nothing points
-                             at the worker. Both causes (nothing linked, everything
-                             disabled) need to be loud, here and in the worker list. -->
-                        <div class="alert alert-danger mb16" role="alert" colspan="2"
-                             invisible="auto_register_status not in ('no_scp', 'no_active_scp')">
-                            <i class="fa fa-exclamation-triangle" title="Warning"/>
-                            <strong>Auto-registration cannot register anything:</strong>
-                            this worker has no <em>active</em> SCP. Unknown hosts are answered 404 and
-                            the worker serves an error page. Link an active SCP below, or enable one of
-                            the SCPs already linked.
                         </div>
                         <field name="auto_register_scp_ids" nolabel="1" colspan="2"/>
                     </group>

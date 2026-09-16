@@ -1,16 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Periodic SCP Synchronization Cron Job -->
+    <!-- Migration: flip ir_model_data.noupdate to True for the cron below.
 
-    <record id="auto_register_sync_cron" model="ir.cron">
-        <field name="name">Auto-Register: Sync all SCPs</field>
-        <field name="model_id" ref="model_sunray_configuration_proxy"/>
-        <field name="state">code</field>
-        <field name="code">model.sync_all_scp()</field>
-        <field name="interval_number">5</field>
-        <field name="interval_type">minutes</field>
-        <field name="active">True</field>
-        <field name="priority" eval="10"/>
-    </record>
+         Flipping the XML alone is not enough. ir.model.data's upsert
+         (base/models/ir_model.py, _build_update_xmlids_query) does
+         `ON CONFLICT DO UPDATE SET (model, res_id, write_date)` — noupdate is
+         NOT in that SET list, so an already-installed row keeps whatever flag
+         it was created with. This record shipped without a noupdate wrapper,
+         so every deployment carries noupdate=False and would go on re-asserting
+         active=True on each upgrade.
 
+         The sentinel res_ids=-1 means "only flip the flag, don't touch the
+         binding". This call sits OUTSIDE the <data noupdate="1"> block on
+         purpose: _tag_function (tools/convert.py) returns early when the
+         surrounding block is noupdate and the mode is not 'init', so a function
+         placed inside it would never run on an upgrade — exactly when it is
+         needed. It is idempotent; drop it once every environment has upgraded
+         past this release. -->
+    <function name="upsert_externalid" model="ir.model.data">
+        <value>sunray_advanced_core.auto_register_sync_cron</value>
+        <value>ir.cron</value>
+        <value eval="-1"/>
+        <value eval="True"/>
+    </function>
+
+    <data noupdate="1">
+        <!-- Periodic SCP Synchronization Cron Job
+
+             noupdate="1" like every other ir.cron we ship (ir_cron.xml,
+             ir_cron_worker.xml): `active` below is the INSTALL default, not a
+             standing instruction. Without it every `-u` re-asserts active=True,
+             so an upgrade silently re-enables a cron an administrator had
+             deliberately switched off — and this one reaches out to every
+             configured SCP every 5 minutes. -->
+        <record id="auto_register_sync_cron" model="ir.cron">
+            <field name="name">Auto-Register: Sync all SCPs</field>
+            <field name="model_id" ref="model_sunray_configuration_proxy"/>
+            <field name="state">code</field>
+            <field name="code">model.sync_all_scp()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+            <field name="priority" eval="10"/>
+        </record>
+    </data>
 </odoo>

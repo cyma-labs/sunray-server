@@ -118,14 +118,20 @@ class TestScpSelection(TransactionCase):
         self.assertIn('app.test.example', captured.output[0])
 
 
-class TestWorkerOnlyInactiveScpFlag(TransactionCase):
-    """The standing admin signal for the configuration that caused the outage."""
+class TestWorkerAutoRegisterStatus(TransactionCase):
+    """The standing admin signal for a worker that cannot register anything.
+
+    Skipping disabled SCPs is right, but it turns a loud failure (the host hangs
+    on the worker's setup page) into a silent one (404, worker serves a 503,
+    nothing points at the worker). These two fields are what keep it visible, in
+    the worker list as much as on the form.
+    """
 
     def setUp(self):
         super().setUp()
         self.Scp = self.env['sunray.configuration_proxy']
         self.worker = self.env['sunray.worker'].create({
-            'name': 'inactive-scp-flag-worker',
+            'name': 'autoregister-status-worker',
             'worker_type': 'fastapi',
             'auto_register_enabled': True,
         })
@@ -137,31 +143,49 @@ class TestWorkerOnlyInactiveScpFlag(TransactionCase):
             'is_active': is_active,
         })
 
-    def test_flag_is_set_when_every_linked_scp_is_disabled(self):
-        self.worker.auto_register_scp_ids = [
-            (6, 0, self._scp('all-dead-scp', is_active=False).ids)
-        ]
+    def test_no_scp_linked_is_broken(self):
+        """Auto-register on with nothing linked can never register a host."""
+        self.worker.auto_register_scp_ids = [(6, 0, [])]
 
-        self.assertTrue(self.worker.auto_register_has_only_inactive_scp)
+        self.assertTrue(self.worker.auto_register_no_active_scp)
+        self.assertEqual(self.worker.auto_register_status, 'On — no SCP linked')
 
-    def test_flag_is_clear_when_one_scp_is_active(self):
+    def test_all_linked_scps_disabled_is_broken(self):
+        """The configuration behind the outage: linked, but all disabled."""
+        dead_scp = self._scp('all-dead-scp', is_active=False)
+        self.worker.auto_register_scp_ids = [(6, 0, dead_scp.ids)]
+
+        self.assertTrue(self.worker.auto_register_no_active_scp)
+        self.assertEqual(
+            self.worker.auto_register_status, 'On — all 1 SCP(s) disabled'
+        )
+
+    def test_one_active_scp_is_healthy(self):
+        """A single active SCP is enough, whatever else is linked."""
         dead_scp = self._scp('mixed-dead-scp', is_active=False)
         live_scp = self._scp('mixed-live-scp', is_active=True)
         self.worker.auto_register_scp_ids = [(6, 0, (dead_scp + live_scp).ids)]
 
-        self.assertFalse(self.worker.auto_register_has_only_inactive_scp)
+        self.assertFalse(self.worker.auto_register_no_active_scp)
+        self.assertEqual(self.worker.auto_register_status, 'mixed-live-scp')
 
-    def test_flag_is_clear_when_auto_register_is_off(self):
-        """No auto-registration, no problem to report."""
+    def test_status_names_every_active_scp(self):
+        """The list column says which control plane a worker registers against."""
+        first_scp = self._scp('aaa-live-scp')
+        second_scp = self._scp('bbb-live-scp')
+        self.worker.auto_register_scp_ids = [(6, 0, (first_scp + second_scp).ids)]
+
+        self.assertFalse(self.worker.auto_register_no_active_scp)
+        self.assertEqual(
+            self.worker.auto_register_status, 'aaa-live-scp, bbb-live-scp'
+        )
+
+    def test_auto_register_off_is_not_broken(self):
+        """No auto-registration, no problem to report — even with a dead SCP."""
         self.worker.auto_register_enabled = False
         self.worker.auto_register_scp_ids = [
             (6, 0, self._scp('off-dead-scp', is_active=False).ids)
         ]
 
-        self.assertFalse(self.worker.auto_register_has_only_inactive_scp)
-
-    def test_flag_is_clear_when_no_scp_is_linked(self):
-        """Nothing linked is a different problem, not this one."""
-        self.worker.auto_register_scp_ids = [(6, 0, [])]
-
-        self.assertFalse(self.worker.auto_register_has_only_inactive_scp)
+        self.assertFalse(self.worker.auto_register_no_active_scp)
+        self.assertEqual(self.worker.auto_register_status, 'Off')

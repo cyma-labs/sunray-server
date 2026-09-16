@@ -118,9 +118,16 @@ so fix `scp_id` first, then press it. `scp_setup_error` carries the failing step
 
 **Selecting a SCP.** `find_matching_scp` skips SCPs with `is_active=False`. It used not to, and a
 disabled SCP with an empty `fqdn_regex` (= match all) silently won over the live one, stranding the
-host on a control plane that no longer knew it. When every linked SCP is disabled the worker form
-raises `auto_register_has_only_inactive_scp`, because the fix turns a loud failure (host hangs in
-setup) into a silent one (404, worker serves an error page).
+host on a control plane that no longer knew it.
+
+Skipping them is right, but it trades a loud failure (the host hangs on the worker's setup page)
+for a silent one (404, the worker serves an error page, nothing points at the worker). Two computed
+fields keep it visible: `auto_register_no_active_scp` is true when auto-register is on and no
+*active* SCP is linked, and `auto_register_status` spells the state out — `Off`,
+`On — no SCP linked`, `On — all N SCP(s) disabled`, or the names of the active SCPs. The status is a
+column in the worker list and a field on the Auto Register tab; the boolean drives the red banner
+and the list decoration. Both causes are reported separately because the fix differs: link a SCP,
+versus enable the one already linked.
 
 **Host state cascade (STD-26).** `_compute_state` is an `if/elif` chain, so branch order is a
 priority ranking. `scp_setup` sits **after** `locked`: a stub can hold `block_all_traffic` with no

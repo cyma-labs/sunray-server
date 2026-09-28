@@ -17,16 +17,17 @@ class TestWorkerCacheClearHost(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        # A failure would audit through a separate cursor; test mode keeps
+        # that cursor inside the test transaction.
+        self.registry.enter_test_mode(self.cr)
+        self.addCleanup(self.registry.leave_test_mode)
         self.api_key_obj = self.env['sunray.api.key'].create({
             'name': 'host_choice_worker_key',
             'is_active': True,
-            'scopes': 'config:read',
         })
         self.worker_obj = self.env['sunray.worker'].create({
             'name': 'Host Choice Worker',
-            'worker_type': 'fastapi',
             'api_key_id': self.api_key_obj.id,
-            'is_active': True,
         })
 
     def _host(self, domain, is_active=True):
@@ -84,15 +85,12 @@ class TestWorkerCacheClearHost(TransactionCase):
         user_obj = self.env['sunray.user'].create({
             'username': 'host-choice-user',
             'email': 'host-choice-user@example.com',
-            'is_active': True,
-            'host_ids': [(4, session_host_obj.id)],
         })
         self.env['sunray.session'].create({
             'session_id': 'host-choice-session',
             'user_id': user_obj.id,
             'host_id': session_host_obj.id,
             'is_active': True,
-            'created_ip': '192.0.2.2',
             'expires_at': datetime.now() + timedelta(hours=1),
         })
 

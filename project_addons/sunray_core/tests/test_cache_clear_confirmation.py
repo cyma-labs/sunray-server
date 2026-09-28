@@ -31,19 +31,15 @@ class TestCacheClearConfirmation(TransactionCase):
         self.api_key_obj = self.env['sunray.api.key'].create({
             'name': 'confirmation_worker_key',
             'is_active': True,
-            'scopes': 'config:read',
         })
         self.worker_obj = self.env['sunray.worker'].create({
             'name': 'Confirmation Worker',
-            'worker_type': 'fastapi',
             'api_key_id': self.api_key_obj.id,
-            'is_active': True,
         })
         self.host_obj = self.env['sunray.host'].create({
             'domain': 'confirm.example.com',
             'sunray_worker_id': self.worker_obj.id,
             'backend_url': 'http://backend.example.com',
-            'is_active': True,
         })
 
     def _mock_answer(self, mock_post, body):
@@ -164,15 +160,12 @@ class TestCacheClearConfirmation(TransactionCase):
         user_obj = self.env['sunray.user'].create({
             'username': 'confirm-user',
             'email': 'confirm-user@example.com',
-            'is_active': True,
-            'host_ids': [(4, self.host_obj.id)],
         })
         session_obj = self.env['sunray.session'].create({
             'session_id': 'confirm-session',
             'user_id': user_obj.id,
             'host_id': self.host_obj.id,
             'is_active': True,
-            'created_ip': '192.0.2.1',
             'expires_at': datetime.now() + timedelta(hours=1),
         })
 

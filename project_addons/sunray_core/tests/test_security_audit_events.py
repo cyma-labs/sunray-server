@@ -59,16 +59,14 @@ class TestSecurityAuditEvents(TransactionCase):
         Workers post it through /audit, which inserts raw SQL: without the
         Selection entry the row would land with no label in the UI.
         """
-        audit_record = self.AuditLog.create_audit_event(
+        audit_log_obj = self.AuditLog.create_audit_event(
             event_type='security.cache_clear_unauthorized',
             details={'path': '/sunray-wrkr/v1/cache/clear', 'method': 'POST',
                      'authorization_present': False},
             severity='warning',
-            sunray_worker='worker-001',
-            ip_address='203.0.113.7',
         )
 
-        self.assertEqual(audit_record.event_type, 'security.cache_clear_unauthorized')
+        self.assertEqual(audit_log_obj.event_type, 'security.cache_clear_unauthorized')
         labels = dict(self.AuditLog._fields['event_type'].selection)
         self.assertEqual(labels['security.cache_clear_unauthorized'], 'Cache Clear Unauthorized')
 

@@ -1591,7 +1591,7 @@ The check covers every `/sunray-wrkr/v1/cache*` route, not only this one.
 | `host` | `hostname` | Deletes `config:<hostname>` and `registered:<hostname>` |
 | `config` | none (`{}` or absent) | Deletes every `config:*` and `registered:*` |
 
-Workers store a session under `session:<hostname>:<username>:<sessionId>`, which makes every scope a direct delete or a prefix scan, without reading any value. They refuse at creation a `username` containing `:`, which would make the key ambiguous.
+Workers store a session under `session:<hostname>:<username>:<sessionId>`, which makes every scope a direct delete or a prefix scan, without reading any value. Each field of that key is escaped, `%` as `%25` then `:` as `%3A`, so any username is accepted - including the `<username> - SCP:<scp_id>` accounts the Sunray Configuration Proxy creates - and a scope never matches another user's sessions. The `target` fields are sent unescaped: the worker escapes them.
 
 **Success Response** (`200`), also when there was nothing to delete (the call is idempotent):
 ```json

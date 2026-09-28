@@ -9,6 +9,24 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+# Scopes that revoke sessions. A 200 that confirms nothing on one of them means
+# the revocation did not happen on the worker: the admin must see a failure,
+# not a success.
+SESSION_CLEAR_SCOPES = frozenset({
+    'user-session',
+    'user-protectedhost',
+    'user-worker',
+    'allusers-protectedhost',
+    'allusers-worker',
+})
+
+
+class WorkerCacheClearError(UserError):
+    """A worker cache clear failed and cache.clear_failed is already written.
+
+    Callers that catch it must not audit the failure a second time.
+    """
+
 
 class SunrayHost(models.Model):
     _name = 'sunray.host'
@@ -746,9 +764,14 @@ class SunrayHost(models.Model):
                 - config: Clear all configuration caches (no target needed)
             target: Target parameters dict based on scope
             reason: Reason for the cache clear operation
+
+        Raises:
+            WorkerCacheClearError: the worker could not be reached, or it
+                answered without confirming anything on a session scope.
+                cache.clear_failed is already written when this is raised.
         """
         self.ensure_one()
-        
+
         if not self.sunray_worker_id:
             raise UserError(f"Host {self.domain} is not bound to a worker")
         
@@ -782,44 +805,75 @@ class SunrayHost(models.Model):
             response = requests.post(url, headers=headers, json=payload, timeout=10)
             response.raise_for_status()
             result = response.json()
-            _logger.info(f"Worker cache clear successful: {result}")
-            
-            # Log successful cache clear operation
-            self.env['sunray.audit.log'].create_api_event(
-                event_type='cache.cleared',
-                api_key_id=api_key_obj.id,
-                details={
-                    'scope': scope,
-                    'target': target,
-                    'reason': reason,
-                    'host': self.domain,
-                    'worker': self.sunray_worker_id.name,
-                    'cleared_items': result.get('cleared', [])
-                },
-                severity='info'
-            )
-            
-            return result
         except requests.exceptions.RequestException as e:
             _logger.error(f"Worker cache clear failed: {str(e)}")
-            
-            # Log failed cache clear attempt
-            self.env['sunray.audit.log'].create_api_event(
+            self._log_cache_clear_failure(
+                api_key_obj, scope, target, reason,
+                error=str(e), failure='request_failed',
+            )
+            raise WorkerCacheClearError(f"Failed to clear worker cache: {str(e)}")
+
+        cleared = result.get('cleared') if isinstance(result, dict) else None
+        confirmed = isinstance(result, dict) and result.get('success') is True and bool(cleared)
+        if scope in SESSION_CLEAR_SCOPES and not confirmed:
+            # A worker that ignores the request still answers 200: taking that
+            # for a success is what made revocations a silent placebo.
+            _logger.error(f"Worker cache clear not confirmed for scope={scope}: {result}")
+            self._log_cache_clear_failure(
+                api_key_obj, scope, target, reason,
+                error='Worker answered without confirming anything cleared',
+                failure='worker_confirmed_nothing', response=result,
+            )
+            raise WorkerCacheClearError(
+                f"Worker {self.sunray_worker_id.name} did not confirm the revocation "
+                f"(scope {scope}): the sessions may still be valid on the worker."
+            )
+
+        _logger.info(f"Worker cache clear successful: {result}")
+
+        # Log successful cache clear operation
+        self.env['sunray.audit.log'].create_api_event(
+            event_type='cache.cleared',
+            api_key_id=api_key_obj.id,
+            details={
+                'scope': scope,
+                'target': target,
+                'reason': reason,
+                'host': self.domain,
+                'worker': self.sunray_worker_id.name,
+                'cleared_items': cleared or []
+            },
+            severity='info'
+        )
+
+        return result
+
+    def _log_cache_clear_failure(self, api_key_obj, scope, target, reason, error, **extra_details):
+        """Write cache.clear_failed in a transaction of its own.
+
+        The caller raises right after, and the UserError rolls back the
+        request's transaction: written through self.env, the audit line would
+        vanish with it and a failed revocation would leave no trace. Tests that
+        reach this path must put the registry in test mode, or the line is
+        committed to the real database.
+        """
+        details = {
+            'scope': scope,
+            'target': target,
+            'reason': reason,
+            'host': self.domain,
+            'worker': self.sunray_worker_id.name,
+            'error': error,
+            **extra_details,
+        }
+        with self.env.registry.cursor() as audit_cr:
+            self.env(cr=audit_cr)['sunray.audit.log'].create_api_event(
                 event_type='cache.clear_failed',
                 api_key_id=api_key_obj.id,
-                details={
-                    'scope': scope,
-                    'target': target,
-                    'reason': reason,
-                    'host': self.domain,
-                    'worker': self.sunray_worker_id.name,
-                    'error': str(e)
-                },
+                details=details,
                 severity='error'
             )
-            
-            raise UserError(f"Failed to clear worker cache: {str(e)}")
-    
+
     
     def action_view_active_users(self):
         """Open list of active users authorized for this host"""

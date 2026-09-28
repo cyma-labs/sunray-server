@@ -704,6 +704,46 @@ bin/sunray-srvr srctl user create "username" --sr-email "user@example.com"
 bin/sunray-srvr srctl setuptoken create "username" --sr-device "laptop" --sr-hours 24
 ```
 
+## Closing the Development Cycle
+
+After completing development work, upgrade, test and validate the changes in the running Sunray
+server before handing control back to the user. Upgrade and test go through `make update` and
+`make test`, under the `[user]` / `[agent]` rule of *Server & Service Operations* above; the
+validation is done in a browser with Playwright.
+
+### Prerequisites
+
+The following environment variables must be set for Playwright-based validation:
+
+| Variable | Description |
+|----------|-------------|
+| `CC_PLAYWRIGHT_URL` | URL of the Sunray server (e.g., `https://sunray18-main-dev-cmorisse.inouk-cloud.ovh/`) |
+| `CC_PLAYWRIGHT_USER` | Username for the Sunray server login |
+| `CC_PLAYWRIGHT_PWD` | Password for the Sunray server login |
+
+**Important Note about URL**: `make run-gui` (or, outside a dev session, the
+`mpy_anyv2_appsrv_sunray_srv.service` unit) serves the server on http://localhost:8069.
+`CC_PLAYWRIGHT_URL` is bound to this URL behind a Traefik reverse proxy, so tests and usage run
+in real conditions.
+
+**Reading the credentials — `printenv`, one variable per command.** The three variables are
+defined in `/etc/muppy.env`, which `~/.bashrc` sources, so every shell an agent opens has
+them — subagents included. Read a value with exactly:
+
+```bash
+printenv CC_PLAYWRIGHT_PWD        # or CC_PLAYWRIGHT_USER, CC_PLAYWRIGHT_URL
+```
+
+That spelling is what the allow rule `Bash(printenv CC_PLAYWRIGHT_*)` matches, and the allow
+rule is what gets it past the auto-mode classifier, which otherwise refuses a command
+materialising a credential (`echo "$CC_PLAYWRIGHT_PWD"` was refused as *Credential
+Materialization*). Two shapes that do NOT work, so nobody retries them: `cat /etc/muppy.env
+| grep CC_PLAYWRIGHT_` — a compound command is split at the `|` and each half must match a
+rule on its own, so a rule written with a pipe never matches; and
+`Bash(printenv CC_PLAYWRIGHT_:*)` — the `:*` form needs a literal colon, a bare `*` is the
+wildcard. The login page is Odoo's standard `/web/login`: fill `#login` and `#password`, then
+submit.
+
 ## Architecture Details
 
 ### Authentication Flow (WebAuthn/Passkeys)

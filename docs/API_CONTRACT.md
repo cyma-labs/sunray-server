@@ -1538,7 +1538,7 @@ curl -X DELETE https://sunray.example.com/sunray-srvr/v1/sessions/sess_abc123 \
 - Configuration Events (e.g., `config.fetched`, `config.session_duration_changed`)
 - Session Events (e.g., `session.created`, `session.expired`, `session.remote_created`, `session.terminated`)
 - WAF Bypass Events (e.g., `waf_bypass.created`, `waf_bypass.tamper.*`)
-- Security Events (e.g., `security.alert`, `security.cross_domain_session`, `security.host_id_mismatch`, `security.unmanaged_host_access`, `SESSION_IP_CHANGED`)
+- Security Events (e.g., `security.alert`, `security.cross_domain_session`, `security.host_id_mismatch`, `security.unmanaged_host_access`, `security.cache_clear_unauthorized`, `SESSION_IP_CHANGED`)
 - Worker Migration Events (e.g., `worker.migration_requested`, `worker.migration_completed`, `worker.registration_blocked`)
 
 **Response**:
@@ -1547,6 +1547,73 @@ curl -X DELETE https://sunray.example.com/sunray-srvr/v1/sessions/sess_abc123 \
   "success": true
 }
 ```
+
+## Worker Endpoints Called by the Server
+
+Every other endpoint in this contract is called by the worker. This one goes the other way: the server pushes it to the worker when an admin revokes sessions or refreshes configuration. Workers MUST implement it as specified here.
+
+### POST /sunray-wrkr/v1/cache/clear
+
+**Purpose**: Delete sessions or cached configuration on the worker, so that a revocation decided on the server takes effect at once instead of at session expiry.
+
+**Called at**: `https://<protected host>/sunray-wrkr/v1/cache/clear`, never on a `*.workers.dev` URL or the worker's own port. For a scope that covers the whole worker, the server calls through the first active host bound to the worker; every bound host reaches the same worker, which applies the whole scope.
+
+**Authentication**: `Authorization: Bearer <worker API key>`, the same key the worker sends to the server. Workers MUST:
+- compare it in constant time;
+- refuse every call when their own key is empty or unset;
+- answer `401` with the same neutral body whatever is wrong (missing header, other scheme, wrong key);
+- log the refusal with the client IP and send the audit event `security.cache_clear_unauthorized` (severity `warning`).
+
+The check covers every `/sunray-wrkr/v1/cache*` route, not only this one.
+
+**Request Body**:
+```json
+{
+  "scope": "user-session",
+  "target": {
+    "hostname": "app.example.com",
+    "username": "alice",
+    "sessionId": "3f2c9a4e-0b1d-4c6e-9f2a-7d5b8e1c4a90"
+  },
+  "reason": "Session revocation: Admin revocation via UI"
+}
+```
+
+`target` is always a JSON object. `reason` is free text, for logs only.
+
+| `scope` | Required `target` fields | Effect on the worker |
+|---------|--------------------------|----------------------|
+| `user-session` | `hostname`, `username`, `sessionId` | Deletes that session, and its pending login (`pending_session:<sessionId>` / `pending:<sessionId>`) |
+| `user-protectedhost` | `username`, `hostname` | Deletes every session of that user on that host |
+| `user-worker` | `username` | Deletes every session of that user, all hosts |
+| `allusers-protectedhost` | `hostname` | Deletes every session on that host |
+| `allusers-worker` | none (`{}` or absent) | Deletes every session on the worker |
+| `host` | `hostname` | Deletes `config:<hostname>` and `registered:<hostname>` |
+| `config` | none (`{}` or absent) | Deletes every `config:*` and `registered:*` |
+
+Workers store a session under `session:<hostname>:<username>:<sessionId>`, which makes every scope a direct delete or a prefix scan, without reading any value. They refuse at creation a `username` containing `:`, which would make the key ambiguous.
+
+**Success Response** (`200`), also when there was nothing to delete (the call is idempotent):
+```json
+{
+  "success": true,
+  "scope": "user-session",
+  "target": {"hostname": "app.example.com", "username": "alice", "sessionId": "3f2c9a4e-..."},
+  "cleared": ["session 3f2c9a4e-... deleted"],
+  "message": "Operation completed successfully."
+}
+```
+
+`cleared` is never empty. It reports real counts, for example `"2 sessions deleted for alice on app.example.com"`, `"0 sessions deleted on app.example.com"`, `"session <id> not found"`. A `user-session` target naming another host or user matches no key and is reported `not found`.
+
+**Error Responses**:
+- `400`: unknown scope, `target` missing or not an object, required field missing or empty, invalid JSON. Nothing is deleted.
+- `401`: authentication failed (see above). Nothing is deleted.
+- `503`: the worker could not apply the whole scope (cache error, or the scan ran out of time). The body has `"success": false` and, in `cleared`, what was actually deleted before stopping. Retrying is safe.
+
+**What the server does with the answer**: it writes `cache.cleared` with `cleared` in the details. On a session scope, a `200` whose body does not say `"success": true` with a non-empty `cleared` counts as a **failure**: the server writes `cache.clear_failed` (`details.failure = "worker_confirmed_nothing"`) and shows the admin an error. A worker that ignores the call and answers `200` anyway is exactly the case this catches. Network errors and non-2xx answers are written as `cache.clear_failed` with `details.failure = "request_failed"`. Both failure lines are written in their own transaction, so they survive the rollback of the admin action that raised them.
+
+**Not propagated**: if the call never reaches the worker, the session stays valid on the worker until it expires. Keep session durations short on sensitive hosts.
 
 ## Error Handling
 

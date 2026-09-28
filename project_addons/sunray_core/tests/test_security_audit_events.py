@@ -70,6 +70,11 @@ class TestSecurityAuditEvents(TransactionCase):
         labels = dict(self.AuditLog._fields['event_type'].selection)
         self.assertEqual(labels['security.cache_clear_unauthorized'], 'Cache Clear Unauthorized')
 
+    def test_worker_event_source_label(self):
+        """Events posted by any worker, FastAPI as well as Cloudflare, share one label."""
+        labels = dict(self.AuditLog._fields['event_source'].selection)
+        self.assertEqual(labels['worker'], 'Sunray Worker')
+
     def test_host_id_mismatch_event(self):
         """Test host ID mismatch event creation"""
         event_details = {

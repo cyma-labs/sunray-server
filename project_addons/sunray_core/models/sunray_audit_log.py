@@ -195,7 +195,7 @@ class SunrayAuditLog(models.Model):
     event_source = fields.Selection([
         ('api', 'REST API'),
         ('ui', 'Odoo UI'),
-        ('worker', 'Cloudflare Worker'),
+        ('worker', 'Sunray Worker'),
         ('cli', 'Command Line'),
         ('system', 'System/Cron')
     ], string='Event Source', help='Where the event originated')

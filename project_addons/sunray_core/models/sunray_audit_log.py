@@ -133,6 +133,7 @@ class SunrayAuditLog(models.Model):
         ('security.protection_disabled_host_access', 'Protection Disabled Host Access'),
         ('security.blocked_host_access', 'Protection Disabled Host Access'),
         ('security.worker_direct_access', 'Worker Direct Access'),
+        ('security.cache_clear_unauthorized', 'Cache Clear Unauthorized'),
         ('SESSION_FINGERPRINT_MISMATCH', 'Session Fingerprint Mismatch'),
         ('SESSION_IP_CHANGED', 'Session IP Changed'),
         ('SESSION_COUNTRY_CHANGED', 'Session Country Changed'),

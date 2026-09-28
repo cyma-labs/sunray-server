@@ -15,3 +15,4 @@ from . import test_access_rules
 from . import test_passkey_counter
 from . import test_email_otp_template
 from . import test_cache_clear_confirmation
+from . import test_worker_cache_clear_host

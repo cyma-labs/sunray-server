@@ -304,9 +304,7 @@ class SunrayUser(models.Model):
             return True
 
         try:
-            # Use the first host to call the worker (all hosts share the same worker)
-            first_host = affected_sessions[0].host_id
-            first_host._call_worker_cache_clear(
+            worker_obj._call_cache_clear(
                 scope='user-worker',
                 target={'username': self.username},
                 reason=f'User sessions revoked on worker {worker_obj.name} by {self.env.user.name}'

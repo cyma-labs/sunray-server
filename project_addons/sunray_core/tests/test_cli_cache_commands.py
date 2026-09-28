@@ -13,6 +13,10 @@ class TestCLICacheCommands(TransactionCase):
     
     def setUp(self):
         super().setUp()
+        # _call_worker_cache_clear audits failures through a separate cursor;
+        # test mode keeps that cursor inside the test transaction.
+        self.registry.enter_test_mode(self.cr)
+        self.addCleanup(self.registry.leave_test_mode)
         self.User = self.env['sunray.user']
         self.Host = self.env['sunray.host']
         self.Session = self.env['sunray.session']
@@ -90,7 +94,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -121,7 +125,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -149,7 +153,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -176,7 +180,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -203,7 +207,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -231,7 +235,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -259,7 +263,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args
@@ -286,7 +290,7 @@ class TestCLICacheCommands(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
         mock_post.return_value = mock_response
         
         # Create mock args with confirmation
@@ -418,7 +422,7 @@ class TestCLICacheCommands(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
             mock_post.return_value = mock_response
             
             args = self._create_mock_args(
@@ -445,7 +449,7 @@ class TestCLICacheCommands(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
             mock_post.return_value = mock_response
             
             args = self._create_mock_args(
@@ -479,7 +483,7 @@ class TestCLICacheCommands(TransactionCase):
                 with patch('requests.post') as mock_post:
                     mock_response = MagicMock()
                     mock_response.status_code = 200
-                    mock_response.json.return_value = {'success': True}
+                    mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
                     mock_post.return_value = mock_response
                     
                     # Create appropriate args for each command
@@ -522,7 +526,7 @@ class TestCLICacheCommands(TransactionCase):
                 with patch('requests.post') as mock_post:
                     mock_response = MagicMock()
                     mock_response.status_code = 200
-                    mock_response.json.return_value = {'success': True}
+                    mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
                     mock_post.return_value = mock_response
                     
                     # Create appropriate args
@@ -559,7 +563,7 @@ class TestCLICacheCommands(TransactionCase):
                 with patch('requests.post') as mock_post:
                     mock_response = MagicMock()
                     mock_response.status_code = 200
-                    mock_response.json.return_value = {'success': True}
+                    mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
                     mock_post.return_value = mock_response
                     
                     # Create appropriate args
@@ -588,7 +592,7 @@ class TestCLICacheCommands(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
             mock_post.return_value = mock_response
             
             args = self._create_mock_args(

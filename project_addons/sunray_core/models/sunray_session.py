@@ -2,6 +2,8 @@
 from odoo import models, fields, api
 import json
 
+from .sunray_host import WorkerCacheClearError
+
 
 class SunraySession(models.Model):
     _name = 'sunray.session'
@@ -163,21 +165,31 @@ class SunraySession(models.Model):
                     reason=f'Session revocation: {revoke_reason}'
                 )
         except Exception as e:
-            # Log the error but don't fail the operation
-            # The local session is already revoked
-            self.env['sunray.audit.log'].create_admin_event(
-                event_type='cache.clear_failed',
-                details={
-                    'scope': 'user-session',
-                    'session_id': self.session_id,
-                    'error': str(e),
-                    'note': 'Session revoked locally but worker cache clear failed'
-                },
-                severity='warning',
-                sunray_user_id=self.user_id.id,
-                username=self.user_id.username
+            # Don't fail the operation: the local session is already revoked.
+            # But don't report a success either - the worker may still accept it.
+            if not isinstance(e, WorkerCacheClearError):
+                # WorkerCacheClearError is already audited by _call_worker_cache_clear
+                self.env['sunray.audit.log'].create_admin_event(
+                    event_type='cache.clear_failed',
+                    details={
+                        'scope': 'user-session',
+                        'session_id': self.session_id,
+                        'error': str(e),
+                        'note': 'Session revoked locally but worker cache clear failed'
+                    },
+                    severity='warning',
+                    sunray_user_id=self.user_id.id,
+                    username=self.user_id.username
+                )
+            self.env.user.ik_notify(
+                'warning',
+                'Session Revoked on Server Only',
+                f'Session {self.session_id[:8]}... is revoked on the server, '
+                f'but the worker did not confirm it: {e}',
+                sticky=True,
             )
-        
+            return True
+
         self.env.user.ik_notify('success', 'Session Revoked', f'Session {self.session_id[:8]}... has been revoked successfully.')
         return True
     

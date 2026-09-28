@@ -52,7 +52,29 @@ class TestSecurityAuditEvents(TransactionCase):
         self.assertEqual(parsed_details['requested_domain'], 'app2.company.com')
         self.assertEqual(parsed_details['username'], 'testuser')
         self.assertEqual(parsed_details['session_id'], 'sess_123')
-    
+
+    def test_cache_clear_unauthorized_event(self):
+        """A refused cache/clear call is a labelled security event.
+
+        Workers post it through /audit, which inserts raw SQL: without the
+        Selection entry the row would land with no label in the UI.
+        """
+        audit_log_obj = self.AuditLog.create_audit_event(
+            event_type='security.cache_clear_unauthorized',
+            details={'path': '/sunray-wrkr/v1/cache/clear', 'method': 'POST',
+                     'authorization_present': False},
+            severity='warning',
+        )
+
+        self.assertEqual(audit_log_obj.event_type, 'security.cache_clear_unauthorized')
+        labels = dict(self.AuditLog._fields['event_type'].selection)
+        self.assertEqual(labels['security.cache_clear_unauthorized'], 'Cache Clear Unauthorized')
+
+    def test_worker_event_source_label(self):
+        """Events posted by any worker, FastAPI as well as Cloudflare, share one label."""
+        labels = dict(self.AuditLog._fields['event_source'].selection)
+        self.assertEqual(labels['worker'], 'Sunray Worker')
+
     def test_host_id_mismatch_event(self):
         """Test host ID mismatch event creation"""
         event_details = {

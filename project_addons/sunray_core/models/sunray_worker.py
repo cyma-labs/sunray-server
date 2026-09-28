@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import UserError
 from datetime import datetime, timedelta
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class SunrayWorker(models.Model):
@@ -277,6 +281,26 @@ class SunrayWorker(models.Model):
         """Get worker associated with an API key"""
         return self.search([('api_key_id', '=', api_key_obj.id)], limit=1)
     
+    def _call_cache_clear(self, scope, target=None, reason=''):
+        """Send a worker-wide cache clear through one of the worker's hosts.
+
+        A worker is only reachable through a protected host URL
+        (https://<host>/sunray-wrkr/v1/cache/clear). Every host bound to the
+        worker reaches the same worker, which applies the whole scope, so the
+        host carrying the call does not change the result. The first active host
+        (lowest id) is chosen, so the call does not go through a host that may
+        no longer be routed; the first bound host is the fallback.
+
+        Raises:
+            UserError: the worker protects no host, so nothing can reach it.
+        """
+        self.ensure_one()
+        host_objs = self.host_ids.sorted('id')
+        host_obj = host_objs.filtered('is_active')[:1] or host_objs[:1]
+        if not host_obj:
+            raise UserError(f"Worker {self.name} protects no host: no URL can reach it")
+        return host_obj._call_worker_cache_clear(scope=scope, target=target, reason=reason)
+
     def action_clear_all_sessions_nuclear(self):
         """Nuclear option: Clear ALL user sessions across ALL hosts protected by this worker"""
         self.ensure_one()
@@ -307,9 +331,7 @@ class SunrayWorker(models.Model):
             }
         
         try:
-            # Use the first host to call the worker (all hosts share the same worker)
-            first_host = self.host_ids[0]
-            result = first_host._call_worker_cache_clear(
+            result = self._call_cache_clear(
                 scope='allusers-worker',
                 target={},  # No target needed for allusers-worker scope
                 reason=f'NUCLEAR: All sessions cleared on worker {self.name} by {self.env.user.name}'
@@ -371,9 +393,7 @@ class SunrayWorker(models.Model):
             }
         
         try:
-            # Use the first host to call the worker (all hosts share the same worker)
-            first_host = self.host_ids[0]
-            result = first_host._call_worker_cache_clear(
+            result = self._call_cache_clear(
                 scope='config',
                 target={},  # No target needed for config scope
                 reason=f'Configuration refresh for all hosts on worker {self.name} by {self.env.user.name}'

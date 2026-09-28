@@ -12,6 +12,10 @@ class TestUICacheActions(TransactionCase):
     
     def setUp(self):
         super().setUp()
+        # _call_worker_cache_clear audits failures through a separate cursor;
+        # test mode keeps that cursor inside the test transaction.
+        self.registry.enter_test_mode(self.cr)
+        self.addCleanup(self.registry.leave_test_mode)
         self.User = self.env['sunray.user']
         self.Host = self.env['sunray.host']
         self.Session = self.env['sunray.session']
@@ -451,7 +455,7 @@ class TestUICacheActions(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['1 total sessions deleted']}
             mock_post.return_value = mock_response
             
             result = self.worker.action_clear_all_sessions_nuclear()
@@ -466,7 +470,7 @@ class TestUICacheActions(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['session test_session_123 deleted']}
             mock_post.return_value = mock_response
             
             # Create second session

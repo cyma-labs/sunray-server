@@ -12,6 +12,10 @@ class TestCacheClearScopes(TransactionCase):
     
     def setUp(self):
         super().setUp()
+        # _call_worker_cache_clear audits failures through a separate cursor;
+        # test mode keeps that cursor inside the test transaction.
+        self.registry.enter_test_mode(self.cr)
+        self.addCleanup(self.registry.leave_test_mode)
         self.User = self.env['sunray.user']
         self.Host = self.env['sunray.host']
         self.Session = self.env['sunray.session']
@@ -294,7 +298,7 @@ class TestCacheClearScopes(TransactionCase):
         # Configure mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'success': True}
+        mock_response.json.return_value = {'success': True, 'cleared': ['session test deleted']}
         mock_post.return_value = mock_response
         
         # Test API call structure
@@ -406,7 +410,7 @@ class TestCacheClearScopes(TransactionCase):
         with patch('requests.post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {'success': True}
+            mock_response.json.return_value = {'success': True, 'cleared': ['1 item cleared']}
             mock_post.return_value = mock_response
             
             for scope, target in scope_targets.items():

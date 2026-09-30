@@ -111,7 +111,12 @@ UNITS_GUARD_STRICT = up=$(UNITS_UP); \
 # /var/lib so creating it needs sudo once; afterwards it persists across reboots.
 TEXTFILE_DIR ?= /var/lib/node_exporter/textfile
 
-.PHONY: help initdb pg_backup pg_backups pg_restore kill update test test-list run-gui run-wrkr metrics-dir clean-logs diff-vs-default code-review
+# How many commits `make git-history` shows (N=0 for all of them). Bounded by default because
+# a recipe's stdout is not always a terminal -- git then disables its pager and an
+# unbounded log dumps ten years of commits into whatever is reading.
+N ?= 20
+
+.PHONY: help initdb pg_backup pg_backups pg_restore kill update test test-list run-gui run-wrkr metrics-dir clean-logs diff-vs-default code-review git-history
 
 help: ## Show this help. The two sections are GENERATED from each target's trailing tag, so the listing can never drift from the targets themselves. [agent]
 	@printf '\n\033[1mSunray server dev commands\033[0m — usage: make <target> [VAR=value]   (params listed per target)\n\n'
@@ -153,6 +158,11 @@ diff-vs-default: ## Show branch diff vs DEFAULT (local branch preferred over ori
 	n=$$(git rev-list --count $$base...HEAD); \
 	printf '\033[1mbase:\033[0m %s (merge-base %s) — \033[1m%s\033[0m commit(s) ahead of it\n\n' "$$base" "$${mb:0:8}" "$$n"; \
 	git diff --stat $$base...HEAD
+
+git-history: ## Commit history one line each, WITH THE TAGS — the readme's changelog helper (`%h %d %s`), newest first. Params N=<n> (default 20, N=0 for the whole history), FROM=<ref> to log something other than HEAD, e.g. make git-history N=100 FROM=main [agent]
+	@if [ "$(N)" = "0" ]; then n=""; else n="-n $(N)"; fi; \
+	git log $$n --color=always --pretty=format:"%C(auto)%h %d%C(reset) %s" $(FROM); \
+	printf '\n'
 
 code-review: ## Explain the 5 Claude Code review/audit commands, their default scope, and how to override it [agent]
 	@printf '\n\033[1mSunray has 5 review/audit commands — these run inside Claude Code, not make:\033[0m\n\n'

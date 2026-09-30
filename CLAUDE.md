@@ -317,6 +317,7 @@ log paths) so nobody has to re-derive them. Run `make help` to list them.
 | `make pg_restore [BACKUP=<f>]` | dropdb + createdb + restore, newest backup by default — **destructive** | — |
 | `make initdb` | fresh DB (drop/create + `sunray_init_db.sh --interactive`) — **destructive** | — |
 | `make diff-vs-default [DEFAULT=<b>]` | branch diff vs its base (default `main`) | — |
+| `make git-history [N=<n>] [FROM=<ref>]` | commit history one line each with tags (`%h %d %s`), newest first; `N=0` for the whole history | — |
 | `make code-review` | print what the 5 Claude review commands cover | — |
 
 **AGENT RULE — read the tag, never a list.** Every target's `##` help line ends with

@@ -9,11 +9,13 @@
             <field name="is_active" eval="True"/>
             <field name="is_default_rule" eval="False"/>
             <field name="is_system" eval="True"/>
-            <field name="url_patterns"><![CDATA[
-^/mpy/dns/v1/lego/*                 # JSON endpoint for Traefik Lego
-^/mpy/dns/v1/lego-http/*            # HTTP endpoint for CertManager K8s
-^/mpy/dns/v1/records$               # Muppy MBD API
-^/inouk/api_auth/v2/token/status$   # Token validation
+            <field name="url_patterns"><![CDATA[# Defined in muppy
+^/mpy/dns/v1/lego/(present|cleanup)$                            # httpreq JSON routes (Traefik / lego)
+^/mpy/dns/v1/lego-http/(present|cleanup)$                       # httpreq HTTP routes (cert-manager webhook, K8s)
+^/mpy/dns/v1/records(\?|$)                                      # MBD records API, with or without query string
+^/mpy/dns/v1/custom-hostnames(\?|$)                             # MBD custom hostnames API
+^/inouk/api_auth/v2/token/status/(bearer|awssigv4|httpbasic)$   # Token status, one route per token type
+
 ]]></field>
             <field name="allowed_cidrs"></field>
         </record>
